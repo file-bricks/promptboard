@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build artifacts
+build/
+dist/
+# Note: pyinstaller.spec is tracked (build config), other *.spec are not
+*.spec
+!pyinstaller.spec
+
+# Release artefacts (large binaries go to GitHub Releases, not git)
+releases/
+
+# IDE / editor
+.idea/
+.vscode/
+
+# OS / logs
+Thumbs.db
+Desktop.ini
+*.log
+
+# Local outputs
+output/
+materialized/

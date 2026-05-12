@@ -1,0 +1,39 @@
+AUFGABEN - PromptBoard V1.0
+===========================
+Status: V1.0 FERTIG (Code + Tests + Build-Pipeline)
+Stand: 2026-05-12
+
+OFFENE AUFGABEN (Lifecycle-Übergang):
+[ ] Build-Artefakt PromptBoard-1.0.0-win64.exe verifizieren - Aufwand: KLEIN
+[ ] releases/v1.0.0/ befüllen + SHA256SUMS - Aufwand: KLEIN
+[ ] Ordner-Rename DEV_PromptBoard -> RDY_PromptBoard - Aufwand: KLEIN
+[ ] git init + initial commit + GitHub-Push - Aufwand: KLEIN
+[ ] GitHub Release v1.0.0 mit Asset-Upload - Aufwand: KLEIN
+[ ] SOFTWARE/releases.json PromptBoard-Eintrag - Aufwand: KLEIN
+[ ] Lifecycle nach Push: RDY -> REL-PUB - Aufwand: TRIVIAL
+
+QUALITAETSPRUEFUNG:
+- 29 von 29 pytest-Tests grün.
+- GUI strukturell mit QTabWidget, Settings-Tab, Theme-Switching.
+- ExplorerPro-Adapter bidirektional inkl. 8 Test-Szenarien.
+- Atomic JSON-Schreibvorgänge in storage.py + adapters.
+- Logging nach %LOCALAPPDATA%\PromptBoard\promptboard.log.
+- Icon-Asset PromptBoard.ico gewired (Fenster + Tray + EXE).
+- LICENSE (MIT), RELEASES.md, CHANGELOG v1.0.0 angelegt.
+
+ERLEDIGT (v1.0-Sprint 2026-05-12):
+- [x] ExplorerPro-Adapter (bidirektional) - Aufwand: HOCH
+- [x] QTabWidget + Settings-Tab + Theme - Aufwand: HOCH
+- [x] Logging + Fehler-Dialoge - Aufwand: MITTEL
+- [x] PyInstaller-Spec + build.bat - Aufwand: MITTEL
+- [x] LICENSE + RELEASES.md + CHANGELOG-Update - Aufwand: KLEIN
+
+ERLEDIGT (vorher, V0.1):
+- [x] Sortier- und Filterlogik präzisiert (2026-05-12)
+- [x] Löschvorgang mit Bestätigungsdialog (2026-05-12)
+- [x] Materialisierung nach Markdown spezifiziert (2026-05-10)
+- [x] ProfiPrompt-Speicherschema gemappt (2026-05-10)
+- [x] Eintrags- und Typmodell ausgearbeitet (2026-05-10)
+- [x] Onboarding-Dokumentation (2026-05-10)
+- [x] Produktidee aus IDEE.txt in Konzept und Architektur überführt (2026-05-10)
+- [x] Erster lauffähiger MVP-Prototyp (2026-05-10)
