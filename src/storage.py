@@ -83,6 +83,27 @@ class Storage:
             items.append(item)
         self.save_items(items)
 
+    def upsert_many(self, new_items: List[LibraryItem]) -> int:
+        """Batch upsert: one load + one save, regardless of how many items.
+
+        Returns the number of items that were either added or updated.
+        """
+        if not new_items:
+            return 0
+        existing = self.load_items()
+        index_by_id = {item.id: idx for idx, item in enumerate(existing)}
+        touched = 0
+        for item in new_items:
+            idx = index_by_id.get(item.id, -1)
+            if idx >= 0:
+                existing[idx] = item
+            else:
+                index_by_id[item.id] = len(existing)
+                existing.append(item)
+            touched += 1
+        self.save_items(existing)
+        return touched
+
     def delete_item(self, item_id: str) -> None:
         items = [item for item in self.load_items() if item.id != item_id]
         self.save_items(items)

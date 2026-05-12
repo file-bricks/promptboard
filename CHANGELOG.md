@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [1.1.1] - 2026-05-12 — Hotfix
+
+### Behoben
+
+- **Absturz nach ProfiPrompt-/ExplorerPro-Import**: Signal-Rekursion in `reload_list()`. Beim `item_list.clear()` wurde `currentItemChanged` ausgelöst, das den noch nicht aktualisierten `current_item_id` zurück in `save_current_item()` schickte, was erneut `reload_list()` aufrief — bei einer leeren oder gerade geleerten Library führte das zu Stack-Recursion und Abbruch ohne Stacktrace im Log.
+
+### Verändert
+
+- `reload_list()` schützt das Rebuild der Liste mit `blockSignals(True/False)`.
+- Neuer `Storage.upsert_many()` — eine `load_items()` + eine `save_items()` für beliebige Batch-Größe (statt O(n²) Reads + Writes pro Import-Item).
+- `import_profiprompt_library` und `import_explorerpro_library` rufen `save_current_item()` vor dem Import, nutzen `upsert_many`, setzen `current_item_id = None` vor dem `reload_list()` und selektieren das gewünschte Item per Helper `_select_item_by_id()` danach.
+
+### Tests
+
+- Neuer Regression-Test `test_import_profiprompt_does_not_recurse_or_crash` baut ein echtes `MainWindow` + `Storage` + `QSettings`, importiert drei ProfiPrompt-Einträge und prüft `reload_list`-Aufrufzähler < 10 sowie korrekten finalen Selektionsstand.
+- 30 / 30 pytest-Tests grün.
+
 ## [1.1.0] - 2026-05-12
 
 ### Hinzugefügt

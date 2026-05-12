@@ -234,11 +234,17 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def reload_list(self) -> None:
         selected_id = self.current_item_id
-        self.item_list.clear()
-        for item in self.filtered_items():
-            widget_item = QtWidgets.QListWidgetItem(f"{item.item_type.value} | {item.name}")
-            widget_item.setData(QtCore.Qt.UserRole, item.id)
-            self.item_list.addItem(widget_item)
+        # Re-entrancy guard: blockSignals so clear()/addItem() don't trigger
+        # currentItemChanged → on_item_selected → save_current_item → reload_list.
+        self.item_list.blockSignals(True)
+        try:
+            self.item_list.clear()
+            for item in self.filtered_items():
+                widget_item = QtWidgets.QListWidgetItem(f"{item.item_type.value} | {item.name}")
+                widget_item.setData(QtCore.Qt.UserRole, item.id)
+                self.item_list.addItem(widget_item)
+        finally:
+            self.item_list.blockSignals(False)
 
         if selected_id:
             for row in range(self.item_list.count()):
@@ -480,6 +486,8 @@ class MainWindow(QtWidgets.QMainWindow):
     # ------------------------------------------------------------ import/export
 
     def import_profiprompt_library(self) -> None:
+        # Save any pending edits before swapping out the library state.
+        self.save_current_item()
         try:
             imported_items = load_profiprompt_items(self.settings.get_profiprompt_data_path())
         except Exception as exc:  # noqa: BLE001
@@ -494,8 +502,12 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             return
 
-        for item in imported_items:
-            self.storage.upsert_item(item)
+        try:
+            self.storage.upsert_many(imported_items)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("ProfiPrompt-Import: Speichern fehlgeschlagen")
+            self._show_error(tr("error.profiprompt_failed"), exc)
+            return
 
         latest_item = max(
             (item for item in imported_items if item.item_type == ItemType.PROMPT),
@@ -505,11 +517,15 @@ class MainWindow(QtWidgets.QMainWindow):
         if latest_item is None:
             latest_item = imported_items[0]
 
-        self.current_item_id = latest_item.id
+        # Set current id AFTER the reload to avoid races with the
+        # currentItemChanged signal during list rebuild.
+        self.current_item_id = None
         self.reload_list()
+        self._select_item_by_id(latest_item.id)
         self.status_label.setText(tr("status.imported_profiprompt", count=len(imported_items)))
 
     def import_explorerpro_library(self) -> None:
+        self.save_current_item()
         try:
             imported_items = load_explorerpro_items(self.settings.get_explorerpro_data_path())
         except Exception as exc:  # noqa: BLE001
@@ -524,12 +540,24 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             return
 
-        for item in imported_items:
-            self.storage.upsert_item(item)
+        try:
+            self.storage.upsert_many(imported_items)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("ExplorerPro-Import: Speichern fehlgeschlagen")
+            self._show_error(tr("error.explorerpro_import_failed"), exc)
+            return
 
-        self.current_item_id = imported_items[0].id
+        self.current_item_id = None
         self.reload_list()
+        self._select_item_by_id(imported_items[0].id)
         self.status_label.setText(tr("status.imported_explorerpro", count=len(imported_items)))
+
+    def _select_item_by_id(self, item_id: str) -> None:
+        for row in range(self.item_list.count()):
+            widget_item = self.item_list.item(row)
+            if widget_item.data(QtCore.Qt.UserRole) == item_id:
+                self.item_list.setCurrentRow(row)
+                return
 
     def export_to_explorerpro_library(self) -> None:
         self.save_current_item()

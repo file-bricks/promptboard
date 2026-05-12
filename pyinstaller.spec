@@ -49,7 +49,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='PromptBoard-1.1.0-win64',
+    name='PromptBoard-1.1.1-win64',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
