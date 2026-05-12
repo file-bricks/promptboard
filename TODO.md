@@ -8,8 +8,8 @@
 - [ ] `releases/v1.0.0/` mit `.exe`, `source.zip`, `CHANGELOG.txt`, `SHA256SUMS.txt` befüllen.
 - [ ] Ordner-Rename `DEV_PromptBoard/` → `RDY_PromptBoard/`.
 - [ ] `git init` + initial commit (alle MVP-Dateien außer `.gitignore`-Patterns).
-- [ ] GitHub-Repo `lukisch/promptboard` anlegen (oder `research-line/promptboard` — User-Entscheidung).
-- [ ] `git remote add origin` + `git push -u origin main`.
+- [x] GitHub-Repo `file-bricks/promptboard` (neben ProfiPrompt) — initial unter `lukisch/promptboard` angelegt, am 2026-05-12 zu `file-bricks` transferiert.
+- [x] `git remote add origin` + `git push -u origin main`.
 - [ ] GitHub Release v1.0.0 mit Asset-Upload (`gh release create v1.0.0 releases/v1.0.0/*`).
 - [ ] `C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\releases.json` um PromptBoard-Eintrag erweitern.
 - [ ] Lifecycle nach Push: `RDY_` → `REL-PUB_PromptBoard/`.

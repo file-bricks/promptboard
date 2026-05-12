@@ -7,7 +7,7 @@ REM copies artefacts into releases\v1.0.0\, generates SHA256SUMS.txt.
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
-set VERSION=1.0.0
+set VERSION=1.1.0
 set RELEASE_DIR=releases\v%VERSION%
 
 echo.
@@ -50,10 +50,10 @@ if errorlevel 1 (
 
 echo.
 echo --- Stage release artefacts ---
-copy /Y "dist\PromptBoard-1.0.0-win64.exe" "%RELEASE_DIR%\" >nul
+copy /Y "dist\PromptBoard-1.1.0-win64.exe" "%RELEASE_DIR%\" >nul
 
 echo --- Source archive ---
-python -c "import shutil; shutil.make_archive(r'%RELEASE_DIR%\PromptBoard-1.0.0-source', 'zip', '.', 'src')"
+python -c "import shutil; shutil.make_archive(r'%RELEASE_DIR%\PromptBoard-1.1.0-source', 'zip', '.', 'src')"
 
 echo --- CHANGELOG ---
 copy /Y "CHANGELOG.md" "%RELEASE_DIR%\CHANGELOG.txt" >nul

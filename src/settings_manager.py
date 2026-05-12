@@ -81,8 +81,25 @@ class SettingsManager(QtCore.QObject):
         self.qs.setValue("imports/explorerpro_data", str(Path(path)))
         self.qs.sync()
 
-    THEME_CHOICES = ("system", "light", "dark")
+    THEME_CHOICES = ("system", "light", "dark", "vibrant")
     DEFAULT_THEME = "system"
+
+    LANGUAGE_CHOICES = ("de", "en")
+    DEFAULT_LANGUAGE = "de"
+
+    def get_language(self) -> str:
+        raw = self.qs.value("view/language", "", type=str)
+        if raw not in self.LANGUAGE_CHOICES:
+            self.qs.setValue("view/language", self.DEFAULT_LANGUAGE)
+            self.qs.sync()
+            return self.DEFAULT_LANGUAGE
+        return raw
+
+    def set_language(self, language: str) -> None:
+        if language not in self.LANGUAGE_CHOICES:
+            language = self.DEFAULT_LANGUAGE
+        self.qs.setValue("view/language", language)
+        self.qs.sync()
 
     def get_theme(self) -> str:
         raw = self.qs.value("view/theme", "", type=str)

@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [1.1.0] - 2026-05-12
+
+### Hinzugefügt
+
+- **Einstellungen als Menü-Dialog** statt eigener Tab (`menu Einstellungen → Einstellungen…`). Hauptfenster zeigt nur noch die Bibliothek; Konfiguration läuft über einen modalen `SettingsDialog`.
+- **Drittes Theme „Vibrant“** mit violett-orangenen Akzentfarben, zusätzlich zu Light/Dark/System.
+- **Internationalisierung (DE/EN)**: neuer `i18n`-Layer (`src/i18n.py`) mit `tr()`-Helper; alle UI-Strings (Menü, Buttons, Labels, Statusmeldungen, Dialoge) sprachfähig. Sprache wählbar in den Einstellungen und persistent gespeichert. Standard: Deutsch.
+- Live-Sprachwechsel: das Hauptfenster relabelt sich beim Wechsel der Sprache, ohne Neustart.
+- `SettingsManager` erweitert um `language` (de/en) und Theme-Choice `vibrant`.
+
+### Verändert
+
+- Hauptfenster (`promptboard.py`) refactored: `QTabWidget` entfernt, Settings-Tab in `SettingsDialog` extrahiert (`src/settings_dialog.py`). Menübar bekommt zwei Menüs: „Datei“ und „Einstellungen“.
+- Repository-Transfer von `lukisch/promptboard` zu `file-bricks/promptboard` (neben ProfiPrompt).
+
+### Tests
+
+- 29/29 weiterhin grün nach Refactor.
+
 ## [1.0.0] - 2026-05-12
 
 ### Hinzugefügt

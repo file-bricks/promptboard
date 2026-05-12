@@ -42,7 +42,7 @@ v1.0-Sprint 2026-05-12:
 
 - [ ] Build-Artefakt `dist/PromptBoard-1.0.0-win64.exe` verifizieren und in `releases/v1.0.0/` ablegen.
 - [ ] Ordner-Rename `DEV_PromptBoard/` → `RDY_PromptBoard/` (Lifecycle-Wechsel laut SOFTWARE/NAMING-SYSTEM.md).
-- [ ] `git init` + initial commit + remote (lukisch/promptboard) + push.
+- [x] `git init` + initial commit + remote → push (Repo bei `file-bricks/promptboard`).
 - [ ] GitHub Release v1.0.0 mit Asset-Upload (`.exe`, source-zip, SHA256SUMS, CHANGELOG).
 - [ ] `C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\releases.json` ergänzen.
 - [ ] Lifecycle nach Push: `RDY_` → `REL-PUB_`.

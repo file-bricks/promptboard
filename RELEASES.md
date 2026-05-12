@@ -2,6 +2,28 @@
 
 > Pro Version eine Zeile. Aktuelle Version oben.
 
+## v1.1.0 — 2026-05-12
+
+**Status:** released
+**Plattform:** Windows x64
+**Repo:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)
+
+### Artefakte (`releases/v1.1.0/`)
+
+| Datei | Inhalt |
+|---|---|
+| `PromptBoard-1.1.0-win64.exe` | Single-File Windows-Executable (PyInstaller, windowed) |
+| `PromptBoard-1.1.0-source.zip` | Quellcode-Archiv (`src/`) |
+| `CHANGELOG.txt` | Changelog dieser Version |
+| `SHA256SUMS.txt` | SHA-256 Prüfsummen |
+
+### Highlights
+
+- **Einstellungen als Menü-Dialog** statt eigener Tab — Hauptfenster ist jetzt schlank und zeigt nur die Bibliothek
+- **3. Theme „Vibrant"** (violett-orange) zusätzlich zu Light/Dark/System
+- **i18n DE/EN** mit Live-Sprachwechsel (alle Menüs/Buttons/Labels/Statusmeldungen/Dialoge übersetzt)
+- Repository neben ProfiPrompt unter `file-bricks/promptboard`
+
 ## v1.0.0 — 2026-05-12
 
 **Status:** released

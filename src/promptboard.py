@@ -9,11 +9,14 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from clipboard_service import ClipboardService
 from explorerpro_adapter import export_to_explorerpro, load_explorerpro_items
+from i18n import set_language as set_global_language
+from i18n import tr
 from library_query import SORT_MODE_LABELS, query_items
-from logging_setup import configure_logging, default_log_dir
+from logging_setup import configure_logging
 from materializer import materialize_item
 from models import ItemType, LibraryItem, gen_id, normalize_name, now_iso, parse_tags
 from profiprompt_adapter import load_profiprompt_items
+from settings_dialog import SettingsDialog
 from settings_manager import SettingsManager
 from storage import Storage
 from theme import apply_theme
@@ -26,7 +29,6 @@ ICON_FALLBACK_PNG = PROJECT_ROOT / "PromptBoard.png"
 
 
 def load_app_icon() -> QtGui.QIcon:
-    """Return the PromptBoard icon if asset files are available, else fallback."""
     if ICON_PATH.exists():
         return QtGui.QIcon(str(ICON_PATH))
     if ICON_FALLBACK_PNG.exists():
@@ -62,28 +64,38 @@ class MainWindow(QtWidgets.QMainWindow):
     # ---------------------------------------------------------------- UI
 
     def _build_ui(self) -> None:
-        self.tabs = QtWidgets.QTabWidget()
-        self.tabs.addTab(self._build_library_tab(), "Bibliothek")
-        self.tabs.addTab(self._build_settings_tab(), "Einstellungen")
-        self.setCentralWidget(self.tabs)
+        self.setCentralWidget(self._build_library_widget())
+        self._build_menubar()
 
-        menu = self.menuBar()
-        file_menu = menu.addMenu("Datei")
-        file_menu.addAction("Neuer Eintrag", self.create_item)
-        file_menu.addAction("Aus ProfiPrompt importieren", self.import_profiprompt_library)
-        file_menu.addAction("Aus ExplorerPro importieren", self.import_explorerpro_library)
-        file_menu.addAction("Nach ExplorerPro exportieren", self.export_to_explorerpro_library)
-        file_menu.addSeparator()
-        file_menu.addAction("Beenden", QtWidgets.QApplication.instance().quit)
+    def _build_menubar(self) -> None:
+        menubar = self.menuBar()
+        menubar.clear()
 
-    def _build_library_tab(self) -> QtWidgets.QWidget:
+        self.file_menu = menubar.addMenu(tr("menu.file"))
+        self.action_new = self.file_menu.addAction(tr("menu.file.new"))
+        self.action_new.triggered.connect(self.create_item)
+        self.action_import_profiprompt = self.file_menu.addAction(tr("menu.file.import_profiprompt"))
+        self.action_import_profiprompt.triggered.connect(self.import_profiprompt_library)
+        self.action_import_explorerpro = self.file_menu.addAction(tr("menu.file.import_explorerpro"))
+        self.action_import_explorerpro.triggered.connect(self.import_explorerpro_library)
+        self.action_export_explorerpro = self.file_menu.addAction(tr("menu.file.export_explorerpro"))
+        self.action_export_explorerpro.triggered.connect(self.export_to_explorerpro_library)
+        self.file_menu.addSeparator()
+        self.action_quit = self.file_menu.addAction(tr("menu.file.quit"))
+        self.action_quit.triggered.connect(QtWidgets.QApplication.instance().quit)
+
+        self.settings_menu = menubar.addMenu(tr("menu.settings"))
+        self.action_open_settings = self.settings_menu.addAction(tr("menu.settings.open"))
+        self.action_open_settings.triggered.connect(self.open_settings_dialog)
+
+    def _build_library_widget(self) -> QtWidgets.QWidget:
         root = QtWidgets.QWidget()
         layout = QtWidgets.QHBoxLayout(root)
 
         left = QtWidgets.QVBoxLayout()
         filter_row = QtWidgets.QHBoxLayout()
         self.type_filter = QtWidgets.QComboBox()
-        self.type_filter.addItem("ALLE")
+        self.type_filter.addItem(tr("filter.all"))
         for item_type in ItemType:
             self.type_filter.addItem(item_type.value)
         self.sort_combo = QtWidgets.QComboBox()
@@ -94,7 +106,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if sort_index >= 0:
             self.sort_combo.setCurrentIndex(sort_index)
         self.search_edit = QtWidgets.QLineEdit()
-        self.search_edit.setPlaceholderText("Suche nach Name, Inhalt oder Kategorie...")
+        self.search_edit.setPlaceholderText(tr("filter.search_placeholder"))
         filter_row.addWidget(self.type_filter)
         filter_row.addWidget(self.sort_combo)
         filter_row.addWidget(self.search_edit)
@@ -104,10 +116,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.item_list.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
         button_row = QtWidgets.QHBoxLayout()
-        self.new_button = QtWidgets.QPushButton("Neu")
-        self.delete_button = QtWidgets.QPushButton("Löschen")
-        self.copy_button = QtWidgets.QPushButton("Kopieren")
-        self.materialize_button = QtWidgets.QPushButton("Materialisieren")
+        self.new_button = QtWidgets.QPushButton(tr("btn.new"))
+        self.delete_button = QtWidgets.QPushButton(tr("btn.delete"))
+        self.copy_button = QtWidgets.QPushButton(tr("btn.copy"))
+        self.materialize_button = QtWidgets.QPushButton(tr("btn.materialize"))
         button_row.addWidget(self.new_button)
         button_row.addWidget(self.delete_button)
         button_row.addWidget(self.copy_button)
@@ -126,17 +138,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.category_edit = QtWidgets.QLineEdit()
         self.tags_edit = QtWidgets.QLineEdit()
         self.source_edit = QtWidgets.QLineEdit()
-        self.source_edit.setPlaceholderText("z. B. lokal, ProfiPrompt, ExplorerPro")
-        form.addRow("Typ", self.type_combo)
-        form.addRow("Name", self.name_edit)
-        form.addRow("Kategorie", self.category_edit)
-        form.addRow("Tags", self.tags_edit)
-        form.addRow("Quelle", self.source_edit)
+        self.source_edit.setPlaceholderText(tr("form.source_placeholder"))
+        self.form_layout = form  # gespeichert für Re-Labeling bei Sprachwechsel
+        form.addRow(tr("form.type"), self.type_combo)
+        form.addRow(tr("form.name"), self.name_edit)
+        form.addRow(tr("form.category"), self.category_edit)
+        form.addRow(tr("form.tags"), self.tags_edit)
+        form.addRow(tr("form.source"), self.source_edit)
 
         self.content_edit = QtWidgets.QPlainTextEdit()
-        self.content_edit.setPlaceholderText("Inhalt des Eintrags...")
+        self.content_edit.setPlaceholderText(tr("form.content_placeholder"))
 
-        self.status_label = QtWidgets.QLabel("Bereit")
+        self.status_label = QtWidgets.QLabel(tr("status.ready"))
 
         right.addLayout(form)
         right.addWidget(self.content_edit, 1)
@@ -145,86 +158,6 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addLayout(left, 2)
         layout.addLayout(right, 3)
         return root
-
-    def _build_settings_tab(self) -> QtWidgets.QWidget:
-        root = QtWidgets.QWidget()
-        outer = QtWidgets.QVBoxLayout(root)
-
-        # Pfade
-        path_group = QtWidgets.QGroupBox("Pfade")
-        path_form = QtWidgets.QFormLayout(path_group)
-        self.materialize_path_edit = QtWidgets.QLineEdit(str(self.settings.get_materialize_path()))
-        self.materialize_path_edit.setReadOnly(True)
-        materialize_row = QtWidgets.QHBoxLayout()
-        materialize_row.addWidget(self.materialize_path_edit, 1)
-        self.change_materialize_button = QtWidgets.QPushButton("Ändern...")
-        materialize_row.addWidget(self.change_materialize_button)
-        path_form.addRow("Materialisierung", self._wrap_layout(materialize_row))
-
-        self.profiprompt_path_edit = QtWidgets.QLineEdit(str(self.settings.get_profiprompt_data_path()))
-        self.profiprompt_path_edit.setReadOnly(True)
-        profiprompt_row = QtWidgets.QHBoxLayout()
-        profiprompt_row.addWidget(self.profiprompt_path_edit, 1)
-        self.change_profiprompt_button = QtWidgets.QPushButton("Ändern...")
-        profiprompt_row.addWidget(self.change_profiprompt_button)
-        path_form.addRow("ProfiPrompt-Ordner", self._wrap_layout(profiprompt_row))
-
-        self.explorerpro_path_edit = QtWidgets.QLineEdit(str(self.settings.get_explorerpro_data_path()))
-        self.explorerpro_path_edit.setReadOnly(True)
-        explorerpro_row = QtWidgets.QHBoxLayout()
-        explorerpro_row.addWidget(self.explorerpro_path_edit, 1)
-        self.change_explorerpro_button = QtWidgets.QPushButton("Ändern...")
-        explorerpro_row.addWidget(self.change_explorerpro_button)
-        path_form.addRow("ExplorerPro-Ordner", self._wrap_layout(explorerpro_row))
-
-        outer.addWidget(path_group)
-
-        # Import/Export
-        io_group = QtWidgets.QGroupBox("Import / Export")
-        io_layout = QtWidgets.QHBoxLayout(io_group)
-        self.import_profiprompt_button = QtWidgets.QPushButton("Aus ProfiPrompt importieren")
-        self.import_explorerpro_button = QtWidgets.QPushButton("Aus ExplorerPro importieren")
-        self.export_explorerpro_button = QtWidgets.QPushButton("Nach ExplorerPro exportieren")
-        io_layout.addWidget(self.import_profiprompt_button)
-        io_layout.addWidget(self.import_explorerpro_button)
-        io_layout.addWidget(self.export_explorerpro_button)
-        outer.addWidget(io_group)
-
-        # Ansicht
-        view_group = QtWidgets.QGroupBox("Ansicht")
-        view_form = QtWidgets.QFormLayout(view_group)
-        self.theme_combo = QtWidgets.QComboBox()
-        for mode in SettingsManager.THEME_CHOICES:
-            self.theme_combo.addItem(mode.capitalize(), mode)
-        current_theme = self.settings.get_theme()
-        idx = self.theme_combo.findData(current_theme)
-        if idx >= 0:
-            self.theme_combo.setCurrentIndex(idx)
-        view_form.addRow("Farbschema", self.theme_combo)
-
-        self.confirm_overwrite_check = QtWidgets.QCheckBox(
-            "Vor Überschreiben beim Materialisieren nachfragen"
-        )
-        self.confirm_overwrite_check.setChecked(self.settings.get_confirm_overwrite())
-        view_form.addRow("Materialisierung", self.confirm_overwrite_check)
-
-        outer.addWidget(view_group)
-
-        # Info
-        info_group = QtWidgets.QGroupBox("Info")
-        info_layout = QtWidgets.QFormLayout(info_group)
-        info_layout.addRow("Datenordner", QtWidgets.QLabel(str(self.settings.get_data_path())))
-        info_layout.addRow("Logdatei", QtWidgets.QLabel(str(default_log_dir() / "promptboard.log")))
-        outer.addWidget(info_group)
-
-        outer.addStretch(1)
-        return root
-
-    @staticmethod
-    def _wrap_layout(layout: QtWidgets.QLayout) -> QtWidgets.QWidget:
-        wrapper = QtWidgets.QWidget()
-        wrapper.setLayout(layout)
-        return wrapper
 
     def _connect_signals(self) -> None:
         self.item_list.currentItemChanged.connect(self.on_item_selected)
@@ -238,7 +171,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.copy_button.clicked.connect(self.copy_current_item)
         self.materialize_button.clicked.connect(self.materialize_current_item)
 
-        # Editor auto-save
         self.type_combo.currentIndexChanged.connect(self.schedule_save)
         self.name_edit.textChanged.connect(self.schedule_save)
         self.category_edit.textChanged.connect(self.schedule_save)
@@ -246,15 +178,35 @@ class MainWindow(QtWidgets.QMainWindow):
         self.source_edit.textChanged.connect(self.schedule_save)
         self.content_edit.textChanged.connect(self.schedule_save)
 
-        # Settings tab
-        self.change_materialize_button.clicked.connect(self.change_materialize_path)
-        self.change_profiprompt_button.clicked.connect(self.change_profiprompt_path)
-        self.change_explorerpro_button.clicked.connect(self.change_explorerpro_path)
-        self.import_profiprompt_button.clicked.connect(self.import_profiprompt_library)
-        self.import_explorerpro_button.clicked.connect(self.import_explorerpro_library)
-        self.export_explorerpro_button.clicked.connect(self.export_to_explorerpro_library)
-        self.theme_combo.currentIndexChanged.connect(self.on_theme_changed)
-        self.confirm_overwrite_check.toggled.connect(self.settings.set_confirm_overwrite)
+    # ------------------------------------------------------------ language
+
+    def relabel_ui(self) -> None:
+        """Apply the active language to all visible UI strings."""
+        self._build_menubar()
+        # Filter row
+        self.type_filter.setItemText(0, tr("filter.all"))
+        self.search_edit.setPlaceholderText(tr("filter.search_placeholder"))
+        # Buttons
+        self.new_button.setText(tr("btn.new"))
+        self.delete_button.setText(tr("btn.delete"))
+        self.copy_button.setText(tr("btn.copy"))
+        self.materialize_button.setText(tr("btn.materialize"))
+        # Form labels
+        labels = [
+            tr("form.type"),
+            tr("form.name"),
+            tr("form.category"),
+            tr("form.tags"),
+            tr("form.source"),
+        ]
+        for i, text in enumerate(labels):
+            label_item = self.form_layout.itemAt(i, QtWidgets.QFormLayout.LabelRole)
+            if label_item and isinstance(label_item.widget(), QtWidgets.QLabel):
+                label_item.widget().setText(text)
+        self.source_edit.setPlaceholderText(tr("form.source_placeholder"))
+        self.content_edit.setPlaceholderText(tr("form.content_placeholder"))
+        # Status (only re-translate if it's the default "Ready")
+        # Active status messages remain as-is (already-formatted).
 
     # ------------------------------------------------------------ helpers
 
@@ -263,7 +215,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return self.storage.load_items()
         except Exception as exc:  # noqa: BLE001
             logger.exception("Fehler beim Laden der Bibliothek")
-            self._show_error("Bibliothek konnte nicht geladen werden", exc)
+            self._show_error(tr("error.library_load"), exc)
             return []
 
     def filtered_items(self) -> List[LibraryItem]:
@@ -320,7 +272,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tags_edit.setText(", ".join(item.tags))
             self.source_edit.setText(item.source)
             self.content_edit.setPlainText(item.content)
-            self.status_label.setText(f"Bearbeite: {item.name}")
+            self.status_label.setText(tr("status.editing", name=item.name))
         finally:
             self._loading_ui = False
 
@@ -333,7 +285,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tags_edit.clear()
             self.source_edit.clear()
             self.content_edit.clear()
-            self.status_label.setText("Bereit")
+            self.status_label.setText(tr("status.ready"))
         finally:
             self._loading_ui = False
 
@@ -366,9 +318,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.storage.upsert_item(item)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Speichern fehlgeschlagen")
-            self._show_error("Speichern fehlgeschlagen", exc)
+            self._show_error(tr("error.save_failed"), exc)
             return
-        self.status_label.setText(f"Automatisch gespeichert: {item.name}")
+        self.status_label.setText(tr("status.autosaved", name=item.name))
         self.current_item_id = item.id
         self.reload_list()
 
@@ -386,23 +338,38 @@ class MainWindow(QtWidgets.QMainWindow):
             self.storage.upsert_item(item)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Eintrag konnte nicht angelegt werden")
-            self._show_error("Eintrag konnte nicht angelegt werden", exc)
+            self._show_error(tr("error.create_failed"), exc)
             return
         self.current_item_id = item.id
         self.reload_list()
-        self.status_label.setText("Neuer Eintrag erstellt")
+        self.status_label.setText(tr("status.created"))
 
     def on_sort_changed(self, *_args) -> None:
         self.settings.set_sort_mode(self.current_sort_mode())
         self.reload_list()
 
-    def on_theme_changed(self, *_args) -> None:
-        mode = self.theme_combo.currentData() or SettingsManager.DEFAULT_THEME
-        self.settings.set_theme(mode)
+    def open_settings_dialog(self) -> None:
+        dialog = SettingsDialog(
+            self.settings,
+            parent=self,
+            on_import_profiprompt=self.import_profiprompt_library,
+            on_import_explorerpro=self.import_explorerpro_library,
+            on_export_explorerpro=self.export_to_explorerpro_library,
+        )
+        dialog.theme_changed.connect(self._on_theme_changed)
+        dialog.language_changed.connect(self._on_language_changed)
+        dialog.exec()
+
+    def _on_theme_changed(self, mode: str) -> None:
         app = QtWidgets.QApplication.instance()
         if app is not None:
             apply_theme(app, mode)
-            self.status_label.setText(f"Farbschema aktualisiert: {mode}")
+            self.status_label.setText(tr("status.theme_updated", mode=mode))
+
+    def _on_language_changed(self, code: str) -> None:
+        set_global_language(code)
+        self.relabel_ui()
+        self.status_label.setText(tr("status.language_updated", lang=tr(f"lang.{code}")))
 
     def current_item(self) -> Optional[LibraryItem]:
         if self.current_item_id is None:
@@ -414,24 +381,24 @@ class MainWindow(QtWidgets.QMainWindow):
         if item is None:
             return
         if not self._confirm_delete_item(item):
-            self.status_label.setText(f"Löschen abgebrochen: {item.name}")
+            self.status_label.setText(tr("status.delete_cancelled", name=item.name))
             return
         try:
             self.storage.delete_item(item.id)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Löschen fehlgeschlagen")
-            self._show_error("Löschen fehlgeschlagen", exc)
+            self._show_error(tr("error.delete_failed"), exc)
             return
         self.current_item_id = None
         self.reload_list()
         self.clear_editor()
-        self.status_label.setText(f"Gelöscht: {item.name}")
+        self.status_label.setText(tr("status.deleted", name=item.name))
 
     def _confirm_delete_item(self, item: LibraryItem) -> bool:
         answer = QtWidgets.QMessageBox.question(
             self,
-            "Eintrag löschen",
-            f"Möchtest du den Eintrag '{item.name}' wirklich löschen?",
+            tr("dialog.delete.title"),
+            tr("dialog.delete.body", name=item.name),
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
             QtWidgets.QMessageBox.No,
         )
@@ -443,16 +410,15 @@ class MainWindow(QtWidgets.QMainWindow):
         if item is None:
             return
         self.clipboard_service.copy_item(item)
-        self.status_label.setText(f"In Zwischenablage kopiert: {item.name}")
+        self.status_label.setText(tr("status.copied", name=item.name))
 
     def copy_double_clicked_item(self, widget_item: QtWidgets.QListWidgetItem) -> None:
-        # Doppelklick = schneller Copy ohne Editor-Wechsel
         item_id = widget_item.data(QtCore.Qt.UserRole)
         item = self.storage.get_item(item_id) if item_id else None
         if item is None:
             return
         self.clipboard_service.copy_item(item)
-        self.status_label.setText(f"In Zwischenablage kopiert: {item.name}")
+        self.status_label.setText(tr("status.copied", name=item.name))
 
     def materialize_current_item(self) -> None:
         self.save_current_item()
@@ -467,21 +433,21 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.settings.get_confirm_overwrite() and target_path.exists():
             answer = QtWidgets.QMessageBox.question(
                 self,
-                "Datei überschreiben?",
-                f"'{target_path.name}' existiert bereits. Überschreiben?",
+                tr("dialog.overwrite.title"),
+                tr("dialog.overwrite.body", name=target_path.name),
                 QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
                 QtWidgets.QMessageBox.No,
             )
             if answer != QtWidgets.QMessageBox.Yes:
-                self.status_label.setText("Materialisierung abgebrochen")
+                self.status_label.setText(tr("status.materialize_cancelled"))
                 return
         try:
             target = materialize_item(item, target_dir)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Materialisierung fehlgeschlagen")
-            self._show_error("Materialisierung fehlgeschlagen", exc)
+            self._show_error(tr("error.materialize_failed"), exc)
             return
-        self.status_label.setText(f"Materialisiert: {target}")
+        self.status_label.setText(tr("status.materialized", target=target))
 
     # ------------------------------------------------------------ context menu
 
@@ -495,66 +461,36 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         menu = QtWidgets.QMenu(self.item_list)
-        copy_action = menu.addAction("Kopieren")
-        materialize_action = menu.addAction("Materialisieren")
+        copy_action = menu.addAction(tr("btn.copy"))
+        materialize_action = menu.addAction(tr("btn.materialize"))
         menu.addSeparator()
-        delete_action = menu.addAction("Löschen")
+        delete_action = menu.addAction(tr("btn.delete"))
         chosen = menu.exec(self.item_list.mapToGlobal(pos))
         if chosen is None:
             return
         if chosen == copy_action:
             self.clipboard_service.copy_item(item)
-            self.status_label.setText(f"In Zwischenablage kopiert: {item.name}")
+            self.status_label.setText(tr("status.copied", name=item.name))
         elif chosen == materialize_action:
             self._materialize_item(item)
         elif chosen == delete_action:
             self.current_item_id = item.id
             self.delete_current_item()
 
-    # ------------------------------------------------------------ settings actions
-
-    def change_materialize_path(self) -> None:
-        current = str(self.settings.get_materialize_path())
-        new_path = QtWidgets.QFileDialog.getExistingDirectory(
-            self, "Materialisierungspfad wählen", current
-        )
-        if new_path:
-            self.settings.set_materialize_path(Path(new_path))
-            self.materialize_path_edit.setText(new_path)
-            self.status_label.setText(f"Neuer Materialisierungspfad: {new_path}")
-
-    def change_profiprompt_path(self) -> None:
-        current = str(self.settings.get_profiprompt_data_path())
-        new_path = QtWidgets.QFileDialog.getExistingDirectory(
-            self, "ProfiPrompt-Datenordner wählen", current
-        )
-        if new_path:
-            self.settings.set_profiprompt_data_path(Path(new_path))
-            self.profiprompt_path_edit.setText(new_path)
-            self.status_label.setText(f"Neuer ProfiPrompt-Pfad: {new_path}")
-
-    def change_explorerpro_path(self) -> None:
-        current = str(self.settings.get_explorerpro_data_path())
-        new_path = QtWidgets.QFileDialog.getExistingDirectory(
-            self, "ExplorerPro-Datenordner wählen", current
-        )
-        if new_path:
-            self.settings.set_explorerpro_data_path(Path(new_path))
-            self.explorerpro_path_edit.setText(new_path)
-            self.status_label.setText(f"Neuer ExplorerPro-Pfad: {new_path}")
+    # ------------------------------------------------------------ import/export
 
     def import_profiprompt_library(self) -> None:
         try:
             imported_items = load_profiprompt_items(self.settings.get_profiprompt_data_path())
         except Exception as exc:  # noqa: BLE001
             logger.exception("ProfiPrompt-Import fehlgeschlagen")
-            self._show_error("ProfiPrompt-Import fehlgeschlagen", exc)
+            self._show_error(tr("error.profiprompt_failed"), exc)
             return
         if not imported_items:
             QtWidgets.QMessageBox.warning(
                 self,
-                "Import fehlgeschlagen",
-                "Kein ProfiPrompt-`prompts.json` mit mindestens einem Prompt gefunden.",
+                tr("dialog.import_failed.title"),
+                tr("dialog.import_failed.profiprompt"),
             )
             return
 
@@ -571,22 +507,20 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.current_item_id = latest_item.id
         self.reload_list()
-        self.status_label.setText(
-            f"Importiert aus ProfiPrompt: {len(imported_items)} Einträge"
-        )
+        self.status_label.setText(tr("status.imported_profiprompt", count=len(imported_items)))
 
     def import_explorerpro_library(self) -> None:
         try:
             imported_items = load_explorerpro_items(self.settings.get_explorerpro_data_path())
         except Exception as exc:  # noqa: BLE001
             logger.exception("ExplorerPro-Import fehlgeschlagen")
-            self._show_error("ExplorerPro-Import fehlgeschlagen", exc)
+            self._show_error(tr("error.explorerpro_import_failed"), exc)
             return
         if not imported_items:
             QtWidgets.QMessageBox.warning(
                 self,
-                "Import fehlgeschlagen",
-                "Kein ExplorerPro-`prompts.json` mit mindestens einem Prompt gefunden.",
+                tr("dialog.import_failed.title"),
+                tr("dialog.import_failed.explorerpro"),
             )
             return
 
@@ -595,9 +529,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.current_item_id = imported_items[0].id
         self.reload_list()
-        self.status_label.setText(
-            f"Importiert aus ExplorerPro: {len(imported_items)} Einträge"
-        )
+        self.status_label.setText(tr("status.imported_explorerpro", count=len(imported_items)))
 
     def export_to_explorerpro_library(self) -> None:
         self.save_current_item()
@@ -606,19 +538,17 @@ class MainWindow(QtWidgets.QMainWindow):
         if not prompt_items:
             QtWidgets.QMessageBox.information(
                 self,
-                "Export",
-                "Es gibt keine PROMPT-Einträge zum Export nach ExplorerPro.",
+                tr("dialog.export_empty.title"),
+                tr("dialog.export_empty.body"),
             )
             return
         try:
-            count = export_to_explorerpro(
-                prompt_items, self.settings.get_explorerpro_data_path()
-            )
+            count = export_to_explorerpro(prompt_items, self.settings.get_explorerpro_data_path())
         except Exception as exc:  # noqa: BLE001
             logger.exception("ExplorerPro-Export fehlgeschlagen")
-            self._show_error("ExplorerPro-Export fehlgeschlagen", exc)
+            self._show_error(tr("error.explorerpro_export_failed"), exc)
             return
-        self.status_label.setText(f"Nach ExplorerPro exportiert: {count} Einträge")
+        self.status_label.setText(tr("status.exported_explorerpro", count=count))
 
     # ------------------------------------------------------------ misc
 
@@ -630,7 +560,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if getattr(self, "tray_icon", None) and self.tray_icon.isVisible():
             self.hide()
             event.ignore()
-            self.status_label.setText("Fenster in den Systemtray minimiert")
+            self.status_label.setText(tr("status.minimized_to_tray"))
             return
         super().closeEvent(event)
 
@@ -642,10 +572,10 @@ def create_tray(window: MainWindow) -> QtWidgets.QSystemTrayIcon:
     tray.setToolTip("PromptBoard")
 
     menu = QtWidgets.QMenu()
-    menu.addAction("Öffnen", window.showNormal)
-    menu.addAction("Verstecken", window.hide)
+    menu.addAction(tr("tray.open"), window.showNormal)
+    menu.addAction(tr("tray.hide"), window.hide)
     menu.addSeparator()
-    menu.addAction("Beenden", app.quit)
+    menu.addAction(tr("tray.quit"), app.quit)
     tray.setContextMenu(menu)
     tray.activated.connect(
         lambda reason: window.showNormal()
@@ -664,6 +594,7 @@ def main() -> int:
     app.setApplicationName("PromptBoard")
     app.setWindowIcon(load_app_icon())
     settings = SettingsManager()
+    set_global_language(settings.get_language())
     apply_theme(app, settings.get_theme())
     storage = Storage(settings.get_data_path())
     window = MainWindow(storage, settings)

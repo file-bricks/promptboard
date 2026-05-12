@@ -17,8 +17,8 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 logger = logging.getLogger(__name__)
 
-ThemeMode = Literal["system", "light", "dark"]
-VALID_MODES: tuple[ThemeMode, ...] = ("system", "light", "dark")
+ThemeMode = Literal["system", "light", "dark", "vibrant"]
+VALID_MODES: tuple[ThemeMode, ...] = ("system", "light", "dark", "vibrant")
 
 
 def _dark_palette() -> QtGui.QPalette:
@@ -62,6 +62,30 @@ def _light_palette() -> QtGui.QPalette:
     return palette
 
 
+def _vibrant_palette() -> QtGui.QPalette:
+    """A more colourful palette: violet base, teal accents."""
+    palette = QtGui.QPalette()
+    role = QtGui.QPalette
+    palette.setColor(role.Window, QtGui.QColor(40, 30, 70))           # deep violet
+    palette.setColor(role.WindowText, QtGui.QColor(240, 230, 255))
+    palette.setColor(role.Base, QtGui.QColor(30, 22, 55))
+    palette.setColor(role.AlternateBase, QtGui.QColor(60, 40, 95))
+    palette.setColor(role.ToolTipBase, QtGui.QColor(60, 40, 95))
+    palette.setColor(role.ToolTipText, QtGui.QColor(255, 235, 200))
+    palette.setColor(role.Text, QtGui.QColor(240, 230, 255))
+    palette.setColor(role.Button, QtGui.QColor(70, 50, 110))
+    palette.setColor(role.ButtonText, QtGui.QColor(255, 240, 220))
+    palette.setColor(role.BrightText, QtGui.QColor(255, 105, 97))
+    palette.setColor(role.Link, QtGui.QColor(100, 220, 220))           # teal link
+    palette.setColor(role.Highlight, QtGui.QColor(255, 145, 60))       # orange highlight
+    palette.setColor(role.HighlightedText, QtGui.QColor(20, 20, 20))
+    palette.setColor(role.PlaceholderText, QtGui.QColor(180, 160, 220))
+    palette.setColor(role.Disabled, role.WindowText, QtGui.QColor(140, 130, 160))
+    palette.setColor(role.Disabled, role.Text, QtGui.QColor(140, 130, 160))
+    palette.setColor(role.Disabled, role.ButtonText, QtGui.QColor(140, 130, 160))
+    return palette
+
+
 _SYSTEM_PALETTE_CACHE: QtGui.QPalette | None = None
 
 
@@ -69,7 +93,7 @@ def apply_theme(app: QtWidgets.QApplication, mode: str) -> None:
     """Apply the named theme to a running QApplication.
 
     Stores the original system palette on first call so ``system``
-    mode can restore it even after switching to light/dark.
+    mode can restore it even after switching to light/dark/vibrant.
     """
     global _SYSTEM_PALETTE_CACHE
     if _SYSTEM_PALETTE_CACHE is None:
@@ -85,6 +109,9 @@ def apply_theme(app: QtWidgets.QApplication, mode: str) -> None:
     elif mode == "light":
         app.setStyle("Fusion")
         app.setPalette(_light_palette())
+    elif mode == "vibrant":
+        app.setStyle("Fusion")
+        app.setPalette(_vibrant_palette())
     else:  # system
         app.setPalette(_SYSTEM_PALETTE_CACHE)
     logger.debug("Theme angewendet: %s", mode)
