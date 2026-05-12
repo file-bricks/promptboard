@@ -2,6 +2,16 @@
 
 > Archiv für erledigte Aufgaben. Neue Einträge nach Möglichkeit aus TODO.md hierher verschieben, statt sie dort nur zu löschen.
 
+## v1.1-Sprint (2026-05-12)
+
+- **Settings als Menü-Dialog** statt eigener Tab (`menu Einstellungen → Einstellungen…`); `src/settings_dialog.py` neu.
+- **3. Theme „Vibrant"** mit violett-orangenen Akzentfarben.
+- **i18n DE/EN** mit `src/i18n.py` und `tr()`-Helper; Live-Sprachwechsel; alle UI-Strings übersetzt.
+- `SettingsManager` um `language` und Theme-Choice `vibrant` erweitert.
+- Repo von `lukisch/promptboard` zu `file-bricks/promptboard` transferiert (neben ProfiPrompt).
+- v1.1.0 PyInstaller-Build + GitHub Release mit Asset-Upload.
+- 29/29 pytest-Tests grün nach Refactor.
+
 ## v1.0-Sprint (2026-05-12)
 
 - **ExplorerPro-Adapter (bidirektional)** — `src/explorerpro_adapter.py` mit Import + Export, stabilen IDs `explorerpro:prompt:*`, Round-Trip-Idempotenz, Schutz von Fremd-Einträgen beim Export.

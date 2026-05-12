@@ -1,6 +1,6 @@
-AUFGABEN - PromptBoard V1.0
+AUFGABEN - PromptBoard V1.1
 ===========================
-Status: V1.0 FERTIG (Code + Tests + Build-Pipeline)
+Status: V1.1.0 RELEASED auf file-bricks/promptboard
 Stand: 2026-05-12
 
 OFFENE AUFGABEN (Lifecycle-Übergang):
@@ -20,6 +20,14 @@ QUALITAETSPRUEFUNG:
 - Logging nach %LOCALAPPDATA%\PromptBoard\promptboard.log.
 - Icon-Asset PromptBoard.ico gewired (Fenster + Tray + EXE).
 - LICENSE (MIT), RELEASES.md, CHANGELOG v1.0.0 angelegt.
+
+ERLEDIGT (v1.1-Sprint 2026-05-12):
+- [x] Settings als Menü-Dialog statt Tab - Aufwand: MITTEL
+- [x] Drittes "Vibrant"-Theme - Aufwand: KLEIN
+- [x] i18n DE/EN mit Live-Wechsel - Aufwand: HOCH
+- [x] PyInstaller-Build v1.1.0 - Aufwand: KLEIN
+- [x] GitHub Release v1.1.0 - Aufwand: KLEIN
+- [x] Repo-Transfer lukisch -> file-bricks - Aufwand: TRIVIAL
 
 ERLEDIGT (v1.0-Sprint 2026-05-12):
 - [x] ExplorerPro-Adapter (bidirektional) - Aufwand: HOCH

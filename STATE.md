@@ -1,10 +1,10 @@
 ---
 name: promptboard-state
 type: state-snapshot
-version: 1.0.0
+version: 1.1.0
 updated: 2026-05-12
 updated_by: Claude/Code
-current_phase: v1.0 fertig
+current_phase: v1.1 fertig & released
 last_verified: 2026-05-12
 description: |
   PromptBoard v1.0 ist fertig: alle MVP-Features (Tray, Editor, Copy,
@@ -19,11 +19,11 @@ description: |
 
 ## Current Phase
 
-**v1.0 fertig (Code + Tests + Build-Pipeline).** Verbleibend für Lifecycle-Wechsel von DEV zu RDY/REL-PUB: Ordner-Rename, GitHub-Repo-Init + Push, `releases.json`-Eintrag im SOFTWARE-Root, GitHub-Release v1.0.0 mit Asset-Upload.
+**v1.1.0 released auf file-bricks/promptboard.** v1.0.0 und v1.1.0 als GitHub-Releases mit Asset-Upload live. SOFTWARE-Registry (`releases.json`) aktualisiert. Verbleibend: Ordner-Rename `DEV_PromptBoard/` → `REL-PUB_PromptBoard/` sobald OneDrive den Build-Lock freigibt.
 
 ## Focus gerade
 
-Lifecycle-Übergang: Build-Verify → Ordner-Rename `DEV_PromptBoard/` → `RDY_PromptBoard/` → `git init` + initial commit → `gh repo create` + push → GitHub Release → SOFTWARE-Registry-Sync.
+Stabilisierungsphase. Mögliche Folge-Iterationen siehe TODO Backlog (Hotkeys, Batch-Materialisierung, ProfiPrompt-Live-Storage-Adapter).
 
 ## Letzte bedeutsame Aktion
 
