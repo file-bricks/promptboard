@@ -11,9 +11,10 @@ from clipboard_service import ClipboardService
 from explorerpro_adapter import export_to_explorerpro, load_explorerpro_items
 from i18n import set_language as set_global_language
 from i18n import tr
+from item_templates import build_default_name, get_item_template
 from library_query import SORT_MODE_LABELS, query_items
 from logging_setup import configure_logging
-from materializer import materialize_item
+from materializer import materialize_items
 from models import ItemType, LibraryItem, gen_id, normalize_name, now_iso, parse_tags
 from profiprompt_adapter import load_profiprompt_items
 from settings_dialog import SettingsDialog
@@ -47,6 +48,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.clipboard_service = ClipboardService(QtWidgets.QApplication.instance())
         self.current_item_id: Optional[str] = None
         self._loading_ui = False
+        self._dirty = False
 
         self.setWindowTitle("PromptBoard")
         self.setWindowIcon(load_app_icon())
@@ -112,14 +114,29 @@ class MainWindow(QtWidgets.QMainWindow):
         filter_row.addWidget(self.search_edit)
 
         self.item_list = QtWidgets.QListWidget()
-        self.item_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.item_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.item_list.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
         button_row = QtWidgets.QHBoxLayout()
         self.new_button = QtWidgets.QPushButton(tr("btn.new"))
         self.delete_button = QtWidgets.QPushButton(tr("btn.delete"))
-        self.copy_button = QtWidgets.QPushButton(tr("btn.copy"))
-        self.materialize_button = QtWidgets.QPushButton(tr("btn.materialize"))
+        self.copy_button = QtWidgets.QToolButton()
+        self.copy_button.setText(tr("btn.copy"))
+        self.copy_button.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
+        self.copy_button_menu = QtWidgets.QMenu(self.copy_button)
+        self.copy_markdown_action = self.copy_button_menu.addAction(tr("btn.copy_markdown"))
+        self.copy_button.setMenu(self.copy_button_menu)
+        self.materialize_button = QtWidgets.QToolButton()
+        self.materialize_button.setText(tr("btn.materialize"))
+        self.materialize_button.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
+        self.materialize_button_menu = QtWidgets.QMenu(self.materialize_button)
+        self.materialize_current_action = self.materialize_button_menu.addAction(
+            tr("btn.materialize_current")
+        )
+        self.materialize_selected_action = self.materialize_button_menu.addAction(
+            tr("btn.materialize_selected")
+        )
+        self.materialize_button.setMenu(self.materialize_button_menu)
         button_row.addWidget(self.new_button)
         button_row.addWidget(self.delete_button)
         button_row.addWidget(self.copy_button)
@@ -169,7 +186,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.new_button.clicked.connect(self.create_item)
         self.delete_button.clicked.connect(self.delete_current_item)
         self.copy_button.clicked.connect(self.copy_current_item)
+        self.copy_markdown_action.triggered.connect(self.copy_current_item_markdown)
         self.materialize_button.clicked.connect(self.materialize_current_item)
+        self.materialize_current_action.triggered.connect(self.materialize_current_item)
+        self.materialize_selected_action.triggered.connect(self.materialize_selected_items)
 
         self.type_combo.currentIndexChanged.connect(self.schedule_save)
         self.name_edit.textChanged.connect(self.schedule_save)
@@ -190,7 +210,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.new_button.setText(tr("btn.new"))
         self.delete_button.setText(tr("btn.delete"))
         self.copy_button.setText(tr("btn.copy"))
+        self.copy_markdown_action.setText(tr("btn.copy_markdown"))
         self.materialize_button.setText(tr("btn.materialize"))
+        self.materialize_current_action.setText(tr("btn.materialize_current"))
+        self.materialize_selected_action.setText(tr("btn.materialize_selected"))
         # Form labels
         labels = [
             tr("form.type"),
@@ -240,18 +263,17 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             self.item_list.clear()
             for item in self.filtered_items():
-                widget_item = QtWidgets.QListWidgetItem(f"{item.item_type.value} | {item.name}")
+                widget_item = QtWidgets.QListWidgetItem(self._item_display_text(item))
                 widget_item.setData(QtCore.Qt.UserRole, item.id)
                 self.item_list.addItem(widget_item)
         finally:
             self.item_list.blockSignals(False)
 
         if selected_id:
-            for row in range(self.item_list.count()):
-                widget_item = self.item_list.item(row)
-                if widget_item.data(QtCore.Qt.UserRole) == selected_id:
-                    self.item_list.setCurrentRow(row)
-                    return
+            row = self._find_list_row_by_id(selected_id)
+            if row >= 0:
+                self.item_list.setCurrentRow(row)
+                return
 
         if self.item_list.count() and self.current_item_id is None:
             self.item_list.setCurrentRow(0)
@@ -281,6 +303,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.status_label.setText(tr("status.editing", name=item.name))
         finally:
             self._loading_ui = False
+            self._dirty = False
 
     def clear_editor(self) -> None:
         self._loading_ui = True
@@ -294,14 +317,18 @@ class MainWindow(QtWidgets.QMainWindow):
             self.status_label.setText(tr("status.ready"))
         finally:
             self._loading_ui = False
+            self._dirty = False
 
     def schedule_save(self) -> None:
         if self._loading_ui or self.current_item_id is None:
             return
+        self._dirty = True
         self.save_timer.start()
 
     def save_current_item(self) -> None:
         if self._loading_ui or self.current_item_id is None:
+            return
+        if not self._dirty:
             return
         existing = self.storage.get_item(self.current_item_id)
         if existing is None:
@@ -326,19 +353,47 @@ class MainWindow(QtWidgets.QMainWindow):
             logger.exception("Speichern fehlgeschlagen")
             self._show_error(tr("error.save_failed"), exc)
             return
+        self._dirty = False
         self.status_label.setText(tr("status.autosaved", name=item.name))
         self.current_item_id = item.id
-        self.reload_list()
+        self._update_list_item_text(item)
+
+    @staticmethod
+    def _item_display_text(item: LibraryItem) -> str:
+        return f"{item.item_type.value} | {item.name}"
+
+    def _find_list_row_by_id(self, item_id: str) -> int:
+        for row in range(self.item_list.count()):
+            if self.item_list.item(row).data(QtCore.Qt.UserRole) == item_id:
+                return row
+        return -1
+
+    def _update_list_item_text(self, item: LibraryItem) -> None:
+        row = self._find_list_row_by_id(item.id)
+        if row >= 0:
+            self.item_list.item(row).setText(self._item_display_text(item))
+
+    def _suggest_new_item_type(self) -> ItemType:
+        filter_value = self.type_filter.currentText().strip()
+        if filter_value and filter_value != tr("filter.all"):
+            return ItemType.from_value(filter_value)
+        current_value = self.type_combo.currentText().strip()
+        if current_value:
+            return ItemType.from_value(current_value)
+        return ItemType.PROMPT
 
     def create_item(self) -> None:
+        self.save_current_item()
+        item_type = self._suggest_new_item_type()
+        template = get_item_template(item_type)
         item = LibraryItem(
             id=gen_id(),
-            item_type=ItemType.PROMPT,
-            name=f"NEUER EINTRAG {len(self.all_items()) + 1}",
-            content="",
+            item_type=item_type,
+            name=build_default_name(item_type, self.item_list.count() + 1),
+            content=template.content,
             category="",
             tags=[],
-            source="lokal",
+            source=template.source,
         )
         try:
             self.storage.upsert_item(item)
@@ -397,7 +452,8 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.current_item_id = None
         self.reload_list()
-        self.clear_editor()
+        if self.item_list.count() == 0:
+            self.clear_editor()
         self.status_label.setText(tr("status.deleted", name=item.name))
 
     def _confirm_delete_item(self, item: LibraryItem) -> bool:
@@ -415,70 +471,151 @@ class MainWindow(QtWidgets.QMainWindow):
         item = self.current_item()
         if item is None:
             return
-        self.clipboard_service.copy_item(item)
-        self.status_label.setText(tr("status.copied", name=item.name))
+        self._copy_item(item)
+
+    def copy_current_item_markdown(self) -> None:
+        self.save_current_item()
+        item = self.current_item()
+        if item is None:
+            return
+        self._copy_item_markdown(item)
+
+    def _copy_item(self, item: LibraryItem) -> None:
+        if self.clipboard_service.copy_item(item):
+            self.status_label.setText(tr("status.copied", name=item.name))
+        else:
+            self.status_label.setText(tr("status.copy_cancelled"))
+
+    def _copy_item_markdown(self, item: LibraryItem) -> None:
+        if self.clipboard_service.copy_item_markdown(item):
+            self.status_label.setText(tr("status.copied_markdown", name=item.name))
+        else:
+            self.status_label.setText(tr("status.copy_markdown_cancelled"))
 
     def copy_double_clicked_item(self, widget_item: QtWidgets.QListWidgetItem) -> None:
         item_id = widget_item.data(QtCore.Qt.UserRole)
         item = self.storage.get_item(item_id) if item_id else None
         if item is None:
             return
-        self.clipboard_service.copy_item(item)
-        self.status_label.setText(tr("status.copied", name=item.name))
+        if self.clipboard_service.copy_item(item):
+            self.status_label.setText(tr("status.copied", name=item.name))
+        else:
+            self.status_label.setText(tr("status.copy_cancelled"))
+
+    def selected_items(self) -> list[LibraryItem]:
+        selected_rows = {
+            self.item_list.row(widget_item) for widget_item in self.item_list.selectedItems()
+        }
+        items: list[LibraryItem] = []
+        for row in range(self.item_list.count()):
+            if row not in selected_rows:
+                continue
+            widget_item = self.item_list.item(row)
+            item_id = widget_item.data(QtCore.Qt.UserRole)
+            item = self.storage.get_item(item_id) if item_id else None
+            if item is not None:
+                items.append(item)
+        return items
 
     def materialize_current_item(self) -> None:
+        selected = self.selected_items()
         self.save_current_item()
+        if len(selected) > 1:
+            self._materialize_items(selected)
+            return
         item = self.current_item()
         if item is None:
             return
         self._materialize_item(item)
 
+    def materialize_selected_items(self) -> None:
+        selected = self.selected_items()
+        self.save_current_item()
+        if not selected:
+            return
+        self._materialize_items(selected)
+
     def _materialize_item(self, item: LibraryItem) -> None:
+        self._materialize_items([item])
+
+    def _materialize_items(self, items: list[LibraryItem]) -> None:
+        if not items:
+            return
         target_dir = self.settings.get_materialize_path()
-        target_path = target_dir / f"{item.filename_stem()}.md"
-        if self.settings.get_confirm_overwrite() and target_path.exists():
-            answer = QtWidgets.QMessageBox.question(
-                self,
-                tr("dialog.overwrite.title"),
-                tr("dialog.overwrite.body", name=target_path.name),
-                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-                QtWidgets.QMessageBox.No,
-            )
-            if answer != QtWidgets.QMessageBox.Yes:
-                self.status_label.setText(tr("status.materialize_cancelled"))
-                return
+        items_to_write: list[LibraryItem] = []
+        for item in items:
+            target_path = target_dir / f"{item.filename_stem()}.md"
+            if self.settings.get_confirm_overwrite() and target_path.exists():
+                answer = QtWidgets.QMessageBox.question(
+                    self,
+                    tr("dialog.overwrite.title"),
+                    tr("dialog.overwrite.body", name=target_path.name),
+                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                    QtWidgets.QMessageBox.No,
+                )
+                if answer != QtWidgets.QMessageBox.Yes:
+                    continue
+            items_to_write.append(item)
+
+        if not items_to_write:
+            self.status_label.setText(tr("status.materialize_cancelled"))
+            return
+
         try:
-            target = materialize_item(item, target_dir)
+            targets = materialize_items(items_to_write, target_dir)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Materialisierung fehlgeschlagen")
             self._show_error(tr("error.materialize_failed"), exc)
             return
-        self.status_label.setText(tr("status.materialized", target=target))
+        if len(targets) == 1:
+            self.status_label.setText(tr("status.materialized", target=targets[0]))
+        else:
+            self.status_label.setText(
+                tr("status.materialized_batch", count=len(targets), target=target_dir)
+            )
 
     # ------------------------------------------------------------ context menu
 
     def on_list_context_menu(self, pos: QtCore.QPoint) -> None:
         widget_item = self.item_list.itemAt(pos)
-        if widget_item is None:
-            return
-        item_id = widget_item.data(QtCore.Qt.UserRole)
-        item = self.storage.get_item(item_id) if item_id else None
-        if item is None:
-            return
+        item: Optional[LibraryItem] = None
+        if widget_item is not None:
+            item_id = widget_item.data(QtCore.Qt.UserRole)
+            item = self.storage.get_item(item_id) if item_id else None
 
         menu = QtWidgets.QMenu(self.item_list)
-        copy_action = menu.addAction(tr("btn.copy"))
-        materialize_action = menu.addAction(tr("btn.materialize"))
-        menu.addSeparator()
-        delete_action = menu.addAction(tr("btn.delete"))
+        new_action = menu.addAction(tr("btn.new"))
+
+        copy_action = None
+        copy_markdown_action = None
+        materialize_action = None
+        materialize_selected_action = None
+        delete_action = None
+
+        if item is not None:
+            menu.addSeparator()
+            copy_action = menu.addAction(tr("btn.copy"))
+            copy_markdown_action = menu.addAction(tr("btn.copy_markdown"))
+            materialize_action = menu.addAction(tr("btn.materialize"))
+            selected_items = self.selected_items()
+            if widget_item.isSelected() and len(selected_items) > 1:
+                materialize_selected_action = menu.addAction(tr("btn.materialize_selected"))
+            menu.addSeparator()
+            delete_action = menu.addAction(tr("btn.delete"))
+
         chosen = menu.exec(self.item_list.mapToGlobal(pos))
         if chosen is None:
             return
-        if chosen == copy_action:
-            self.clipboard_service.copy_item(item)
-            self.status_label.setText(tr("status.copied", name=item.name))
+        if chosen == new_action:
+            self.create_item()
+        elif chosen == copy_action:
+            self._copy_item(item)
+        elif chosen == copy_markdown_action:
+            self._copy_item_markdown(item)
         elif chosen == materialize_action:
             self._materialize_item(item)
+        elif chosen == materialize_selected_action:
+            self.materialize_selected_items()
         elif chosen == delete_action:
             self.current_item_id = item.id
             self.delete_current_item()
@@ -553,11 +690,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.status_label.setText(tr("status.imported_explorerpro", count=len(imported_items)))
 
     def _select_item_by_id(self, item_id: str) -> None:
-        for row in range(self.item_list.count()):
-            widget_item = self.item_list.item(row)
-            if widget_item.data(QtCore.Qt.UserRole) == item_id:
-                self.item_list.setCurrentRow(row)
-                return
+        row = self._find_list_row_by_id(item_id)
+        if row >= 0:
+            self.item_list.setCurrentRow(row)
 
     def export_to_explorerpro_library(self) -> None:
         self.save_current_item()

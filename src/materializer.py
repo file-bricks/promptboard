@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Iterable
 
 from models import LibraryItem
 
@@ -27,8 +28,8 @@ def _build_metadata_lines(item: LibraryItem) -> list[str]:
     return lines
 
 
-def build_markdown(item: LibraryItem) -> str:
-    content = item.content.rstrip()
+def build_markdown(item: LibraryItem, *, content: str | None = None) -> str:
+    rendered_content = (item.content if content is None else content).rstrip()
     lines = [
         _origin_marker(item),
         "",
@@ -36,7 +37,7 @@ def build_markdown(item: LibraryItem) -> str:
         "",
         *_build_metadata_lines(item),
         "",
-        content or "_Kein Inhalt vorhanden._",
+        rendered_content or "_Kein Inhalt vorhanden._",
         "",
     ]
     return "\n".join(lines)
@@ -50,3 +51,11 @@ def materialize_item(
     target_path = target_dir / f"{item.filename_stem()}.md"
     target_path.write_text(build_markdown(item), encoding="utf-8")
     return target_path
+
+
+def materialize_items(
+    items: Iterable[LibraryItem],
+    target_dir: Path,
+) -> list[Path]:
+    """Materialize several items into the same target directory."""
+    return [materialize_item(item, target_dir) for item in items]

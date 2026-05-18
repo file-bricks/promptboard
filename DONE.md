@@ -2,6 +2,36 @@
 
 > Archiv für erledigte Aufgaben. Neue Einträge nach Möglichkeit aus TODO.md hierher verschieben, statt sie dort nur zu löschen.
 
+## v1.2-Start (2026-05-13)
+
+- Inline-Variablen `{{name}}` analog ExplorerPro umgesetzt: Rohkopie und
+  Markdown-Kopie fragen Platzhalter beim Kopieren interaktiv ab, ersetzen sie
+  einmalig und brechen bei Abbruch ohne falsche Erfolgsmeldung sauber ab.
+- Regressionstests für Inline-Variablen und Abbruch-Status ergänzt; Teststand
+  auf 42/42 pytest-Tests erhöht.
+- Vorlagen pro Eintragstyp umgesetzt: neue Einträge übernehmen jetzt je nach
+  aktivem Typfilter oder Editor-Typ passende Namen und Inhaltsvorlagen.
+- Regressionstests für Typvorlagen ergänzt; Teststand auf 38/38 pytest-Tests erhöht.
+- Nächsten v1.2-Schwerpunkt festgelegt und direkt umgesetzt: Batch-Materialisierung
+  als erster Fokus gewählt.
+- Batch-Materialisierung umgesetzt: Mehrfachauswahl im Board, Materialisierung
+  ausgewählter Einträge per Button und Kontextmenü.
+- Release-Artefakt `releases/v1.1.1/PromptBoard-1.1.1-win64.exe` in einer
+  isolierten Offscreen-Session gestartet; Startup-Log und Theme-Initialisierung
+  bestätigt.
+- Erweiterte Copy-Modi ergänzt: Rohinhalt bleibt der Standard, Markdown-Kopie
+  ist jetzt über Button-Menü und Kontextmenü verfügbar.
+- `copy_item_markdown()` ergänzt und mit zwei Regressionstests abgesichert.
+- Teststand auf 33/33 pytest-Tests angehoben.
+
+## Lifecycle-Sync + v1.1.1-Stand (2026-05-12)
+
+- Lokaler Projektordner auf `REL-PUB_PromptBoard` umgestellt.
+- Projektstatus, Aufgabenlisten und Release-Dokumente auf den echten Stand `v1.1.1` synchronisiert.
+- Root-Dokumente (`releases.json`, `PROJECT_STATUS.md`) auf REL-PUB umgestellt.
+- GitHub-Releases `v1.0.0`, `v1.1.0` und `v1.1.1` bestätigt.
+- 30/30 pytest-Tests erneut verifiziert.
+
 ## v1.1-Sprint (2026-05-12)
 
 - **Settings als Menü-Dialog** statt eigener Tab (`menu Einstellungen → Einstellungen…`); `src/settings_dialog.py` neu.

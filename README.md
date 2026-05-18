@@ -2,18 +2,23 @@
 
 > Ein leichtgewichtiges Systemtray-Board für Prompts, Skills, Workflows, Rollen und Agenten.
 
-PromptBoard ist als schnelles Desktop-Werkzeug für wiederverwendbare LLM-Bausteine gedacht. Im Unterschied zu umfangreicheren Prompt-Managern steht hier nicht Versionierung oder Board-Komplexität im Vordergrund, sondern schneller Zugriff: öffnen, filtern, kopieren, direkt editieren und bei Bedarf als `.md`-Datei materialisieren.
+PromptBoard ist als schnelles Desktop-Werkzeug für wiederverwendbare
+LLM-Bausteine gedacht. Im Unterschied zu umfangreicheren Prompt-Managern steht
+hier nicht Versionierung oder Board-Komplexität im Vordergrund, sondern
+schneller Zugriff: öffnen, filtern, kopieren, direkt editieren und bei Bedarf
+als `.md`-Datei materialisieren.
 
 ## Status
 
-**Phase:** erster lauffähiger Prototyp  
-**Code:** PySide6-MVP vorhanden  
-**Repository:** noch nicht initialisiert  
-**Aktueller Ordnerstatus:** `LLM/DEV_PromptBoard`
+**Phase:** öffentlich released (`v1.1.1`), erster v1.2-Fokus im lokalen Entwicklungsstand umgesetzt  
+**Code:** PySide6-Desktop-App mit 42/42 pytest-Tests  
+**Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
+**Aktueller Ordnerstatus:** `LLM/REL-PUB_PromptBoard`
 
 ## Zielbild
 
-PromptBoard soll ein kleines Tray-Tool werden, das lokal gespeicherte Wissensbausteine verwaltet:
+PromptBoard ist ein kleines Tray-Tool zur lokalen Verwaltung von
+Wissensbausteinen:
 
 - Prompts
 - Skills
@@ -21,12 +26,16 @@ PromptBoard soll ein kleines Tray-Tool werden, das lokal gespeicherte Wissensbau
 - Rollen
 - Agenten
 
-Jeder Eintrag soll direkt editierbar, nach Typ und Name sortierbar und per Klick in die Zwischenablage kopierbar sein. Per Rechtsklick kann ein Eintrag zusätzlich als Markdown-Datei an einen konfigurierbaren Ort materialisiert werden, standardmäßig auf den Desktop. Der Export bleibt inhaltszentriert: H1, kompakter Metadatenkopf, dann der eigentliche Inhalt.
+Jeder Eintrag ist direkt editierbar, nach Typ und Name sortierbar und per
+Klick in die Zwischenablage kopierbar. Per Rechtsklick kann ein Eintrag
+zusätzlich als Markdown-Datei an einen konfigurierbaren Ort materialisiert
+werden, standardmäßig auf den Desktop. Der Export bleibt inhaltszentriert:
+H1, kompakter Metadatenkopf, dann der eigentliche Inhalt.
 
 ## Abgrenzung
 
 - **Leichter als ProfiPrompt:** keine große Versionshistorie, kein schweres Board-System als Kern.
-- **Robuster als AutoPrompter:** keine fragile Keyboard-/Daemon-Logik als MVP.
+- **Robuster als AutoPrompter:** keine fragile Keyboard-/Daemon-Logik als Kern.
 - **Lokaler als Cloud-Tools:** keine Pflicht zu Online-Sync oder externen APIs.
 
 ## Onboarding
@@ -45,12 +54,14 @@ Jeder Eintrag soll direkt editierbar, nach Typ und Name sortierbar und per Klick
 
 ## Nächster sinnvoller Schritt
 
-Der nächste sinnvolle Schritt ist der ExplorerPro-Adapter und die weitere UX-Politur, damit aus dem MVP ein stabiler Arbeitsprototyp wird.
+Der nächste sinnvolle Schritt ist kein weiterer Lifecycle-Task mehr, sondern
+ein kleiner v1.2-Fokus: globale Hotkeys, Windows-Store-Einreichung oder
+optionale ProfiPrompt-Nähe sind die naheliegendsten Kandidaten.
 
-## Prototyp starten
+## Projekt starten
 
 ```powershell
-cd 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\DEV_PromptBoard'
+cd 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\REL-PUB_PromptBoard'
 python -m pip install -r requirements.txt
 python src\promptboard.py
 ```

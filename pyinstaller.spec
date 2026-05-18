@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec for PromptBoard v1.0.0.
+"""PyInstaller spec for PromptBoard v1.1.1.
 
 Build with:
     python -m PyInstaller pyinstaller.spec --noconfirm

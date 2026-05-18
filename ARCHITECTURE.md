@@ -1,6 +1,8 @@
 # ARCHITECTURE.md - Struktur & Architekturkonzept
 
-> PromptBoard hat noch keine technische Implementierung. Diese Datei beschreibt die konzeptionelle Zielarchitektur für einen kleinen, robusten Desktop-MVP.
+> PromptBoard ist inzwischen technisch umgesetzt. Diese Datei hält die
+> Zielarchitektur, den gewachsenen Zuschnitt des Desktop-Tools und die
+> weiterhin gültigen Leitplanken für spätere Iterationen fest.
 
 ## Overview
 
@@ -121,7 +123,7 @@ Nicht empfehlenswert im MVP:
 ## Zielstruktur für spätere Implementierung
 
 ```text
-DEV_PromptBoard/
+REL-PUB_PromptBoard/
 ├── docs/              # Spezifikationen, Wireframes, Import-Formate
 ├── src/               # Anwendungscode
 ├── tests/             # Modell-, Storage-, Adapter- und UI-Tests

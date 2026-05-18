@@ -121,3 +121,62 @@ def test_query_items_sorts_by_selected_mode():
 def test_coerce_sort_mode_falls_back_to_default():
     assert coerce_sort_mode("unknown") == DEFAULT_SORT_MODE
     assert coerce_sort_mode(None) == DEFAULT_SORT_MODE
+
+
+def test_query_items_filter_all_works_in_english_and_german():
+    items = [
+        make_item(
+            "a",
+            ItemType.PROMPT,
+            "Alpha",
+            updated_at="2026-05-01T10:00:00+00:00",
+            created_at="2026-05-01T10:00:00+00:00",
+        ),
+        make_item(
+            "b",
+            ItemType.SKILL,
+            "Beta",
+            updated_at="2026-05-02T10:00:00+00:00",
+            created_at="2026-05-02T10:00:00+00:00",
+        ),
+    ]
+
+    result_de = query_items(items, "", "ALLE", SORT_MODE_NAME_ASC)
+    result_en = query_items(items, "", "ALL", SORT_MODE_NAME_ASC)
+    result_any = query_items(items, "", "Anything", SORT_MODE_NAME_ASC)
+
+    assert [i.id for i in result_de] == ["a", "b"]
+    assert [i.id for i in result_en] == ["a", "b"]
+    assert [i.id for i in result_any] == ["a", "b"]
+
+
+def test_query_items_type_filter_selects_only_matching_type():
+    items = [
+        make_item(
+            "a",
+            ItemType.PROMPT,
+            "Alpha",
+            updated_at="2026-05-01T10:00:00+00:00",
+            created_at="2026-05-01T10:00:00+00:00",
+        ),
+        make_item(
+            "b",
+            ItemType.SKILL,
+            "Beta",
+            updated_at="2026-05-02T10:00:00+00:00",
+            created_at="2026-05-02T10:00:00+00:00",
+        ),
+        make_item(
+            "c",
+            ItemType.PROMPT,
+            "Charlie",
+            updated_at="2026-05-03T10:00:00+00:00",
+            created_at="2026-05-03T10:00:00+00:00",
+        ),
+    ]
+
+    result = query_items(items, "", "PROMPT", SORT_MODE_NAME_ASC)
+    assert [i.id for i in result] == ["a", "c"]
+
+    result = query_items(items, "", "SKILL", SORT_MODE_NAME_ASC)
+    assert [i.id for i in result] == ["b"]

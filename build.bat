@@ -1,8 +1,8 @@
 @echo off
-REM Build script for PromptBoard v1.0.0
+REM Build script for PromptBoard v1.1.1
 REM ===================================
 REM Builds a single-file Windows executable via PyInstaller,
-REM copies artefacts into releases\v1.0.0\, generates SHA256SUMS.txt.
+REM copies artefacts into releases\v1.1.1\, generates SHA256SUMS.txt.
 
 setlocal enabledelayedexpansion
 cd /d "%~dp0"

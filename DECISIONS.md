@@ -4,6 +4,29 @@
 
 ---
 
+## 2026-05-12: PromptBoard wird lokal als REL-PUB-Projekt geführt
+
+### Kontext
+
+Repo, Release-Artefakte und GitHub-Releases für `v1.0.0`, `v1.1.0` und
+`v1.1.1` sind live. Lokal lief der Projektordner noch als `DEV_`, weil der
+ursprüngliche OneDrive-Lock den Rename blockiert hatte.
+
+### Entscheidung
+
+Der lokale Projektpfad wird auf `LLM/REL-PUB_PromptBoard` umgestellt. Die
+Root-Registry und Statusdokumente folgen diesem Lifecycle-Stand.
+
+### Begründung
+
+- Repo und Releases sind nicht mehr Konzept oder aktive Vorstufe, sondern
+  öffentlich veröffentlicht.
+- Der Ordnername soll mit `releases.json`, `PROJECT_STATUS.md` und dem
+  tatsächlichen Veröffentlichungsstatus übereinstimmen.
+- Veraltete DEV-/RDY-Übergangsaufgaben erzeugen sonst unnötigen Drift.
+
+---
+
 ## 2026-05-10: Markdown-Materialisierung bleibt content-first und trägt nur leichte Metadaten
 
 ### Kontext

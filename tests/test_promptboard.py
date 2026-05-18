@@ -33,6 +33,7 @@ def _make_fake_delete_window(item: LibraryItem, confirm_result: bool):
         _confirm_delete_item=lambda current_item: confirm_result,
         reload_list=lambda: events.append("reload"),
         clear_editor=lambda: events.append("clear"),
+        item_list=SimpleNamespace(count=lambda: 0),
         status_label=SimpleNamespace(setText=lambda text: status_messages.append(text)),
         events=events,
         status_messages=status_messages,
@@ -69,6 +70,176 @@ def test_delete_current_item_deletes_after_confirmation():
     assert window.current_item_id is None
     assert window.events == [("delete", item.id), "reload", "clear"]
     assert window.status_messages == [f"Gelöscht: {item.name}"]
+
+
+def _make_fake_copy_window(item: LibraryItem):
+    events: list[object] = []
+    status_messages: list[str] = []
+
+    clipboard_service = SimpleNamespace(
+        copy_item=lambda current_item: events.append(("raw", current_item.id)),
+        copy_item_markdown=lambda current_item: events.append(("markdown", current_item.id)),
+    )
+
+    def _copy_item_markdown(current_item: LibraryItem) -> None:
+        events.append(("markdown", current_item.id))
+        status_messages.append(f"Als Markdown kopiert: {current_item.name}")
+
+    return SimpleNamespace(
+        current_item_id=item.id,
+        current_item=lambda: item,
+        save_current_item=lambda: events.append("save"),
+        clipboard_service=clipboard_service,
+        _copy_item_markdown=_copy_item_markdown,
+        status_label=SimpleNamespace(setText=lambda text: status_messages.append(text)),
+        events=events,
+        status_messages=status_messages,
+    )
+
+
+def test_copy_current_item_markdown_uses_markdown_status():
+    item = LibraryItem(
+        id="item-3",
+        item_type=ItemType.WORKFLOW,
+        name="Markdown Eintrag",
+        content="## Hallo",
+    )
+    window = _make_fake_copy_window(item)
+
+    MainWindow.copy_current_item_markdown(window)
+
+    assert window.events == ["save", ("markdown", item.id)]
+    assert window.status_messages == [f"Als Markdown kopiert: {item.name}"]
+
+
+def test_copy_item_sets_cancelled_status_when_variable_prompt_is_aborted():
+    item = LibraryItem(
+        id="item-cancelled",
+        item_type=ItemType.PROMPT,
+        name="Abbruch",
+        content="Hallo {{name}}",
+    )
+    status_messages: list[str] = []
+    window = SimpleNamespace(
+        clipboard_service=SimpleNamespace(copy_item=lambda current_item: False),
+        status_label=SimpleNamespace(setText=lambda text: status_messages.append(text)),
+    )
+
+    MainWindow._copy_item(window, item)
+
+    assert status_messages == ["Kopieren abgebrochen"]
+
+
+def test_copy_item_markdown_sets_cancelled_status_when_variable_prompt_is_aborted():
+    item = LibraryItem(
+        id="item-markdown-cancelled",
+        item_type=ItemType.SKILL,
+        name="Markdown Abbruch",
+        content="Hallo {{name}}",
+    )
+    status_messages: list[str] = []
+    window = SimpleNamespace(
+        clipboard_service=SimpleNamespace(copy_item_markdown=lambda current_item: False),
+        status_label=SimpleNamespace(setText=lambda text: status_messages.append(text)),
+    )
+
+    MainWindow._copy_item_markdown(window, item)
+
+    assert status_messages == ["Markdown-Kopie abgebrochen"]
+
+
+def _select_item_rows(window: MainWindow, item_ids: set[str]) -> None:
+    for row in range(window.item_list.count()):
+        widget_item = window.item_list.item(row)
+        if widget_item.data(QtCore.Qt.UserRole) in item_ids:
+            widget_item.setSelected(True)
+
+
+def test_materialize_current_item_batches_selected_rows(qapp_isolated, tmp_path):
+    data_dir = tmp_path / "library"
+    export_dir = tmp_path / "exports"
+
+    settings = SettingsManager()
+    settings.qs.setValue("paths/data", str(data_dir))
+    settings.set_materialize_path(export_dir)
+    settings.qs.sync()
+
+    storage = Storage(data_dir)
+    first = LibraryItem(
+        id="item-a",
+        item_type=ItemType.PROMPT,
+        name="Erster Prompt",
+        content="Alpha",
+    )
+    second = LibraryItem(
+        id="item-b",
+        item_type=ItemType.SKILL,
+        name="Zweiter Skill",
+        content="Beta",
+    )
+    storage.upsert_many([first, second])
+
+    window = MainWindow(storage, settings)
+    try:
+        _select_item_rows(window, {first.id, second.id})
+
+        window.materialize_current_item()
+
+        first_target = export_dir / "ERSTER PROMPT.md"
+        second_target = export_dir / "ZWEITER SKILL.md"
+        assert first_target.exists()
+        assert second_target.exists()
+        assert window.status_label.text().startswith("2 Einträge materialisiert")
+        assert str(export_dir) in window.status_label.text()
+    finally:
+        window.close()
+
+
+def test_create_item_uses_type_filter_template(qapp_isolated, tmp_path):
+    data_dir = tmp_path / "library"
+
+    settings = SettingsManager()
+    settings.qs.setValue("paths/data", str(data_dir))
+    settings.qs.sync()
+
+    storage = Storage(data_dir)
+    window = MainWindow(storage, settings)
+    try:
+        window.type_filter.setCurrentText(ItemType.SKILL.value)
+
+        window.create_item()
+
+        [created] = storage.load_items()
+        assert created.item_type is ItemType.SKILL
+        assert created.name == "NEUER SKILL 1"
+        assert created.source == "lokal"
+        assert created.content.startswith("Zweck:")
+        assert "Ergebnis:" in created.content
+    finally:
+        window.close()
+
+
+def test_create_item_uses_editor_type_when_filter_is_all(qapp_isolated, tmp_path):
+    data_dir = tmp_path / "library"
+
+    settings = SettingsManager()
+    settings.qs.setValue("paths/data", str(data_dir))
+    settings.qs.sync()
+
+    storage = Storage(data_dir)
+    window = MainWindow(storage, settings)
+    try:
+        window.type_combo.setCurrentText(ItemType.AGENT.value)
+
+        window.create_item()
+
+        [created] = storage.load_items()
+        assert created.item_type is ItemType.AGENT
+        assert created.name == "NEUER AGENT 1"
+        assert created.content.startswith("Zweck:")
+        assert "Werkzeuge:" in created.content
+    finally:
+        window.close()
 
 
 # ---------------------------------------------------------------- integration
@@ -163,5 +334,104 @@ def test_import_profiprompt_does_not_recurse_or_crash(qapp_isolated, tmp_path):
         # current_item_id is now the latest imported prompt.
         assert window.current_item_id is not None
         assert window.current_item_id.startswith("profiprompt:prompt:")
+    finally:
+        window.close()
+
+
+def test_dirty_flag_prevents_save_without_changes(qapp_isolated, tmp_path):
+    """Switching items without editing must not update updated_at."""
+    data_dir = tmp_path / "library"
+    settings = SettingsManager()
+    settings.qs.setValue("paths/data", str(data_dir))
+    settings.qs.sync()
+
+    storage = Storage(data_dir)
+    item_a = LibraryItem(
+        id="item-a", item_type=ItemType.PROMPT, name="Alpha", content="AAA",
+        created_at="2026-01-01T00:00:00+00:00",
+        updated_at="2026-01-01T00:00:00+00:00",
+    )
+    item_b = LibraryItem(
+        id="item-b", item_type=ItemType.SKILL, name="Beta", content="BBB",
+        created_at="2026-01-02T00:00:00+00:00",
+        updated_at="2026-01-02T00:00:00+00:00",
+    )
+    storage.upsert_many([item_a, item_b])
+
+    window = MainWindow(storage, settings)
+    try:
+        window.item_list.setCurrentRow(0)
+        original_a = storage.get_item("item-a")
+        original_b = storage.get_item("item-b")
+
+        window.item_list.setCurrentRow(1)
+        window.item_list.setCurrentRow(0)
+
+        after_a = storage.get_item("item-a")
+        after_b = storage.get_item("item-b")
+        assert after_a.updated_at == original_a.updated_at
+        assert after_b.updated_at == original_b.updated_at
+    finally:
+        window.close()
+
+
+def test_item_switch_does_not_crash_on_dangling_reference(qapp_isolated, tmp_path):
+    """Switching between items must not cause RuntimeError from destroyed C++ objects."""
+    data_dir = tmp_path / "library"
+    settings = SettingsManager()
+    settings.qs.setValue("paths/data", str(data_dir))
+    settings.qs.sync()
+
+    storage = Storage(data_dir)
+    storage.upsert_many([
+        LibraryItem(id="x1", item_type=ItemType.PROMPT, name="First", content="C1"),
+        LibraryItem(id="x2", item_type=ItemType.SKILL, name="Second", content="C2"),
+    ])
+
+    window = MainWindow(storage, settings)
+    try:
+        window.item_list.setCurrentRow(0)
+        first_id = window.current_item_id
+        window.content_edit.setPlainText("Modified content")
+
+        window.item_list.setCurrentRow(1)
+
+        second_id = window.current_item_id
+        assert second_id != first_id
+        saved = storage.get_item(first_id)
+        assert saved.content == "Modified content"
+    finally:
+        window.close()
+
+
+def test_delete_does_not_blank_surviving_item(qapp_isolated, tmp_path):
+    """Deleting one item must not blank the editor for the remaining item."""
+    data_dir = tmp_path / "library"
+    settings = SettingsManager()
+    settings.qs.setValue("paths/data", str(data_dir))
+    settings.qs.sync()
+
+    storage = Storage(data_dir)
+    storage.upsert_many([
+        LibraryItem(id="del-1", item_type=ItemType.PROMPT, name="ToDelete", content="Gone"),
+        LibraryItem(id="keep-1", item_type=ItemType.SKILL, name="ToKeep", content="Stay"),
+    ])
+
+    window = MainWindow(storage, settings)
+    try:
+        for row in range(window.item_list.count()):
+            witem = window.item_list.item(row)
+            if witem.data(QtCore.Qt.UserRole) == "del-1":
+                window.item_list.setCurrentRow(row)
+                break
+
+        window._confirm_delete_item = lambda _item: True
+        window.delete_current_item()
+
+        assert len(storage.load_items()) == 1
+        surviving = storage.get_item("keep-1")
+        assert surviving is not None
+        assert surviving.content == "Stay"
+        assert window.content_edit.toPlainText() != ""
     finally:
         window.close()

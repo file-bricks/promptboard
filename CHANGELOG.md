@@ -2,6 +2,33 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-05-16
+
+### Hinzugefügt
+
+- **Inline-Variablen-Substitution für Copy-Flows**: Platzhalter wie
+  `{{name}}` werden bei Rohkopie und Markdown-Kopie ExplorerPro-kompatibel
+  abgefragt, mehrfach vorkommende Variablen nur einmal erfasst und dann in
+  allen Vorkommen ersetzt.
+- Hinweis im Editor-Placeholder, dass `{{name}}` beim Kopieren interaktiv
+  abgefragt wird.
+- **Typvorlagen für neue Einträge**: Neue Einträge übernehmen jetzt je nach
+  aktivem Typfilter oder aktuell gewähltem Editor-Typ passende Startnamen und
+  Inhaltsschablonen für `PROMPT`, `SKILL`, `WORKFLOW`, `ROLLE` und `AGENT`.
+
+### Verändert
+
+- `ClipboardService` meldet Abbrüche der Variablenabfrage jetzt explizit an
+  die UI zurück, damit keine falschen Erfolgsmeldungen entstehen.
+
+### Tests
+
+- Neue Tests für Inline-Variablen in Rohkopie, Markdown-Kopie und
+  Abbruch-Statusmeldungen.
+- 42/42 pytest-Tests grün.
+- Neue Tests für Typvorlagen und deren Integration in `create_item()`.
+- 38/38 pytest-Tests grün.
+
 ## [1.1.1] - 2026-05-12 — Hotfix
 
 ### Behoben

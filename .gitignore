@@ -31,3 +31,9 @@ Desktop.ini
 # Local outputs
 output/
 materialized/
+
+# Internal workspace coordination
+AUFGABEN.txt
+TEST.txt
+TESTS.txt
+TESTERGEBNISSE.txt

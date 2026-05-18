@@ -1,9 +1,9 @@
 ---
 name: promptboard-start
 type: session-bootstrap
-version: 0.1.0
-updated: 2026-05-10
-last_verified: 2026-05-10
+version: 1.1.1
+updated: 2026-05-12
+last_verified: 2026-05-12
 description: |
   Bootstrap-Sequenz für neue Arbeitssessions im PromptBoard-Projekt.
 ---
@@ -16,7 +16,7 @@ description: |
 
 1. [CLAUDE.md](./CLAUDE.md) lesen, falls sie nicht automatisch geladen wurde.
 2. Prüfen, ob `TEST.txt` oder `TESTS.txt` existiert. Falls ja: keine Dateien ändern, bis der Test-Lock aufgehoben ist.
-3. Falls Git später initialisiert wurde: `git status` prüfen.
+3. `git status` prüfen.
 4. [STATE.md](./STATE.md) lesen.
 5. [TODO.md](./TODO.md) und [AUFGABEN.txt](./AUFGABEN.txt) lesen.
 6. [KONZEPT.md](./KONZEPT.md) lesen, wenn Produktumfang oder Abgrenzung unklar sind.
@@ -26,11 +26,14 @@ description: |
 
 ```powershell
 # Projektdateien anzeigen
-Get-ChildItem -Force 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\DEV_PromptBoard'
+Get-ChildItem -Force 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\REL-PUB_PromptBoard'
 
 # Aktive Aufgaben lesen
-Get-Content -LiteralPath 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\DEV_PromptBoard\TODO.md'
-Get-Content -LiteralPath 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\DEV_PromptBoard\AUFGABEN.txt'
+Get-Content -LiteralPath 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\REL-PUB_PromptBoard\TODO.md'
+Get-Content -LiteralPath 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\REL-PUB_PromptBoard\AUFGABEN.txt'
+
+# Tests
+python -m pytest -q
 ```
 
 ## Session-Ende

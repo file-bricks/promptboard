@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from materializer import build_markdown, materialize_item
+from materializer import build_markdown, materialize_item, materialize_items
 from models import (
     ItemType,
     LibraryItem,
@@ -204,3 +204,26 @@ def test_materialize_item_writes_content_first_markdown(tmp_path):
     assert "> Kategorie:" not in markdown
     assert "> Tags:" not in markdown
     assert "_Kein Inhalt vorhanden._" in markdown
+
+
+def test_materialize_items_writes_multiple_markdowns(tmp_path):
+    items = [
+        LibraryItem(
+            id="item-4",
+            item_type=ItemType.PROMPT,
+            name="Erster Eintrag",
+            content="Alpha",
+        ),
+        LibraryItem(
+            id="item-5",
+            item_type=ItemType.SKILL,
+            name="Zweiter Eintrag",
+            content="Beta",
+        ),
+    ]
+
+    targets = materialize_items(items, tmp_path)
+
+    assert targets == [tmp_path / "ERSTER EINTRAG.md", tmp_path / "ZWEITER EINTRAG.md"]
+    assert targets[0].read_text(encoding="utf-8").endswith("Alpha\n")
+    assert targets[1].read_text(encoding="utf-8").endswith("Beta\n")

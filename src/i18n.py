@@ -43,7 +43,16 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
     "btn.new": {"de": "Neu", "en": "New"},
     "btn.delete": {"de": "Löschen", "en": "Delete"},
     "btn.copy": {"de": "Kopieren", "en": "Copy"},
+    "btn.copy_markdown": {"de": "Als Markdown kopieren", "en": "Copy as Markdown"},
     "btn.materialize": {"de": "Materialisieren", "en": "Materialize"},
+    "btn.materialize_current": {
+        "de": "Aktuellen Eintrag materialisieren",
+        "en": "Materialize current entry",
+    },
+    "btn.materialize_selected": {
+        "de": "Ausgewählte Einträge materialisieren",
+        "en": "Materialize selected entries",
+    },
     "btn.change": {"de": "Ändern…", "en": "Change…"},
     "btn.ok": {"de": "OK", "en": "OK"},
     "btn.cancel": {"de": "Abbrechen", "en": "Cancel"},
@@ -66,8 +75,8 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
         "en": "e.g. local, ProfiPrompt, ExplorerPro",
     },
     "form.content_placeholder": {
-        "de": "Inhalt des Eintrags…",
-        "en": "Entry content…",
+        "de": "Inhalt des Eintrags… Platzhalter wie {{name}} werden beim Kopieren abgefragt.",
+        "en": "Entry content… Placeholders like {{name}} are prompted when copying.",
     },
 
     # ----- Settings-Dialog ----------------------------------------------
@@ -122,7 +131,23 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
         "de": "In Zwischenablage kopiert: {name}",
         "en": "Copied to clipboard: {name}",
     },
+    "status.copied_markdown": {
+        "de": "Als Markdown kopiert: {name}",
+        "en": "Copied as Markdown: {name}",
+    },
+    "status.copy_cancelled": {
+        "de": "Kopieren abgebrochen",
+        "en": "Copy cancelled",
+    },
+    "status.copy_markdown_cancelled": {
+        "de": "Markdown-Kopie abgebrochen",
+        "en": "Markdown copy cancelled",
+    },
     "status.materialized": {"de": "Materialisiert: {target}", "en": "Materialized: {target}"},
+    "status.materialized_batch": {
+        "de": "{count} Einträge materialisiert: {target}",
+        "en": "Materialized {count} entries: {target}",
+    },
     "status.materialize_cancelled": {
         "de": "Materialisierung abgebrochen",
         "en": "Materialization cancelled",
@@ -179,6 +204,14 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
     "dialog.overwrite.body": {
         "de": "'{name}' existiert bereits. Überschreiben?",
         "en": "'{name}' already exists. Overwrite?",
+    },
+    "dialog.inline_variable.title": {
+        "de": "Variable: {name}",
+        "en": "Variable: {name}",
+    },
+    "dialog.inline_variable.body": {
+        "de": "Wert für '{name}' eingeben:",
+        "en": "Enter value for '{name}':",
     },
     "dialog.import_failed.title": {"de": "Import fehlgeschlagen", "en": "Import failed"},
     "dialog.import_failed.profiprompt": {

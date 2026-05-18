@@ -2,26 +2,32 @@
 
 > Nur offene Aufgaben. Erledigtes nach [DONE.md](./DONE.md) archivieren.
 
-## Active (Lifecycle-Übergang nach v1.0)
+## Active
 
-- [ ] Build-Artefakt `dist/PromptBoard-1.0.0-win64.exe` verifizieren (Doppelklick, Tray, beide Tabs).
-- [ ] `releases/v1.0.0/` mit `.exe`, `source.zip`, `CHANGELOG.txt`, `SHA256SUMS.txt` befüllen.
-- [ ] Ordner-Rename `DEV_PromptBoard/` → `RDY_PromptBoard/`.
-- [ ] `git init` + initial commit (alle MVP-Dateien außer `.gitignore`-Patterns).
-- [x] GitHub-Repo `file-bricks/promptboard` (neben ProfiPrompt) — initial unter `lukisch/promptboard` angelegt, am 2026-05-12 zu `file-bricks` transferiert.
-- [x] `git remote add origin` + `git push -u origin main`.
-- [ ] GitHub Release v1.0.0 mit Asset-Upload (`gh release create v1.0.0 releases/v1.0.0/*`).
-- [ ] `C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\releases.json` um PromptBoard-Eintrag erweitern.
-- [ ] Lifecycle nach Push: `RDY_` → `REL-PUB_PromptBoard/`.
-- [ ] STATUS_UEBERSICHT bzw. PROJECT_STATUS.md im SOFTWARE-Root aktualisieren (optional).
+- Keine offenen Aufgaben.
 
-## Backlog (für v1.1+)
+## Backlog (für v1.2+)
 
 - [ ] Globale Hotkeys evaluieren (Tray-Show, Quick-Copy zuletzt benutzter Eintrag).
-- [ ] Batch-Materialisierung (mehrere Einträge gleichzeitig).
-- [ ] Vorlagen pro Eintragstyp.
 - [ ] Prüfen, ob PromptBoard direkt einen kompatiblen Teil des ProfiPrompt-Speichers lesen/schreiben soll.
 - [ ] ExplorerPro: AppEntries als optionaler PromptBoard-Typ?
 - [ ] Windows-Store-Einreichung als MSIX (SOFTWARE/WINDOWS_STORE_PIPELINE.md).
-- [ ] Erweiterte Copy-Modi (Markdown statt Plain Text, Roh-Inhalt vs. mit Metadaten).
-- [ ] Inline-Variablen-Substitution `{{name}}` analog ExplorerPro.
+
+## Done
+
+- [x] Inline-Variablen-Substitution `{{name}}` analog ExplorerPro umgesetzt:
+  Rohkopie und Markdown-Kopie fragen Platzhalter beim Kopieren ab, ersetzen
+  sie einmalig und brechen bei Dialog-Abbruch sauber ab.
+- [x] Regressionstests für Inline-Variablen ergänzt; Teststand auf 42/42 pytest-Tests angehoben.
+- [x] Vorlagen pro Eintragstyp umgesetzt: neue Einträge übernehmen jetzt je nach
+  aktivem Typfilter oder Editor-Typ passende Namen und Inhaltsschablonen.
+- [x] Regressionstests für Typvorlagen ergänzt; Teststand auf 38/38 pytest-Tests angehoben.
+- [x] Nächsten v1.2-Schwerpunkt festgelegt und umgesetzt: Batch-Materialisierung als
+  nächster Fokus gewählt und direkt implementiert.
+- [x] Batch-Materialisierung umgesetzt: Mehrfachauswahl im Board, Materialisierung
+  ausgewählter Einträge per Button und Kontextmenü.
+- [x] Release-Artefakt `releases/v1.1.1/PromptBoard-1.1.1-win64.exe`
+  manuell smoke-testen: isolierter Offscreen-Start, Log-Initialisierung und
+  Laufzeitstabilität geprüft.
+- [x] Erweiterte Copy-Modi umgesetzt: Markdown-Kopie per Button-Menü und Kontextmenü
+- [x] `copy_item_markdown()` ergänzt und mit Regressionstests abgesichert

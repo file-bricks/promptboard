@@ -2,10 +2,10 @@
 name: promptboard
 type: project-docs
 profile: FULL
-version: 0.1.0
+version: 1.1.1
 created: 2026-05-10
-updated: 2026-05-10
-last_verified: 2026-05-10
+updated: 2026-05-12
+last_verified: 2026-05-12
 author: Lukas Geiger
 anthropic_compatible: true
 description: |
@@ -21,9 +21,9 @@ description: |
 
 **PromptBoard** ist ein leichtgewichtiges Systemtray-Tool zur lokalen Verwaltung und Wiederverwendung von Prompts, Skills, Workflows, Rollen und Agenten.
 
-**Pfad:** `C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\DEV_PromptBoard`  
-**Repository:** noch kein Git-Repository  
-**Phase:** Konzept / MVP-Spezifikation  
+**Pfad:** `C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\REL-PUB_PromptBoard`  
+**Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
+**Phase:** öffentlich released, Stabilisierung / v1.2-Backlog  
 **Empfohlener Stack:** PySide6, lokale JSON-Speicherung, Markdown-Materialisierung
 
 ## Rolle & Stil
@@ -54,14 +54,21 @@ Kommunikation:
 
 ```powershell
 # Projektstatus ansehen
-Get-ChildItem -Force 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\DEV_PromptBoard'
+Get-ChildItem -Force 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\REL-PUB_PromptBoard'
 
 # Kernidee lesen
-Get-Content -LiteralPath 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\DEV_PromptBoard\IDEE.txt'
-Get-Content -LiteralPath 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\DEV_PromptBoard\KONZEPT.md'
+Get-Content -LiteralPath 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\REL-PUB_PromptBoard\IDEE.txt'
+Get-Content -LiteralPath 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\REL-PUB_PromptBoard\KONZEPT.md'
+
+# App starten / Tests / Build
+python src\promptboard.py
+python -m pytest -q
+build.bat
 ```
 
-Es gibt derzeit keinen Run-, Build- oder Testbefehl, weil noch kein Quellcode vorhanden ist.
+Release-Linie und GitHub-Repo sind aktiv. Historische Konzeptaussagen in den
+Dokumenten bleiben als Verlauf stehen; für den Ist-Stand immer zuerst
+`STATE.md`, `TODO.md` und `AUFGABEN.txt` lesen.
 
 ## Wichtige Dateien
 
@@ -96,7 +103,7 @@ Zentrale Domänenbausteine:
 ## Projekt-Struktur
 
 ```text
-DEV_PromptBoard/
+REL-PUB_PromptBoard/
 ├── IDEE.txt
 ├── KONZEPT.md
 ├── README.md

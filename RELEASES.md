@@ -2,6 +2,28 @@
 
 > Pro Version eine Zeile. Aktuelle Version oben.
 
+## v1.1.1 — 2026-05-12
+
+**Status:** released
+**Plattform:** Windows x64
+**Repo:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)
+
+### Artefakte (`releases/v1.1.1/`)
+
+| Datei | Inhalt |
+|---|---|
+| `PromptBoard-1.1.1-win64.exe` | Single-File Windows-Executable (PyInstaller, windowed) |
+| `PromptBoard-1.1.1-source.zip` | Quellcode-Archiv (`src/`) |
+| `CHANGELOG.txt` | Changelog dieser Version |
+| `SHA256SUMS.txt` | SHA-256 Prüfsummen |
+
+### Highlights
+
+- **Hotfix für Import-Crash** nach ProfiPrompt-/ExplorerPro-Import
+- `reload_list()` schützt den Listen-Rebuild mit `blockSignals(True/False)`
+- `Storage.upsert_many()` reduziert Batch-Imports auf einen Read- und einen Write-Pfad
+- 30/30 pytest-Tests grün
+
 ## v1.1.0 — 2026-05-12
 
 **Status:** released
@@ -28,7 +50,7 @@
 
 **Status:** released
 **Plattform:** Windows x64
-**Stores:** GitHub Release (geplant)
+**Repo:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)
 
 ### Artefakte (`releases/v1.0.0/`)
 

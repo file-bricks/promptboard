@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Iterable, List
 
-from models import LibraryItem
+from models import ItemType, LibraryItem
 
 SORT_MODE_UPDATED_DESC = "updated_desc"
 SORT_MODE_NAME_ASC = "name_asc"
@@ -90,9 +90,11 @@ def query_items(
     item_type_filter: str,
     sort_mode: str | None,
 ) -> List[LibraryItem]:
+    valid_types = set(ItemType.choices())
+    type_filter_active = item_type_filter in valid_types
     filtered: List[LibraryItem] = []
     for item in items:
-        if item_type_filter != "ALLE" and item.item_type.value != item_type_filter:
+        if type_filter_active and item.item_type.value != item_type_filter:
             continue
         if not item_matches_search(item, search_text):
             continue
