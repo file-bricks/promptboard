@@ -3,13 +3,39 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 APP_NAME = "PromptBoard"
 APP_VERSION = "1.1.1"
 STORE_VERSION = "1.1.1.0"
 APP_EXECUTABLE = f"{APP_NAME}-{APP_VERSION}-win64.exe"
+STORE_CONFIG_NAME = "store_package.json"
+LOCAL_STORE_CONFIG_NAME = "store_package.local.json"
+STORE_CONFIG_DEFAULTS = {
+    "app_name": APP_NAME,
+    "publisher": "CN=YourPublisher",
+    "publisher_display": "Lukas Geiger",
+    "identity_name": "YourPublisher.PromptBoard",
+    "version": STORE_VERSION,
+    "description": "Lokales Tray-Tool für Prompts, Skills, Workflows, Rollen und Agenten.",
+    "executable": APP_EXECUTABLE,
+    "capabilities": "",
+    "category": "Productivity",
+    "age_rating": "3+",
+    "privacy_url": "https://github.com/file-bricks/promptboard/blob/main/PRIVACY_POLICY.md",
+    "support_url": "https://github.com/file-bricks/promptboard/issues",
+}
+PLACEHOLDER_VALUES = {
+    "publisher": {"CN=YourPublisher", ""},
+    "identity_name": {"YourPublisher.PromptBoard", ""},
+}
+STORE_ENV_OVERRIDES = {
+    "publisher": "PROMPTBOARD_STORE_PUBLISHER",
+    "publisher_display": "PROMPTBOARD_STORE_PUBLISHER_DISPLAY",
+    "identity_name": "PROMPTBOARD_STORE_IDENTITY_NAME",
+}
 
 
 def project_root() -> Path:
@@ -26,23 +52,78 @@ def store_tool_path(root: Path | None = None) -> Path:
 
 
 def build_store_config() -> dict[str, str]:
-    return {
-        "app_name": APP_NAME,
-        "publisher": "CN=YourPublisher",
-        "publisher_display": "Lukas Geiger",
-        "identity_name": "YourPublisher.PromptBoard",
-        "version": STORE_VERSION,
-        "description": "Lokales Tray-Tool für Prompts, Skills, Workflows, Rollen und Agenten.",
-        "executable": APP_EXECUTABLE,
-        "capabilities": "",
-        "category": "Productivity",
-        "age_rating": "3+",
-        "privacy_url": "https://github.com/file-bricks/promptboard/blob/master/PRIVACY_POLICY.md",
-        "support_url": "https://github.com/file-bricks/promptboard/issues",
-    }
+    return dict(STORE_CONFIG_DEFAULTS)
 
 
-def build_store_listing(config: dict[str, str]) -> str:
+def store_config_path(root: Path | None = None) -> Path:
+    base = root or project_root()
+    return base / STORE_CONFIG_NAME
+
+
+def local_store_config_path(root: Path | None = None) -> Path:
+    base = root or project_root()
+    return base / LOCAL_STORE_CONFIG_NAME
+
+
+def read_json_file(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"Ungültige Store-Konfiguration in {path}: Objekt erwartet.")
+    return {str(key): str(value) for key, value in data.items()}
+
+
+def environment_store_overrides(environ: Mapping[str, str] | None = None) -> dict[str, str]:
+    source = environ or os.environ
+    overrides: dict[str, str] = {}
+    for field, env_name in STORE_ENV_OVERRIDES.items():
+        value = source.get(env_name, "").strip()
+        if value:
+            overrides[field] = value
+    return overrides
+
+
+def load_store_config(
+    root: Path | None = None,
+    *,
+    include_local_overrides: bool = True,
+    environ: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    base = root or project_root()
+    config = build_store_config()
+    config.update(read_json_file(store_config_path(base)))
+    if include_local_overrides:
+        config.update(read_json_file(local_store_config_path(base)))
+        config.update(environment_store_overrides(environ))
+    return config
+
+
+def is_placeholder_value(field: str, value: str) -> bool:
+    return value.strip() in PLACEHOLDER_VALUES.get(field, set())
+
+
+def unresolved_store_fields(config: Mapping[str, str]) -> list[str]:
+    unresolved = []
+    for field in ("publisher", "identity_name"):
+        value = str(config.get(field, ""))
+        if is_placeholder_value(field, value):
+            unresolved.append(field)
+    return unresolved
+
+
+def assert_store_ready(config: Mapping[str, str]) -> None:
+    unresolved = unresolved_store_fields(config)
+    if unresolved:
+        raise ValueError(
+            "Partner-Center-Werte fehlen noch: "
+            f"{', '.join(unresolved)}. Trage sie in {STORE_CONFIG_NAME}, "
+            f"{LOCAL_STORE_CONFIG_NAME} oder per Umgebungsvariablen ein "
+            "(PROMPTBOARD_STORE_PUBLISHER, PROMPTBOARD_STORE_IDENTITY_NAME)."
+        )
+
+
+def build_store_listing(config: Mapping[str, str]) -> str:
     description_de = (
         "PromptBoard ist ein leichtgewichtiges, offline-first Desktop-Werkzeug für wiederverwendbare "
         "LLM-Bausteine. Die App verwaltet Prompts, Skills, Workflows, Rollen und "
@@ -56,8 +137,8 @@ def build_store_listing(config: dict[str, str]) -> str:
         "without mandatory cloud sync."
     )
     return (
-        f"# Store Listing — {config['app_name']}\n\n"
-        "Stand: 2026-05-20\n\n"
+        f"# Store Listing - {config['app_name']}\n\n"
+        "Stand: 2026-05-24\n\n"
         "## Deutsch\n\n"
         f"**Name:** {config['app_name']}  \n"
         f"**Kurzbeschreibung:** {config['description']}  \n"
@@ -82,8 +163,8 @@ def build_store_listing(config: dict[str, str]) -> str:
 
 def write_root_files(root: Path | None = None) -> tuple[Path, Path]:
     base = root or project_root()
-    config = build_store_config()
-    config_path = base / "store_package.json"
+    config = load_store_config(base, include_local_overrides=False)
+    config_path = store_config_path(base)
     config_path.write_text(
         json.dumps(config, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
@@ -126,11 +207,12 @@ def load_store_packager(root: Path | None = None) -> Any:
 def prepare_store_package(root: Path | None = None, explicit_exe: str | None = None) -> Path:
     base = root or project_root()
     config_path, _listing_path = write_root_files(base)
+    effective_config = load_store_config(base)
+    assert_store_ready(effective_config)
     executable = resolve_executable(base, explicit=explicit_exe)
     module = load_store_packager(base)
     packager = module.StorePackager(str(base), app_name=APP_NAME, config_file=str(config_path))
-    packager.config.update(build_store_config())
-    packager.save_config(str(config_path))
+    packager.config.update(effective_config)
     packager.prepare_package(
         icon_source=str(base / "PromptBoard.png"),
         exe_path=str(executable),
@@ -143,22 +225,33 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("write-root-files", help="store_package.json und STORE_LISTING.md schreiben")
+    subparsers.add_parser("check", help="Store-Konfiguration auf echte Partner-Center-Werte prüfen")
 
     prepare_parser = subparsers.add_parser("prepare", help="Store-Paket-Staging erzeugen")
     prepare_parser.add_argument("--exe", help="Pfad zur PromptBoard-EXE")
 
     args = parser.parse_args()
 
-    if args.command == "write-root-files":
-        config_path, listing_path = write_root_files()
-        print(f"[+] Geschrieben: {config_path}")
-        print(f"[+] Geschrieben: {listing_path}")
-        return
+    try:
+        if args.command == "write-root-files":
+            config_path, listing_path = write_root_files()
+            print(f"[+] Geschrieben: {config_path}")
+            print(f"[+] Geschrieben: {listing_path}")
+            return
 
-    if args.command == "prepare":
-        output_dir = prepare_store_package(explicit_exe=args.exe)
-        print(f"[+] Store-Staging vorbereitet: {output_dir}")
-        return
+        if args.command == "check":
+            config = load_store_config()
+            assert_store_ready(config)
+            print("[+] Store-Konfiguration ist für den echten Partner-Center-Lauf bereit.")
+            return
+
+        if args.command == "prepare":
+            output_dir = prepare_store_package(explicit_exe=args.exe)
+            print(f"[+] Store-Staging vorbereitet: {output_dir}")
+            return
+    except (FileNotFoundError, RuntimeError, ValueError) as exc:
+        print(f"[!] {exc}")
+        raise SystemExit(1) from exc
 
 
 if __name__ == "__main__":

@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-05-24
+
+### Verändert
+
+- **Windows-Store-Workflow gehärtet**: `_tools/store_release.py` erhält
+  bestehende Partner-Center-Werte in `store_package.json`, statt sie beim
+  nächsten Vorbereitungslauf wieder durch Platzhalter zu ersetzen.
+- **Lokale Store-Overrides**: `store_package.local.json` sowie
+  `PROMPTBOARD_STORE_PUBLISHER`, `PROMPTBOARD_STORE_PUBLISHER_DISPLAY` und
+  `PROMPTBOARD_STORE_IDENTITY_NAME` können reale Partner-Center-Werte lokal
+  einspeisen.
+- **Früher Store-Readiness-Check**: `build_store.bat` prüft vor dem Staging,
+  ob `publisher` und `identity_name` echte Werte haben.
+
+### Tests
+
+- Neue Tests für Konfig-Merging, Platzhalter-Erkennung und Store-Staging mit
+  echten effektiven Werten im Helper `tests/test_store_release.py`.
+
 ## [Unreleased] - 2026-05-22
 
 ### Hinzugefügt

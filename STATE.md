@@ -2,17 +2,17 @@
 name: promptboard-state
 type: state-snapshot
 version: 1.1.1
-updated: 2026-05-22
+updated: 2026-05-24
 updated_by: GPT
-current_phase: REL-PUB v1.1.1 stabilisiert; Windows-Store-Vorbereitung für v1.2 mit reproduzierbaren Screenshots erweitert
-last_verified: 2026-05-22
+current_phase: REL-PUB v1.1.1 stabilisiert; Windows-Store-Vorbereitung für v1.2 mit gehärtetem Store-Workflow und reproduzierbaren Screenshots erweitert
+last_verified: 2026-05-24
 description: |
   PromptBoard ist als öffentliches Desktop-Tool veröffentlicht. Die aktuelle
   Linie steht bei v1.1.1 inklusive Hotfix für den Import-Crash,
   vollständiger Release-Artefakte und lokalem REL-PUB-Lifecycle.
   Batch-Materialisierung, Typvorlagen, Inline-Variablen, globale Hotkeys und
   jetzt auch reproduzierbare Store-Screenshots sind umgesetzt.
-  56/56 Tests grün. PyInstaller-Build + Release-Pipeline vorhanden.
+  60/60 Tests grün. PyInstaller-Build + Release-Pipeline vorhanden.
 ---
 
 # STATE.md - Aktueller Projekt-Stand
@@ -34,6 +34,16 @@ reproduzierbare Screenshots sind da; offen bleiben Partner-Center-Werte sowie
 der echte MSIX-/WACK-Lauf.
 
 ## Letzte bedeutsame Aktion
+
+2026-05-24:
+- **Store-Workflow gehärtet**: `_tools/store_release.py` überschreibt
+  Partner-Center-Werte nicht mehr mit Platzhaltern.
+- **Lokale Store-Overrides ergänzt**: `store_package.local.json` oder
+  `PROMPTBOARD_STORE_*` können Publisher/Identity lokal liefern, ohne den
+  getrackten Standardworkflow zu verbiegen.
+- **Früher Readiness-Check**: `build_store.bat` prüft jetzt vor dem Staging,
+  ob `publisher` und `identity_name` echte Werte haben.
+- **Teststand** für den Store-Helper erweitert.
 
 2026-05-22:
 - **Bugfix-Runde ergänzt**: Batch-Materialisierung speichert offene Edits jetzt
@@ -75,8 +85,8 @@ der echte MSIX-/WACK-Lauf.
 ## Aktuelle Blocker
 
 - Keine technischen Code-Blocker.
-- Für den echten MSIX-Build fehlen noch die finalen Partner-Center-Werte
-  (`publisher`, `identity_name`).
+- Für den echten MSIX-Build fehlen weiter die finalen Partner-Center-Werte
+  (`publisher`, `identity_name`); sie blockieren jetzt aber sauber und früh.
 
 ## Notizen für nächste Session
 
@@ -88,7 +98,8 @@ der echte MSIX-/WACK-Lauf.
 - Logdatei: `%LOCALAPPDATA%\PromptBoard\promptboard.log`.
 - `build_store.bat` nutzt die zentrale `_STORE`-Pipeline und erwartet eine
   vorhandene EXE in `dist/` oder `releases/v1.1.1/`.
-- `store_package.json` enthält bewusst Platzhalter für Publisher/Identity.
+- `store_package.json` darf Platzhalter behalten; lokale echte Werte können
+  über `store_package.local.json` oder `PROMPTBOARD_STORE_*` kommen.
 - Store-Screenshots liegen unter `README/screenshots/store/` und können per
   `_tools/generate_store_screenshots.py` neu erzeugt werden.
 

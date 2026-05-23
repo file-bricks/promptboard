@@ -1,6 +1,6 @@
-# Store Listing — PromptBoard
+# Store Listing - PromptBoard
 
-Stand: 2026-05-20
+Stand: 2026-05-24
 
 ## Deutsch
 

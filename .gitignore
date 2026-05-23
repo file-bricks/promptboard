@@ -19,6 +19,7 @@ dist/
 # Release artefacts (large binaries go to GitHub Releases, not git)
 releases/
 store_package/
+store_package.local.json
 *.msix
 *.appx
 *.appxbundle

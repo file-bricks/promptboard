@@ -16,6 +16,10 @@
 
 ## Done
 
+- [x] Store-Workflow gehärtet: `write-root-files` erhält bestehende
+  Partner-Center-Werte, `check` stoppt echte Store-Läufe mit Platzhaltern,
+  und `store_package.local.json` sowie Umgebungsvariablen können lokale
+  Publisher/Identity-Werte liefern.
 - [x] Windows-Store-Vorbereitung automatisiert: `store_package.json`,
   `STORE_LISTING.md`, `PRIVACY_POLICY.md`, `build_store.bat` und
   `_tools/store_release.py` angelegt; Store-Einreichung in konkrete Folgeaufgaben zerlegt.
