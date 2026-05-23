@@ -182,6 +182,12 @@ def test_materialize_current_item_batches_selected_rows(qapp_isolated, tmp_path)
     window = MainWindow(storage, settings)
     try:
         _select_item_rows(window, {first.id, second.id})
+        for row in range(window.item_list.count()):
+            widget_item = window.item_list.item(row)
+            if widget_item.data(QtCore.Qt.UserRole) == first.id:
+                window.item_list.setCurrentRow(row)
+                break
+        window.content_edit.setPlainText("Alpha geändert")
 
         window.materialize_current_item()
 
@@ -189,6 +195,7 @@ def test_materialize_current_item_batches_selected_rows(qapp_isolated, tmp_path)
         second_target = export_dir / "ZWEITER SKILL.md"
         assert first_target.exists()
         assert second_target.exists()
+        assert "Alpha geändert" in first_target.read_text(encoding="utf-8")
         assert window.status_label.text().startswith("2 Einträge materialisiert")
         assert str(export_dir) in window.status_label.text()
     finally:
@@ -433,5 +440,59 @@ def test_delete_does_not_blank_surviving_item(qapp_isolated, tmp_path):
         assert surviving is not None
         assert surviving.content == "Stay"
         assert window.content_edit.toPlainText() != ""
+    finally:
+        window.close()
+
+
+def test_quick_copy_last_used_item_uses_persisted_recent_entry(qapp_isolated, tmp_path):
+    data_dir = tmp_path / "library"
+    settings = SettingsManager()
+    settings.qs.setValue("paths/data", str(data_dir))
+    settings.set_last_active_item_id("recent-item")
+    settings.qs.sync()
+
+    storage = Storage(data_dir)
+    recent = LibraryItem(
+        id="recent-item",
+        item_type=ItemType.PROMPT,
+        name="Letzter Eintrag",
+        content="Hallo",
+    )
+    storage.upsert_item(recent)
+
+    window = MainWindow(storage, settings)
+    try:
+        copied: list[str] = []
+        window.clipboard_service = SimpleNamespace(
+            copy_item=lambda current_item: copied.append(current_item.id) or True,
+            copy_item_markdown=lambda current_item: False,
+        )
+        window.current_item_id = None
+
+        window.quick_copy_last_used_item()
+
+        assert copied == ["recent-item"]
+        assert window.last_active_item_id == "recent-item"
+    finally:
+        window.close()
+
+
+def test_toggle_visibility_from_hotkey_hides_and_shows_window(qapp_isolated, tmp_path):
+    data_dir = tmp_path / "library"
+    settings = SettingsManager()
+    settings.qs.setValue("paths/data", str(data_dir))
+    settings.qs.sync()
+
+    storage = Storage(data_dir)
+    window = MainWindow(storage, settings)
+    try:
+        window.show()
+        assert window.isVisible()
+
+        window.toggle_visibility_from_hotkey()
+        assert not window.isVisible()
+
+        window.toggle_visibility_from_hotkey()
+        assert window.isVisible()
     finally:
         window.close()

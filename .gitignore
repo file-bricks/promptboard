@@ -18,6 +18,15 @@ dist/
 
 # Release artefacts (large binaries go to GitHub Releases, not git)
 releases/
+store_package/
+*.msix
+*.appx
+*.appxbundle
+AppPackages/
+WACK/
+*.cer
+*.pfx
+README-WORKSTATION-*.md
 
 # IDE / editor
 .idea/

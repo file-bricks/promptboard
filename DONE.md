@@ -4,6 +4,10 @@
 
 ## v1.2-Start (2026-05-13)
 
+- Windows-Store-Vorbereitung konkretisiert: `store_package.json`,
+  `STORE_LISTING.md`, `PRIVACY_POLICY.md`, `build_store.bat` und
+  `_tools/store_release.py` angelegt; Store-Aufgabe in konkrete Folgeschritte
+  für Publisher-Daten, Screenshots und MSIX/WACK-Lauf zerlegt.
 - Inline-Variablen `{{name}}` analog ExplorerPro umgesetzt: Rohkopie und
   Markdown-Kopie fragen Platzhalter beim Kopieren interaktiv ab, ersetzen sie
   einmalig und brechen bei Abbruch ohne falsche Erfolgsmeldung sauber ab.

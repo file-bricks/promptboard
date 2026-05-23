@@ -1,0 +1,14 @@
+{
+  "app_name": "PromptBoard",
+  "publisher": "CN=YourPublisher",
+  "publisher_display": "Lukas Geiger",
+  "identity_name": "YourPublisher.PromptBoard",
+  "version": "1.1.1.0",
+  "description": "Lokales Tray-Tool für Prompts, Skills, Workflows, Rollen und Agenten.",
+  "executable": "PromptBoard-1.1.1-win64.exe",
+  "capabilities": "",
+  "category": "Productivity",
+  "age_rating": "3+",
+  "privacy_url": "https://github.com/file-bricks/promptboard/blob/main/PRIVACY_POLICY.md",
+  "support_url": "https://github.com/file-bricks/promptboard/issues"
+}

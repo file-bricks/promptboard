@@ -24,6 +24,14 @@
 - `Storage.upsert_many()` reduziert Batch-Imports auf einen Read- und einen Write-Pfad
 - 30/30 pytest-Tests grün
 
+### Store-Vorbereitung
+
+- `store_package.json`, `STORE_LISTING.md` und `PRIVACY_POLICY.md` liegen im
+  Projektroot als Grundlage für einen späteren Windows-Store-Eintrag.
+- `build_store.bat` und `_tools/store_release.py` koppeln PromptBoard an die
+  zentrale `_STORE`-Pipeline für Staging, Pretest und den späteren MSIX-Build.
+- Künftige MSIX-Artefakte gehören nach `releases/windowsstore/`.
+
 ## v1.1.0 — 2026-05-12
 
 **Status:** released

@@ -8,13 +8,20 @@
 
 ## Backlog (für v1.2+)
 
-- [ ] Globale Hotkeys evaluieren (Tray-Show, Quick-Copy zuletzt benutzter Eintrag).
+- [x] Globale Hotkeys umgesetzt (Tray-Show, Quick-Copy zuletzt benutzter Eintrag; Windows-native Registrierung, Fallback ohne Konflikt).
 - [ ] Prüfen, ob PromptBoard direkt einen kompatiblen Teil des ProfiPrompt-Speichers lesen/schreiben soll.
 - [ ] ExplorerPro: AppEntries als optionaler PromptBoard-Typ?
-- [ ] Windows-Store-Einreichung als MSIX (SOFTWARE/WINDOWS_STORE_PIPELINE.md).
+- [ ] Partner-Center-Publisher/Identity für den Store in `store_package.json` eintragen.
+- [ ] MSIX + WACK-Lauf mit `build_store.bat` und `_STORE/msstore_build_msix.ps1` durchführen.
 
 ## Done
 
+- [x] Windows-Store-Vorbereitung automatisiert: `store_package.json`,
+  `STORE_LISTING.md`, `PRIVACY_POLICY.md`, `build_store.bat` und
+  `_tools/store_release.py` angelegt; Store-Einreichung in konkrete Folgeaufgaben zerlegt.
+- [x] Reproduzierbare Store-Screenshots erzeugt: `_tools/generate_store_screenshots.py`
+  schreibt `tray.png`, `library.png`, `editor.png` und `settings.png` nach
+  `README/screenshots/store/`; Smoke-Test `tests/test_store_screenshots.py` prüft die Ausgabe.
 - [x] Inline-Variablen-Substitution `{{name}}` analog ExplorerPro umgesetzt:
   Rohkopie und Markdown-Kopie fragen Platzhalter beim Kopieren ab, ersetzen
   sie einmalig und brechen bei Dialog-Abbruch sauber ab.

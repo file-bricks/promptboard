@@ -66,3 +66,10 @@ def test_materialize_path_round_trip(tmp_path):
     target = tmp_path / "exports"
     settings.set_materialize_path(target)
     assert SettingsManager().get_materialize_path() == target
+
+
+def test_last_active_item_id_round_trip():
+    settings = SettingsManager()
+    assert settings.get_last_active_item_id() == ""
+    settings.set_last_active_item_id("item-42")
+    assert SettingsManager().get_last_active_item_id() == "item-42"

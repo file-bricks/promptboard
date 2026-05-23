@@ -8,10 +8,14 @@ hier nicht Versionierung oder Board-Komplexität im Vordergrund, sondern
 schneller Zugriff: öffnen, filtern, kopieren, direkt editieren und bei Bedarf
 als `.md`-Datei materialisieren.
 
+PromptBoard is a local prompt manager and Windows tray app for reusable LLM
+prompts, skills, workflows, roles and agents. It keeps prompt libraries offline,
+searchable and copy-ready without requiring a cloud account.
+
 ## Status
 
 **Phase:** öffentlich released (`v1.1.1`), erster v1.2-Fokus im lokalen Entwicklungsstand umgesetzt  
-**Code:** PySide6-Desktop-App mit 42/42 pytest-Tests  
+**Code:** PySide6-Desktop-App mit 56/56 pytest-Tests
 **Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
 **Aktueller Ordnerstatus:** `LLM/REL-PUB_PromptBoard`
 
@@ -31,6 +35,9 @@ Klick in die Zwischenablage kopierbar. Per Rechtsklick kann ein Eintrag
 zusätzlich als Markdown-Datei an einen konfigurierbaren Ort materialisiert
 werden, standardmäßig auf den Desktop. Der Export bleibt inhaltszentriert:
 H1, kompakter Metadatenkopf, dann der eigentliche Inhalt.
+
+Globale Hotkeys blenden das Tray-Fenster ein oder aus und kopieren den
+zuletzt benutzten Eintrag schnell in die Zwischenablage.
 
 ## Abgrenzung
 

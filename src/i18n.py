@@ -173,6 +173,30 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
         "de": "Neuer Materialisierungspfad: {path}",
         "en": "New materialize path: {path}",
     },
+    "status.hotkeys_enabled": {
+        "de": "Globale Hotkeys aktiv: {show} / {copy}",
+        "en": "Global hotkeys active: {show} / {copy}",
+    },
+    "status.hotkeys_unavailable": {
+        "de": "Globale Hotkeys nicht verfügbar; Systemtray bleibt aktiv",
+        "en": "Global hotkeys unavailable; system tray remains active",
+    },
+    "status.hotkeys_toggle_shown": {
+        "de": "Fenster über Hotkey eingeblendet",
+        "en": "Window shown via hotkey",
+    },
+    "status.hotkeys_toggle_hidden": {
+        "de": "Fenster über Hotkey ausgeblendet",
+        "en": "Window hidden via hotkey",
+    },
+    "status.hotkeys_no_recent_item": {
+        "de": "Kein zuletzt benutzter Eintrag für die Schnellkopie gefunden",
+        "en": "No recently used entry found for quick copy",
+    },
+    "status.hotkeys_quick_copy": {
+        "de": "Schnellkopie per Hotkey: {name}",
+        "en": "Quick copy via hotkey: {name}",
+    },
     "status.profiprompt_path_set": {
         "de": "Neuer ProfiPrompt-Pfad: {path}",
         "en": "New ProfiPrompt path: {path}",

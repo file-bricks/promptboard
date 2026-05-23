@@ -9,6 +9,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from clipboard_service import ClipboardService
 from explorerpro_adapter import export_to_explorerpro, load_explorerpro_items
+from hotkeys import PromptBoardHotkeys
 from i18n import set_language as set_global_language
 from i18n import tr
 from item_templates import build_default_name, get_item_template
@@ -47,8 +48,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.settings = settings
         self.clipboard_service = ClipboardService(QtWidgets.QApplication.instance())
         self.current_item_id: Optional[str] = None
+        self.last_active_item_id: Optional[str] = self.settings.get_last_active_item_id() or None
         self._loading_ui = False
         self._dirty = False
+        self.tray_icon: Optional[QtWidgets.QSystemTrayIcon] = None
+        self.hotkeys: Optional[PromptBoardHotkeys] = None
 
         self.setWindowTitle("PromptBoard")
         self.setWindowIcon(load_app_icon())
@@ -289,6 +293,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.current_item_id = current.data(QtCore.Qt.UserRole)
         item = self.storage.get_item(self.current_item_id)
         if item is not None:
+            self._remember_active_item(item)
             self.load_item_into_editor(item)
 
     def load_item_into_editor(self, item: LibraryItem) -> None:
@@ -356,6 +361,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._dirty = False
         self.status_label.setText(tr("status.autosaved", name=item.name))
         self.current_item_id = item.id
+        self._remember_active_item(item)
         self._update_list_item_text(item)
 
     @staticmethod
@@ -404,6 +410,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.current_item_id = item.id
         self.reload_list()
         self.status_label.setText(tr("status.created"))
+        self._remember_active_item(item)
 
     def on_sort_changed(self, *_args) -> None:
         self.settings.set_sort_mode(self.current_sort_mode())
@@ -480,27 +487,36 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self._copy_item_markdown(item)
 
-    def _copy_item(self, item: LibraryItem) -> None:
+    def _copy_item(self, item: LibraryItem, notify_message: Optional[str] = None) -> bool:
+        remember = getattr(self, "_remember_active_item", None)
+        if callable(remember):
+            remember(item)
         if self.clipboard_service.copy_item(item):
             self.status_label.setText(tr("status.copied", name=item.name))
+            if notify_message:
+                self._announce_status(notify_message)
+            return True
         else:
             self.status_label.setText(tr("status.copy_cancelled"))
+            return False
 
-    def _copy_item_markdown(self, item: LibraryItem) -> None:
+    def _copy_item_markdown(self, item: LibraryItem) -> bool:
+        remember = getattr(self, "_remember_active_item", None)
+        if callable(remember):
+            remember(item)
         if self.clipboard_service.copy_item_markdown(item):
             self.status_label.setText(tr("status.copied_markdown", name=item.name))
+            return True
         else:
             self.status_label.setText(tr("status.copy_markdown_cancelled"))
+            return False
 
     def copy_double_clicked_item(self, widget_item: QtWidgets.QListWidgetItem) -> None:
         item_id = widget_item.data(QtCore.Qt.UserRole)
         item = self.storage.get_item(item_id) if item_id else None
         if item is None:
             return
-        if self.clipboard_service.copy_item(item):
-            self.status_label.setText(tr("status.copied", name=item.name))
-        else:
-            self.status_label.setText(tr("status.copy_cancelled"))
+        self._copy_item(item)
 
     def selected_items(self) -> list[LibraryItem]:
         selected_rows = {
@@ -518,8 +534,8 @@ class MainWindow(QtWidgets.QMainWindow):
         return items
 
     def materialize_current_item(self) -> None:
-        selected = self.selected_items()
         self.save_current_item()
+        selected = self.selected_items()
         if len(selected) > 1:
             self._materialize_items(selected)
             return
@@ -529,8 +545,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._materialize_item(item)
 
     def materialize_selected_items(self) -> None:
-        selected = self.selected_items()
         self.save_current_item()
+        selected = self.selected_items()
         if not selected:
             return
         self._materialize_items(selected)
@@ -694,6 +710,42 @@ class MainWindow(QtWidgets.QMainWindow):
         if row >= 0:
             self.item_list.setCurrentRow(row)
 
+    def _remember_active_item(self, item: LibraryItem) -> None:
+        self.last_active_item_id = item.id
+        self.settings.set_last_active_item_id(item.id)
+
+    def toggle_visibility_from_hotkey(self) -> None:
+        if self.isVisible() and not self.isMinimized():
+            self.hide()
+            self._announce_status(tr("status.hotkeys_toggle_hidden"))
+            return
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        self._announce_status(tr("status.hotkeys_toggle_shown"))
+
+    def quick_copy_last_used_item(self) -> None:
+        item = self.current_item()
+        if item is None and self.last_active_item_id:
+            item = self.storage.get_item(self.last_active_item_id)
+        if item is None:
+            items = self.all_items()
+            item = items[0] if items else None
+        if item is None:
+            self._announce_status(tr("status.hotkeys_no_recent_item"))
+            return
+        self._copy_item(item, notify_message=tr("status.hotkeys_quick_copy", name=item.name))
+
+    def _announce_status(self, text: str) -> None:
+        self.status_label.setText(text)
+        if self.tray_icon is not None:
+            self.tray_icon.showMessage(
+                "PromptBoard",
+                text,
+                QtWidgets.QSystemTrayIcon.Information,
+                2500,
+            )
+
     def export_to_explorerpro_library(self) -> None:
         self.save_current_item()
         items = self.all_items()
@@ -762,6 +814,23 @@ def main() -> int:
     storage = Storage(settings.get_data_path())
     window = MainWindow(storage, settings)
     create_tray(window)
+    hotkeys = PromptBoardHotkeys(
+        on_toggle_visibility=window.toggle_visibility_from_hotkey,
+        on_quick_copy=window.quick_copy_last_used_item,
+    )
+    hotkeys.start(app)
+    window.hotkeys = hotkeys
+    if hotkeys.supported and hotkeys.registered:
+        window._announce_status(
+            tr(
+                "status.hotkeys_enabled",
+                show=hotkeys.hotkeys[0].label(settings.get_language()),
+                copy=hotkeys.hotkeys[1].label(settings.get_language()),
+            )
+        )
+    else:
+        window.status_label.setText(tr("status.hotkeys_unavailable"))
+    app.aboutToQuit.connect(hotkeys.stop)
     if not storage.load_items():
         window.create_item()
     window.show()

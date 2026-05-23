@@ -122,3 +122,10 @@ class SettingsManager(QtCore.QObject):
     def set_confirm_overwrite(self, value: bool) -> None:
         self.qs.setValue("materialize/confirm_overwrite", bool(value))
         self.qs.sync()
+
+    def get_last_active_item_id(self) -> str:
+        return self.qs.value("session/last_active_item_id", "", type=str)
+
+    def set_last_active_item_id(self, item_id: str) -> None:
+        self.qs.setValue("session/last_active_item_id", str(item_id))
+        self.qs.sync()
