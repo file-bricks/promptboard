@@ -4,20 +4,20 @@ type: state-snapshot
 version: 1.1.1
 updated: 2026-05-24
 updated_by: GPT
-current_phase: REL-PUB v1.1.1 stabilisiert; Windows-Store-Vorbereitung für v1.2 mit gehärtetem Store-Workflow und reproduzierbaren Screenshots erweitert
+current_phase: REL-PUB v1.1.1 stabilisiert; Windows-Store-Vorbereitung für v1.2 mit gehärtetem Store-Workflow, reproduzierbaren Screenshots und lokalem MSIX-Preflight erweitert
 last_verified: 2026-05-24
 description: |
   PromptBoard ist als öffentliches Desktop-Tool veröffentlicht. Die aktuelle
   Linie steht bei v1.1.1 inklusive Hotfix für den Import-Crash,
   vollständiger Release-Artefakte und lokalem REL-PUB-Lifecycle.
   Batch-Materialisierung, Typvorlagen, Inline-Variablen, globale Hotkeys und
-  jetzt auch reproduzierbare Store-Screenshots sind umgesetzt.
-  60/60 Tests grün. PyInstaller-Build + Release-Pipeline vorhanden.
+  jetzt auch reproduzierbare Store-Screenshots sowie ein lokaler
+  MSIX-Preflight sind umgesetzt. PyInstaller-Build + Release-Pipeline vorhanden.
 ---
 
 # STATE.md - Aktueller Projekt-Stand
 
-**Next review:** nach dem ersten echten MSIX-/WACK-Lauf oder nach Eintrag der
+**Next review:** nach dem ersten erhöhten WACK-Lauf oder nach Eintrag der
 finalen Partner-Center-Werte.
 
 ## Current Phase
@@ -29,9 +29,9 @@ Lifecycle `REL-PUB_PromptBoard`.
 ## Focus gerade
 
 Die Bugfix-Runde ist abgeschlossen. Der aktuelle Fokus liegt auf der
-Windows-Store-Vorbereitung: Metadaten, Privacy-Text, Build-Wrapper und
-reproduzierbare Screenshots sind da; offen bleiben Partner-Center-Werte sowie
-der echte MSIX-/WACK-Lauf.
+Windows-Store-Vorbereitung: Metadaten, Privacy-Text, Build-Wrapper,
+reproduzierbare Screenshots und ein lokaler MSIX-Preflight sind da; offen
+bleiben Partner-Center-Werte sowie der erhöhte WACK-Lauf.
 
 ## Letzte bedeutsame Aktion
 
@@ -43,6 +43,14 @@ der echte MSIX-/WACK-Lauf.
   getrackten Standardworkflow zu verbiegen.
 - **Früher Readiness-Check**: `build_store.bat` prüft jetzt vor dem Staging,
   ob `publisher` und `identity_name` echte Werte haben.
+- **MSIX-Preflight ergänzt**: `store_package.json` setzt für die Desktop-App
+  jetzt `runFullTrust`, `_tools/store_release.py` synchronisiert
+  `store_assets/` und kann via `msix-preflight` den generischen
+  `_STORE`-MSIX-Build mit temporären effektiven Werten anstoßen, ohne die
+  getrackten Platzhalter dauerhaft zu überschreiben.
+- **Lokaler MSIX-Build verifiziert**: `releases/PromptBoard.msix` wurde
+  erfolgreich erzeugt; der direkte WACK-Lauf scheitert nur noch an fehlender
+  Erhöhung/UAC.
 - **Teststand** für den Store-Helper erweitert.
 
 2026-05-22:
@@ -85,8 +93,11 @@ der echte MSIX-/WACK-Lauf.
 ## Aktuelle Blocker
 
 - Keine technischen Code-Blocker.
-- Für den echten MSIX-Build fehlen weiter die finalen Partner-Center-Werte
-  (`publisher`, `identity_name`); sie blockieren jetzt aber sauber und früh.
+- Für den finalen Store-Lauf fehlen weiter die finalen Partner-Center-Werte
+  (`publisher`, `identity_name`); sie blockieren echte Einreichungen jetzt
+  aber sauber und früh.
+- Der WACK-Lauf benötigt erhöhte Rechte; der direkte `appcert.exe`-Aufruf
+  wurde lokal durch UAC blockiert.
 
 ## Notizen für nächste Session
 
@@ -100,6 +111,11 @@ der echte MSIX-/WACK-Lauf.
   vorhandene EXE in `dist/` oder `releases/v1.1.1/`.
 - `store_package.json` darf Platzhalter behalten; lokale echte Werte können
   über `store_package.local.json` oder `PROMPTBOARD_STORE_*` kommen.
+- `python _tools\store_release.py msix-preflight --exe dist\PromptBoard-1.1.1-win64.exe --use-test-identity`
+  baut einen lokalen MSIX-Preflight und stellt danach die getrackte
+  `store_package.json` wieder her.
+- `store_assets/` wird aus dem App-Icon abgeleitet und liefert dem generischen
+  `_STORE`-MSIX-Builder die erwarteten Logos.
 - Store-Screenshots liegen unter `README/screenshots/store/` und können per
   `_tools/generate_store_screenshots.py` neu erzeugt werden.
 

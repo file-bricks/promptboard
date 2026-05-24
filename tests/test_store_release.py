@@ -24,7 +24,7 @@ def test_build_store_config_has_store_defaults():
     assert config["app_name"] == "PromptBoard"
     assert config["version"] == "1.1.1.0"
     assert config["executable"] == "PromptBoard-1.1.1-win64.exe"
-    assert config["capabilities"] == ""
+    assert config["capabilities"] == "runFullTrust"
     assert config["privacy_url"].endswith("/PRIVACY_POLICY.md")
 
 
@@ -94,6 +94,19 @@ def test_load_store_config_merges_local_and_environment_overrides(tmp_path):
     assert config["publisher"] == "CN=Tracked Publisher"
     assert config["identity_name"] == "LocalPublisher.PromptBoard"
     assert config["publisher_display"] == "PromptBoard Labs"
+    assert config["capabilities"] == "runFullTrust"
+
+
+def test_load_store_config_adds_run_full_trust_to_existing_capabilities(tmp_path):
+    module = load_module()
+    (tmp_path / "store_package.json").write_text(
+        json.dumps({"capabilities": "internetClient"}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    config = module.load_store_config(tmp_path, include_local_overrides=False)
+
+    assert config["capabilities"] == "runFullTrust,internetClient"
 
 
 def test_assert_store_ready_rejects_placeholders():
@@ -140,6 +153,10 @@ def test_prepare_store_package_uses_effective_store_values(tmp_path):
                 "exe_path": exe_path,
             }
             self.output_dir.mkdir(parents=True, exist_ok=True)
+            icons_dir = self.output_dir / "icons"
+            icons_dir.mkdir(parents=True, exist_ok=True)
+            for source_name in module.STORE_ASSET_FILENAMES:
+                (icons_dir / source_name).write_bytes(b"png")
             return str(self.output_dir)
 
     class DummyModule:
@@ -158,3 +175,16 @@ def test_prepare_store_package_uses_effective_store_values(tmp_path):
     assert instance.config["publisher"] == "CN=Tracked Publisher"
     assert instance.config["identity_name"] == "TrackedPublisher.PromptBoard"
     assert instance.prepared_with["exe_path"] == str(exe_path.resolve())
+
+
+def test_ensure_store_assets_copies_expected_logo_names(tmp_path):
+    module = load_module()
+    icons_dir = tmp_path / "icons"
+    icons_dir.mkdir()
+    for source_name in module.STORE_ASSET_FILENAMES:
+        (icons_dir / source_name).write_bytes(b"png")
+
+    assets_dir = module.ensure_store_assets(tmp_path, icons_dir=icons_dir)
+
+    for target_name in module.STORE_ASSET_FILENAMES.values():
+        assert (assets_dir / target_name).exists()

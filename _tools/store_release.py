@@ -4,6 +4,8 @@ import argparse
 import importlib.util
 import json
 import os
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -21,7 +23,7 @@ STORE_CONFIG_DEFAULTS = {
     "version": STORE_VERSION,
     "description": "Lokales Tray-Tool für Prompts, Skills, Workflows, Rollen und Agenten.",
     "executable": APP_EXECUTABLE,
-    "capabilities": "",
+    "capabilities": "runFullTrust",
     "category": "Productivity",
     "age_rating": "3+",
     "privacy_url": "https://github.com/file-bricks/promptboard/blob/main/PRIVACY_POLICY.md",
@@ -31,10 +33,20 @@ PLACEHOLDER_VALUES = {
     "publisher": {"CN=YourPublisher", ""},
     "identity_name": {"YourPublisher.PromptBoard", ""},
 }
+TEST_STORE_OVERRIDES = {
+    "publisher": "CN=PromptBoard Test",
+    "identity_name": "PromptBoard.Test",
+}
 STORE_ENV_OVERRIDES = {
     "publisher": "PROMPTBOARD_STORE_PUBLISHER",
     "publisher_display": "PROMPTBOARD_STORE_PUBLISHER_DISPLAY",
     "identity_name": "PROMPTBOARD_STORE_IDENTITY_NAME",
+}
+STORE_ASSET_FILENAMES = {
+    "icon_44x44.png": "Square44x44Logo.png",
+    "icon_150x150.png": "Square150x150Logo.png",
+    "icon_310x150.png": "Wide310x150Logo.png",
+    "icon_310x310.png": "Square310x310Logo.png",
 }
 
 
@@ -52,7 +64,7 @@ def store_tool_path(root: Path | None = None) -> Path:
 
 
 def build_store_config() -> dict[str, str]:
-    return dict(STORE_CONFIG_DEFAULTS)
+    return normalize_store_config(dict(STORE_CONFIG_DEFAULTS))
 
 
 def store_config_path(root: Path | None = None) -> Path:
@@ -72,6 +84,19 @@ def read_json_file(path: Path) -> dict[str, str]:
     if not isinstance(data, dict):
         raise ValueError(f"Ungültige Store-Konfiguration in {path}: Objekt erwartet.")
     return {str(key): str(value) for key, value in data.items()}
+
+
+def normalize_capabilities(value: str) -> str:
+    capabilities = [cap.strip() for cap in value.split(",") if cap.strip()]
+    if "runFullTrust" not in capabilities:
+        capabilities.insert(0, "runFullTrust")
+    return ",".join(dict.fromkeys(capabilities))
+
+
+def normalize_store_config(config: Mapping[str, str]) -> dict[str, str]:
+    normalized = {str(key): str(value) for key, value in config.items()}
+    normalized["capabilities"] = normalize_capabilities(normalized.get("capabilities", ""))
+    return normalized
 
 
 def environment_store_overrides(environ: Mapping[str, str] | None = None) -> dict[str, str]:
@@ -96,7 +121,7 @@ def load_store_config(
     if include_local_overrides:
         config.update(read_json_file(local_store_config_path(base)))
         config.update(environment_store_overrides(environ))
-    return config
+    return normalize_store_config(config)
 
 
 def is_placeholder_value(field: str, value: str) -> bool:
@@ -175,6 +200,24 @@ def write_root_files(root: Path | None = None) -> tuple[Path, Path]:
     return config_path, listing_path
 
 
+def ensure_store_assets(root: Path | None = None, *, icons_dir: Path | None = None) -> Path:
+    base = root or project_root()
+    source_dir = icons_dir or (base / "store_package" / APP_NAME / "icons")
+    if not source_dir.exists():
+        raise FileNotFoundError(f"Store-Icons nicht gefunden: {source_dir}")
+
+    assets_dir = base / "store_assets"
+    assets_dir.mkdir(parents=True, exist_ok=True)
+
+    for source_name, target_name in STORE_ASSET_FILENAMES.items():
+        source_path = source_dir / source_name
+        if not source_path.exists():
+            raise FileNotFoundError(f"Store-Icon fehlt: {source_path}")
+        shutil.copy2(source_path, assets_dir / target_name)
+
+    return assets_dir
+
+
 def resolve_executable(root: Path | None = None, explicit: str | None = None) -> Path:
     base = root or project_root()
     candidates = []
@@ -217,7 +260,68 @@ def prepare_store_package(root: Path | None = None, explicit_exe: str | None = N
         icon_source=str(base / "PromptBoard.png"),
         exe_path=str(executable),
     )
+    ensure_store_assets(base, icons_dir=packager.output_dir / "icons")
     return Path(packager.output_dir)
+
+
+def with_test_overrides_if_needed(
+    config: Mapping[str, str],
+    *,
+    allow_test_identity: bool = False,
+) -> dict[str, str]:
+    effective = dict(config)
+    if allow_test_identity:
+        for field, value in TEST_STORE_OVERRIDES.items():
+            if field in unresolved_store_fields(effective):
+                effective[field] = value
+    return normalize_store_config(effective)
+
+
+def build_msix_preflight(
+    root: Path | None = None,
+    *,
+    explicit_exe: str | None = None,
+    allow_test_identity: bool = False,
+) -> Path:
+    base = root or project_root()
+    effective_config = with_test_overrides_if_needed(
+        load_store_config(base),
+        allow_test_identity=allow_test_identity,
+    )
+    assert_store_ready(effective_config)
+
+    config_path = store_config_path(base)
+    original_config_text = config_path.read_text(encoding="utf-8") if config_path.exists() else None
+    try:
+        config_path.write_text(
+            json.dumps(effective_config, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        prepare_store_package(base, explicit_exe=explicit_exe)
+        executable = resolve_executable(base, explicit=explicit_exe)
+        command = [
+            "powershell",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(software_root(base) / "_STORE" / "msstore_build_msix.ps1"),
+            "-ProjectRoot",
+            str(base),
+            "-ExePath",
+            str(executable),
+        ]
+        result = subprocess.run(command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(
+                "MSIX-Build fehlgeschlagen:\n"
+                f"{result.stdout}{result.stderr}"
+            )
+        return base / "releases" / f"{APP_NAME}.msix"
+    finally:
+        if original_config_text is None:
+            config_path.unlink(missing_ok=True)
+        else:
+            config_path.write_text(original_config_text, encoding="utf-8")
 
 
 def main() -> None:
@@ -229,6 +333,17 @@ def main() -> None:
 
     prepare_parser = subparsers.add_parser("prepare", help="Store-Paket-Staging erzeugen")
     prepare_parser.add_argument("--exe", help="Pfad zur PromptBoard-EXE")
+
+    msix_parser = subparsers.add_parser(
+        "msix-preflight",
+        help="Store-Staging plus generischen MSIX-Build mit effektiver Konfiguration ausführen",
+    )
+    msix_parser.add_argument("--exe", help="Pfad zur PromptBoard-EXE")
+    msix_parser.add_argument(
+        "--use-test-identity",
+        action="store_true",
+        help="Für lokalen Preflight gültige Testwerte nutzen, falls noch keine echten Partner-Center-Werte gesetzt sind.",
+    )
 
     args = parser.parse_args()
 
@@ -248,6 +363,13 @@ def main() -> None:
         if args.command == "prepare":
             output_dir = prepare_store_package(explicit_exe=args.exe)
             print(f"[+] Store-Staging vorbereitet: {output_dir}")
+            return
+        if args.command == "msix-preflight":
+            output_path = build_msix_preflight(
+                explicit_exe=args.exe,
+                allow_test_identity=args.use_test_identity,
+            )
+            print(f"[+] MSIX-Preflight erstellt: {output_path}")
             return
     except (FileNotFoundError, RuntimeError, ValueError) as exc:
         print(f"[!] {exc}")

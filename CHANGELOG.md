@@ -15,11 +15,23 @@ Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
   einspeisen.
 - **Früher Store-Readiness-Check**: `build_store.bat` prüft vor dem Staging,
   ob `publisher` und `identity_name` echte Werte haben.
+- **FullTrust-MSIX korrekt vorbereitet**: `store_package.json` setzt für den
+  Desktop-Store-Lauf jetzt standardmäßig `runFullTrust`.
+- **Store-Assets synchronisiert**: `_tools/store_release.py` spiegelt die
+  generierten Icons zusätzlich nach `store_assets/`, damit der generische
+  `_STORE/msstore_build_msix.ps1`-Builder ohne manuelle Zusatzschritte läuft.
+- **Lokaler MSIX-Preflight**: neuer Befehl
+  `python _tools/store_release.py msix-preflight --exe ... --use-test-identity`
+  materialisiert effektive Store-Werte nur temporär, erzeugt
+  `releases/PromptBoard.msix` und stellt die getrackte Konfiguration danach
+  wieder her.
 
 ### Tests
 
 - Neue Tests für Konfig-Merging, Platzhalter-Erkennung und Store-Staging mit
   echten effektiven Werten im Helper `tests/test_store_release.py`.
+- Neuer lokaler MSIX-Preflight erfolgreich; direkter WACK-Aufruf ist nur noch
+  durch fehlende Erhöhung/UAC blockiert.
 
 ## [Unreleased] - 2026-05-22
 

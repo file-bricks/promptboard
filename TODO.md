@@ -12,10 +12,15 @@
 - [ ] Prüfen, ob PromptBoard direkt einen kompatiblen Teil des ProfiPrompt-Speichers lesen/schreiben soll.
 - [ ] ExplorerPro: AppEntries als optionaler PromptBoard-Typ?
 - [ ] Partner-Center-Publisher/Identity für den Store in `store_package.json` eintragen.
-- [ ] MSIX + WACK-Lauf mit `build_store.bat` und `_STORE/msstore_build_msix.ps1` durchführen.
+- [ ] WACK-Lauf für `releases/PromptBoard.msix` als Administrator durchführen und XML-Report prüfen.
 
 ## Done
 
+- [x] Lokalen MSIX-Preflight für den generischen `_STORE`-Build ergänzt:
+  `_tools/store_release.py msix-preflight --exe dist\PromptBoard-1.1.1-win64.exe --use-test-identity`
+  materialisiert effektive Store-Werte nur temporär, synchronisiert `store_assets/`
+  aus dem App-Icon und baut `releases/PromptBoard.msix`, ohne `store_package.json`
+  dauerhaft auf Testwerte zu drehen.
 - [x] Store-Workflow gehärtet: `write-root-files` erhält bestehende
   Partner-Center-Werte, `check` stoppt echte Store-Läufe mit Platzhaltern,
   und `store_package.local.json` sowie Umgebungsvariablen können lokale

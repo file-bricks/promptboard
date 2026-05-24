@@ -19,6 +19,21 @@ searchable and copy-ready without requiring a cloud account.
 **Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
 **Aktueller Ordnerstatus:** `LLM/REL-PUB_PromptBoard`
 
+## Screenshots
+
+Die lokale README-Vorschau und die vier Store-Ansichten werden aus dem
+aktuellen UI-Stand erzeugt.
+
+![PromptBoard Hauptansicht](README/screenshots/main.png)
+
+![PromptBoard Tray-Ansicht](README/screenshots/store/tray.png)
+![PromptBoard Bibliothek](README/screenshots/store/library.png)
+![PromptBoard Editor](README/screenshots/store/editor.png)
+![PromptBoard Einstellungen](README/screenshots/store/settings.png)
+
+Die Store-Bilder lassen sich reproduzierbar über
+`_tools/generate_store_screenshots.py` neu erzeugen.
+
 ## Zielbild
 
 PromptBoard ist ein kleines Tray-Tool zur lokalen Verwaltung von

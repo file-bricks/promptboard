@@ -20,6 +20,7 @@ dist/
 releases/
 store_package/
 store_package.local.json
+_WARTUNG/
 *.msix
 *.appx
 *.appxbundle

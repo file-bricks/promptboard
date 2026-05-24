@@ -45,7 +45,9 @@ echo Vorbereitung abgeschlossen.
 echo Nächste Schritte:
 echo 1. Falls noch nicht geschehen: Partner-Center-Werte lokal oder tracked pflegen
 echo 2. Screenshots ergänzen
-echo 3. ..\..\_STORE\msstore_build_msix.ps1 mit dem Projekt ausführen
-echo 4. WACK und manuellen Store-Testlauf durchführen
+echo 3. Lokaler MSIX-Preflight ohne dauerhaftes Überschreiben:
+echo    python _tools\store_release.py msix-preflight --exe "%EXE_PATH%" --use-test-identity
+echo 4. Finalen Store-Build mit echten Werten prüfen
+echo 5. WACK als Administrator und manuellen Store-Testlauf durchführen
 echo.
 endlocal
