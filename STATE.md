@@ -4,21 +4,21 @@ type: state-snapshot
 version: 1.1.1
 updated: 2026-05-27
 updated_by: GPT
-current_phase: REL-PUB v1.1.1 stabilisiert; Windows-Store-Vorbereitung für v1.2 mit gehärtetem Store-Workflow, reproduzierbaren Screenshots, lokalem MSIX-Preflight und projektlokalem WACK-Review-Flow erweitert
+current_phase: REL-PUB v1.1.1 stabilisiert; Windows-Store-Vorbereitung plus Flutter-Mobile-Companion-MVP für v1.2 erweitert
 last_verified: 2026-05-27
 description: |
   PromptBoard ist als öffentliches Desktop-Tool veröffentlicht. Die aktuelle
   Linie steht bei v1.1.1 inklusive Hotfix für den Import-Crash,
   vollständiger Release-Artefakte und lokalem REL-PUB-Lifecycle.
-  Batch-Materialisierung, Typvorlagen, Inline-Variablen, globale Hotkeys und
-  jetzt auch reproduzierbare Store-Screenshots sowie ein lokaler
-  MSIX-Preflight sind umgesetzt. PyInstaller-Build + Release-Pipeline vorhanden.
+  Batch-Materialisierung, Typvorlagen, Inline-Variablen, globale Hotkeys sowie
+  der Store-Workflow stehen; dazu kommt jetzt ein erster read-only
+  Flutter-Companion für Android und iOS.
 ---
 
 # STATE.md - Aktueller Projekt-Stand
 
-**Next review:** nach dem ersten erhöhten WACK-Lauf über `_tools\run_wack.ps1`
-oder nach Eintrag der finalen Partner-Center-Werte.
+**Next review:** nach dem ersten Android-/iOS-Smoke mit echter `library.json`
+oder nach dem ersten erhöhten WACK-Lauf über `_tools\run_wack.ps1`.
 
 ## Current Phase
 
@@ -28,15 +28,28 @@ Lifecycle `REL-PUB_PromptBoard`.
 
 ## Focus gerade
 
-Die Bugfix-Runde ist abgeschlossen. Der aktuelle Fokus liegt auf der
-Windows-Store-Vorbereitung: Metadaten, Privacy-Text, Build-Wrapper,
-reproduzierbare Screenshots, lokaler MSIX-Preflight und jetzt auch ein
-projektlokaler WACK-Start-/Review-Flow sind da; offen bleiben
-Partner-Center-Werte sowie der erhöhte echte WACK-Lauf.
+Die Bugfix-Runde ist abgeschlossen. Der aktuelle Fokus liegt auf zwei klar
+getrennten Plattformpfaden: der Windows-Store-Vorbereitung und einem ersten
+Flutter-Mobile-Companion für Android/iOS. Metadaten, Privacy-Text,
+Build-Wrapper, reproduzierbare Screenshots, lokaler MSIX-Preflight und jetzt
+auch ein projektlokaler WACK-Start-/Review-Flow sind da; im Mobile-Strang gibt
+es nun einen read-only Viewer für `library.json` per Demo, Zwischenablage oder
+manueller JSON-Eingabe. Offen bleiben Partner-Center-Werte, der erhöhte echte
+WACK-Lauf und ein echter Datei-/Share-Import im Flutter-Companion.
 
 ## Letzte bedeutsame Aktion
 
 2026-05-27:
+- **Flutter-Mobile-Companion als MVP umgesetzt**: Das vorhandene
+  `flutter_port/`-Scaffold zeigt PromptBoard-`library.json` jetzt read-only
+  mobil an.
+- **Drei Ladepfade im Mobile-UI**: Demo-Daten, Import aus der Zwischenablage
+  und manuelle JSON-Eingabe direkt im Bottom Sheet.
+- **Mobile-Nutzung fokussiert**: Suche, Typfilter, Detailansicht und
+  Copy-Button decken den ersten Android-/iOS-Unterwegs-Usecase ab, ohne den
+  Desktop-Storage zu beschreiben.
+- **Flutter-Smoke-Test ergänzt**: Widget-Test prüft Demo-Import und mobile
+  Suchfilterung.
 - **WACK-Wrapper projektspezifisch angebunden**: `_tools/run_wack.ps1`
   startet den zentralen `_STORE/msstore_wack.ps1` mit festen PromptBoard-
   Pfaden erhöht, statt dass der Lauf jedes Mal händisch zusammengesetzt
@@ -103,6 +116,7 @@ Partner-Center-Werte sowie der erhöhte echte WACK-Lauf.
 - [x] Inline-Variablen `{{name}}` im Copy-Flow umsetzen.
 - [x] Windows-Store-Einreichung als MSIX technisch prüfen.
 - [x] Store-Screenshots für Tray, Bibliothek, Editor und Einstellungen erzeugen.
+- [x] Flutter-Companion als read-only Android/iOS-MVP aus dem Scaffold bauen.
 
 ## Aktuelle Blocker
 
@@ -113,6 +127,8 @@ Partner-Center-Werte sowie der erhöhte echte WACK-Lauf.
 - Der WACK-Lauf benötigt weiter erhöhte Rechte; `_tools\run_wack.ps1`
   standardisiert jetzt nur den Aufruf, ersetzt aber nicht die nötige UAC-
   Bestätigung und keinen echten Admin-Durchlauf.
+- Der Mobile-Companion lädt `library.json` noch nicht direkt als Datei oder
+  Share-Intent; aktuell laufen Demo, Zwischenablage und manuelle JSON-Eingabe.
 
 ## Notizen für nächste Session
 
@@ -138,6 +154,9 @@ Partner-Center-Werte sowie der erhöhte echte WACK-Lauf.
   `_STORE`-MSIX-Builder die erwarteten Logos.
 - Store-Screenshots liegen unter `README/screenshots/store/` und können per
   `_tools/generate_store_screenshots.py` neu erzeugt werden.
+- `flutter_port/` ist jetzt ein read-only Mobile-Viewer für `library.json`;
+  nächster realistischer Schritt ist Datei- oder Share-Import statt reinem
+  Paste-Flow.
 
 ## Kurz-Historie
 
@@ -149,3 +168,5 @@ Partner-Center-Werte sowie der erhöhte echte WACK-Lauf.
 - 2026-05-18 — Bugfix-Runde + globale Hotkeys.
 - 2026-05-20 — Store-Metadaten, Listing, Privacy-Text und Build-Wrapper ergänzt.
 - 2026-05-22 — Reproduzierbare Store-Screenshots und Screenshot-Smoke-Test ergänzt.
+- 2026-05-27 — Flutter-Companion-MVP für Android/iOS mit JSON-Import,
+  Suche, Typfilter und Detailansicht umgesetzt.

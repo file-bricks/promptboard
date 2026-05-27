@@ -15,9 +15,14 @@
 - [ ] WACK-Lauf für `releases/PromptBoard.msix` als Administrator durchführen und XML-Report prüfen.
   Start: `powershell -ExecutionPolicy Bypass -File "_tools\run_wack.ps1"`
   Review: `python _tools\store_release.py review-wack-report`
+- [ ] Flutter-Companion um echten Dateiimport oder Share-Intent für `library.json` erweitern.
 
 ## Done
 
+- [x] Flutter-Companion als erster Android/iOS-MVP umgesetzt:
+  `flutter_port/` zeigt PromptBoard-`library.json` read-only mit Demo-,
+  Zwischenablage- und manueller JSON-Eingabe, Suche, Typfiltern und
+  Detailansicht mit Copy-Button.
 - [x] Lokalen MSIX-Preflight für den generischen `_STORE`-Build ergänzt:
   `_tools/store_release.py msix-preflight --exe dist\PromptBoard-1.1.1-win64.exe --use-test-identity`
   materialisiert effektive Store-Werte nur temporär, synchronisiert `store_assets/`
