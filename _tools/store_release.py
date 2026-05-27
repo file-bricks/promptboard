@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import subprocess
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -48,6 +49,7 @@ STORE_ASSET_FILENAMES = {
     "icon_310x150.png": "Wide310x150Logo.png",
     "icon_310x310.png": "Square310x310Logo.png",
 }
+WACK_REPORT_DIRNAME = "test_reports"
 
 
 def project_root() -> Path:
@@ -237,6 +239,103 @@ def resolve_executable(root: Path | None = None, explicit: str | None = None) ->
     )
 
 
+def resolve_msix(root: Path | None = None, explicit: str | None = None) -> Path:
+    base = root or project_root()
+    candidates = []
+    if explicit:
+        candidates.append(Path(explicit))
+    candidates.append(base / "releases" / f"{APP_NAME}.msix")
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    raise FileNotFoundError(
+        f"Keine PromptBoard-MSIX gefunden. Erwartet z. B. {APP_NAME}.msix in releases/."
+    )
+
+
+def default_wack_report_dir(root: Path | None = None) -> Path:
+    base = root or project_root()
+    return base / "releases" / WACK_REPORT_DIRNAME
+
+
+def latest_wack_report(root: Path | None = None, *, report_dir: Path | None = None) -> Path:
+    target_dir = report_dir or default_wack_report_dir(root)
+    if not target_dir.exists():
+        raise FileNotFoundError(f"WACK-Report-Verzeichnis nicht gefunden: {target_dir}")
+
+    candidates = sorted(
+        target_dir.glob("wack_*.xml"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    if not candidates:
+        raise FileNotFoundError(f"Keine WACK-XML-Reports gefunden in: {target_dir}")
+    return candidates[0].resolve()
+
+
+def summarize_wack_report(report_path: str | Path) -> dict[str, Any]:
+    resolved = Path(report_path).resolve()
+    if not resolved.exists():
+        raise FileNotFoundError(f"WACK-Report nicht gefunden: {resolved}")
+
+    root = ET.fromstring(resolved.read_text(encoding="utf-8"))
+    requirements = []
+    pass_count = 0
+    fail_count = 0
+    warning_count = 0
+
+    for requirement in root.findall("./REQUIREMENTS/REQUIREMENT"):
+        title = (requirement.findtext("TITLE") or "").strip() or "Unbenannter Test"
+        result = (requirement.findtext("OVERALL_RESULT") or "UNKNOWN").strip() or "UNKNOWN"
+        details = []
+        for test in requirement.findall("TEST"):
+            test_result = (test.findtext("RESULT") or "").strip()
+            description = (test.findtext("DESCRIPTION") or "").strip()
+            if test_result in {"FAIL", "WARNING"} and description:
+                details.append(description)
+
+        requirements.append(
+            {
+                "title": title,
+                "result": result,
+                "details": details,
+            }
+        )
+
+        if result == "PASS":
+            pass_count += 1
+        elif result == "FAIL":
+            fail_count += 1
+        elif result == "WARNING":
+            warning_count += 1
+
+    return {
+        "report_path": resolved,
+        "overall_result": (root.findtext("OVERALL_RESULT") or "UNKNOWN").strip() or "UNKNOWN",
+        "pass_count": pass_count,
+        "fail_count": fail_count,
+        "warning_count": warning_count,
+        "requirements": requirements,
+    }
+
+
+def format_wack_summary(summary: Mapping[str, Any]) -> str:
+    lines = [
+        f"Report: {summary['report_path']}",
+        f"Gesamtergebnis: {summary['overall_result']}",
+        f"PASS {summary['pass_count']} | FAIL {summary['fail_count']} | WARNING {summary['warning_count']}",
+    ]
+
+    for requirement in summary["requirements"]:
+        if requirement["result"] == "PASS":
+            continue
+        lines.append(f"- {requirement['result']}: {requirement['title']}")
+        for detail in requirement["details"]:
+            lines.append(f"  -> {detail}")
+
+    return "\n".join(lines)
+
+
 def load_store_packager(root: Path | None = None) -> Any:
     tool_path = store_tool_path(root)
     spec = importlib.util.spec_from_file_location("store_packager", tool_path)
@@ -345,6 +444,16 @@ def main() -> None:
         help="Für lokalen Preflight gültige Testwerte nutzen, falls noch keine echten Partner-Center-Werte gesetzt sind.",
     )
 
+    report_parser = subparsers.add_parser(
+        "review-wack-report",
+        help="Neueste oder explizite WACK-XML laden und kompakt auswerten",
+    )
+    report_parser.add_argument("--report", help="Pfad zu einem konkreten WACK-XML-Report")
+    report_parser.add_argument(
+        "--report-dir",
+        help=f"Report-Verzeichnis (Default: releases\\{WACK_REPORT_DIRNAME})",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -370,6 +479,12 @@ def main() -> None:
                 allow_test_identity=args.use_test_identity,
             )
             print(f"[+] MSIX-Preflight erstellt: {output_path}")
+            return
+        if args.command == "review-wack-report":
+            report_dir = Path(args.report_dir).resolve() if args.report_dir else None
+            report_path = Path(args.report).resolve() if args.report else latest_wack_report(report_dir=report_dir)
+            summary = summarize_wack_report(report_path)
+            print(format_wack_summary(summary))
             return
     except (FileNotFoundError, RuntimeError, ValueError) as exc:
         print(f"[!] {exc}")

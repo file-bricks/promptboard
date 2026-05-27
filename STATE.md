@@ -2,10 +2,10 @@
 name: promptboard-state
 type: state-snapshot
 version: 1.1.1
-updated: 2026-05-24
+updated: 2026-05-27
 updated_by: GPT
-current_phase: REL-PUB v1.1.1 stabilisiert; Windows-Store-Vorbereitung für v1.2 mit gehärtetem Store-Workflow, reproduzierbaren Screenshots und lokalem MSIX-Preflight erweitert
-last_verified: 2026-05-24
+current_phase: REL-PUB v1.1.1 stabilisiert; Windows-Store-Vorbereitung für v1.2 mit gehärtetem Store-Workflow, reproduzierbaren Screenshots, lokalem MSIX-Preflight und projektlokalem WACK-Review-Flow erweitert
+last_verified: 2026-05-27
 description: |
   PromptBoard ist als öffentliches Desktop-Tool veröffentlicht. Die aktuelle
   Linie steht bei v1.1.1 inklusive Hotfix für den Import-Crash,
@@ -17,8 +17,8 @@ description: |
 
 # STATE.md - Aktueller Projekt-Stand
 
-**Next review:** nach dem ersten erhöhten WACK-Lauf oder nach Eintrag der
-finalen Partner-Center-Werte.
+**Next review:** nach dem ersten erhöhten WACK-Lauf über `_tools\run_wack.ps1`
+oder nach Eintrag der finalen Partner-Center-Werte.
 
 ## Current Phase
 
@@ -30,10 +30,24 @@ Lifecycle `REL-PUB_PromptBoard`.
 
 Die Bugfix-Runde ist abgeschlossen. Der aktuelle Fokus liegt auf der
 Windows-Store-Vorbereitung: Metadaten, Privacy-Text, Build-Wrapper,
-reproduzierbare Screenshots und ein lokaler MSIX-Preflight sind da; offen
-bleiben Partner-Center-Werte sowie der erhöhte WACK-Lauf.
+reproduzierbare Screenshots, lokaler MSIX-Preflight und jetzt auch ein
+projektlokaler WACK-Start-/Review-Flow sind da; offen bleiben
+Partner-Center-Werte sowie der erhöhte echte WACK-Lauf.
 
 ## Letzte bedeutsame Aktion
+
+2026-05-27:
+- **WACK-Wrapper projektspezifisch angebunden**: `_tools/run_wack.ps1`
+  startet den zentralen `_STORE/msstore_wack.ps1` mit festen PromptBoard-
+  Pfaden erhöht, statt dass der Lauf jedes Mal händisch zusammengesetzt
+  werden muss.
+- **XML-Review im Store-Helper**: `_tools/store_release.py review-wack-report`
+  findet den neuesten Report unter `releases/test_reports/` oder lädt einen
+  expliziten XML-Pfad und fasst PASS/FAIL/WARNING kompakt zusammen.
+- **Build-Hinweise nachgezogen**: `build_store.bat`, `AUFGABEN.txt` und
+  `TODO.md` nennen jetzt den reproduzierbaren WACK-Start und die
+  Report-Prüfung.
+- **Teststand** für den Store-Helper erneut erweitert.
 
 2026-05-24:
 - **Store-Workflow gehärtet**: `_tools/store_release.py` überschreibt
@@ -96,8 +110,9 @@ bleiben Partner-Center-Werte sowie der erhöhte WACK-Lauf.
 - Für den finalen Store-Lauf fehlen weiter die finalen Partner-Center-Werte
   (`publisher`, `identity_name`); sie blockieren echte Einreichungen jetzt
   aber sauber und früh.
-- Der WACK-Lauf benötigt erhöhte Rechte; der direkte `appcert.exe`-Aufruf
-  wurde lokal durch UAC blockiert.
+- Der WACK-Lauf benötigt weiter erhöhte Rechte; `_tools\run_wack.ps1`
+  standardisiert jetzt nur den Aufruf, ersetzt aber nicht die nötige UAC-
+  Bestätigung und keinen echten Admin-Durchlauf.
 
 ## Notizen für nächste Session
 
@@ -114,6 +129,11 @@ bleiben Partner-Center-Werte sowie der erhöhte WACK-Lauf.
 - `python _tools\store_release.py msix-preflight --exe dist\PromptBoard-1.1.1-win64.exe --use-test-identity`
   baut einen lokalen MSIX-Preflight und stellt danach die getrackte
   `store_package.json` wieder her.
+- `powershell -ExecutionPolicy Bypass -File "_tools\run_wack.ps1"` startet
+  den zentralen WACK-Runner mit PromptBoard-Pfaden erhöht.
+- `python _tools\store_release.py review-wack-report` liest den neuesten
+  XML-Report unter `releases\test_reports\` und fasst nur die relevanten
+  FAIL-/WARNING-Blöcke zusammen.
 - `store_assets/` wird aus dem App-Icon abgeleitet und liefert dem generischen
   `_STORE`-MSIX-Builder die erwarteten Logos.
 - Store-Screenshots liegen unter `README/screenshots/store/` und können per

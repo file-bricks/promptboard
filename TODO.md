@@ -13,6 +13,8 @@
 - [ ] ExplorerPro: AppEntries als optionaler PromptBoard-Typ?
 - [ ] Partner-Center-Publisher/Identity für den Store in `store_package.json` eintragen.
 - [ ] WACK-Lauf für `releases/PromptBoard.msix` als Administrator durchführen und XML-Report prüfen.
+  Start: `powershell -ExecutionPolicy Bypass -File "_tools\run_wack.ps1"`
+  Review: `python _tools\store_release.py review-wack-report`
 
 ## Done
 
@@ -21,6 +23,10 @@
   materialisiert effektive Store-Werte nur temporär, synchronisiert `store_assets/`
   aus dem App-Icon und baut `releases/PromptBoard.msix`, ohne `store_package.json`
   dauerhaft auf Testwerte zu drehen.
+- [x] WACK-Start und XML-Report-Prüfung reproduzierbar gemacht:
+  `_tools/run_wack.ps1` startet den zentralen `_STORE\msstore_wack.ps1`
+  mit PromptBoard-Pfaden erhöht; `python _tools\store_release.py review-wack-report`
+  fasst den neuesten XML-Report oder einen expliziten Report danach kompakt zusammen.
 - [x] Store-Workflow gehärtet: `write-root-files` erhält bestehende
   Partner-Center-Werte, `check` stoppt echte Store-Läufe mit Platzhaltern,
   und `store_package.local.json` sowie Umgebungsvariablen können lokale

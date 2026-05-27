@@ -48,6 +48,9 @@ echo 2. Screenshots ergänzen
 echo 3. Lokaler MSIX-Preflight ohne dauerhaftes Überschreiben:
 echo    python _tools\store_release.py msix-preflight --exe "%EXE_PATH%" --use-test-identity
 echo 4. Finalen Store-Build mit echten Werten prüfen
-echo 5. WACK als Administrator und manuellen Store-Testlauf durchführen
+echo 5. Erhöhten WACK-Lauf über den Projekt-Wrapper starten:
+echo    powershell -ExecutionPolicy Bypass -File "_tools\run_wack.ps1"
+echo 6. Danach den neuesten XML-Report kompakt prüfen:
+echo    python _tools\store_release.py review-wack-report
 echo.
 endlocal

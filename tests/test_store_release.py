@@ -188,3 +188,64 @@ def test_ensure_store_assets_copies_expected_logo_names(tmp_path):
 
     for target_name in module.STORE_ASSET_FILENAMES.values():
         assert (assets_dir / target_name).exists()
+
+
+def test_latest_wack_report_uses_newest_xml(tmp_path):
+    module = load_module()
+    report_dir = tmp_path / "reports"
+    report_dir.mkdir()
+    older = report_dir / "wack_20260527_100000.xml"
+    newer = report_dir / "wack_20260527_101500.xml"
+    older.write_text("<REPORT><OVERALL_RESULT>PASS</OVERALL_RESULT></REPORT>", encoding="utf-8")
+    newer.write_text("<REPORT><OVERALL_RESULT>FAIL</OVERALL_RESULT></REPORT>", encoding="utf-8")
+    older.touch()
+    newer.touch()
+
+    latest = module.latest_wack_report(report_dir=report_dir)
+
+    assert latest == newer.resolve()
+
+
+def test_summarize_wack_report_counts_failures_and_warnings(tmp_path):
+    module = load_module()
+    report = tmp_path / "wack_report.xml"
+    report.write_text(
+        """<REPORT>
+  <OVERALL_RESULT>FAIL</OVERALL_RESULT>
+  <REQUIREMENTS>
+    <REQUIREMENT>
+      <TITLE>Supported APIs</TITLE>
+      <OVERALL_RESULT>PASS</OVERALL_RESULT>
+    </REQUIREMENT>
+    <REQUIREMENT>
+      <TITLE>Package integrity</TITLE>
+      <OVERALL_RESULT>FAIL</OVERALL_RESULT>
+      <TEST>
+        <RESULT>FAIL</RESULT>
+        <DESCRIPTION>Manifest entry is invalid.</DESCRIPTION>
+      </TEST>
+    </REQUIREMENT>
+    <REQUIREMENT>
+      <TITLE>Installability</TITLE>
+      <OVERALL_RESULT>WARNING</OVERALL_RESULT>
+      <TEST>
+        <RESULT>WARNING</RESULT>
+        <DESCRIPTION>Test environment skipped a signing check.</DESCRIPTION>
+      </TEST>
+    </REQUIREMENT>
+  </REQUIREMENTS>
+</REPORT>
+""",
+        encoding="utf-8",
+    )
+
+    summary = module.summarize_wack_report(report)
+    rendered = module.format_wack_summary(summary)
+
+    assert summary["overall_result"] == "FAIL"
+    assert summary["pass_count"] == 1
+    assert summary["fail_count"] == 1
+    assert summary["warning_count"] == 1
+    assert "Package integrity" in rendered
+    assert "Manifest entry is invalid." in rendered
+    assert "Installability" in rendered
