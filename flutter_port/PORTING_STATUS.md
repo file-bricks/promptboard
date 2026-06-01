@@ -21,3 +21,10 @@ Jetzt existiert ein erster nutzbarer Mobile-MVP:
 - reale `library.json` über Datei oder Share-Intent importieren
 - Android- und iOS-Smoke mit echter Exportdatei dokumentieren
 - später optional Offline-Cache für zuletzt geladene Bibliothek ergänzen
+
+## Portierungsentscheidung 2026-06-02
+
+Der Mobile-Strang bleibt Companion, nicht Voll-App. Android und iOS erfüllen
+den mobilen Referenz-Usecase: vorhandene Desktop-Bausteine lesen, suchen und
+kopieren. Schreibzugriff, Konfliktauflösung und direkte Server-Synchronisierung
+werden erst geprüft, wenn echter Live-Mehrgerätebedarf belegt ist.

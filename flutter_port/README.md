@@ -32,3 +32,9 @@ flutter test
 - Echten Dateiupload oder Share-Intent für `library.json` ergänzen
 - Lokalen Offline-Cache für die zuletzt geladene Bibliothek ergänzen
 - Android- und iOS-Smoke mit realer Desktop-Exportdatei dokumentieren
+
+## Grenze
+
+Der Companion bleibt read-only. Er soll `library.json` dateibasiert übernehmen,
+aber keine Einträge zurück in die Desktop-Bibliothek schreiben und keine direkte
+Server-Synchronisierung einführen.

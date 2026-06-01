@@ -2,17 +2,18 @@
 name: promptboard-state
 type: state-snapshot
 version: 1.1.1
-updated: 2026-05-27
+updated: 2026-06-02
 updated_by: GPT
-current_phase: REL-PUB v1.1.1 stabilisiert; Windows-Store-Vorbereitung plus Flutter-Mobile-Companion-MVP für v1.2 erweitert
-last_verified: 2026-05-27
+current_phase: REL-PUB v1.1.1 stabilisiert; Portierungsplan usecase-basiert geprüft
+last_verified: 2026-06-02
 description: |
   PromptBoard ist als öffentliches Desktop-Tool veröffentlicht. Die aktuelle
   Linie steht bei v1.1.1 inklusive Hotfix für den Import-Crash,
   vollständiger Release-Artefakte und lokalem REL-PUB-Lifecycle.
   Batch-Materialisierung, Typvorlagen, Inline-Variablen, globale Hotkeys sowie
-  der Store-Workflow stehen; dazu kommt jetzt ein erster read-only
-  Flutter-Companion für Android und iOS.
+  der Store-Workflow stehen; dazu kommt ein erster read-only Flutter-Companion
+  für Android und iOS. Der Portierungsplan wurde am 2026-06-02 auf Features,
+  Usecases und getrennte Usecase-Settings zurückgeführt.
 ---
 
 # STATE.md - Aktueller Projekt-Stand
@@ -35,9 +36,20 @@ Build-Wrapper, reproduzierbare Screenshots, lokaler MSIX-Preflight und jetzt
 auch ein projektlokaler WACK-Start-/Review-Flow sind da; im Mobile-Strang gibt
 es nun einen read-only Viewer für `library.json` per Demo, Zwischenablage oder
 manueller JSON-Eingabe. Offen bleiben Partner-Center-Werte, der erhöhte echte
-WACK-Lauf und ein echter Datei-/Share-Import im Flutter-Companion.
+WACK-Lauf, macOS-/Linux-Source-Smokes und ein echter Datei-/Share-Import im
+Flutter-Companion.
 
 ## Letzte bedeutsame Aktion
+
+2026-06-02:
+- **Portierungsplan geprüft und geschärft**: `PORTIERUNGSPLAN.md` leitet die
+  Plattformentscheidung jetzt aus Features, Usecases und getrennten
+  Usecase-Settings ab.
+- **Austauschformat dokumentiert**: `EXPORTFORMAT.md` beschreibt `library.json`
+  als lokales, dateibasiertes Format für den read-only Companion.
+- **Mobile-Grenze festgelegt**: Android/iOS bleiben Companion für Lesen, Suchen
+  und Kopieren. Schreibsync und direkte Server-Synchronisierung sind Nicht-Ziele
+  ohne belegten Live-Mehrgerätebedarf.
 
 2026-05-27:
 - **Flutter-Mobile-Companion als MVP umgesetzt**: Das vorhandene
@@ -117,6 +129,11 @@ WACK-Lauf und ein echter Datei-/Share-Import im Flutter-Companion.
 - [x] Windows-Store-Einreichung als MSIX technisch prüfen.
 - [x] Store-Screenshots für Tray, Bibliothek, Editor und Einstellungen erzeugen.
 - [x] Flutter-Companion als read-only Android/iOS-MVP aus dem Scaffold bauen.
+- [x] Portierungsplan usecase-basiert prüfen und aktualisieren.
+- [ ] Partner-Center-Werte eintragen und WACK-Report prüfen.
+- [ ] macOS-/Linux-Source-Smokes dokumentieren.
+- [ ] Flutter-Companion um Dateiimport oder Share-Intent für `library.json`
+      erweitern.
 
 ## Aktuelle Blocker
 
@@ -154,9 +171,10 @@ WACK-Lauf und ein echter Datei-/Share-Import im Flutter-Companion.
   `_STORE`-MSIX-Builder die erwarteten Logos.
 - Store-Screenshots liegen unter `README/screenshots/store/` und können per
   `_tools/generate_store_screenshots.py` neu erzeugt werden.
-- `flutter_port/` ist jetzt ein read-only Mobile-Viewer für `library.json`;
-  nächster realistischer Schritt ist Datei- oder Share-Import statt reinem
-  Paste-Flow.
+- `flutter_port/` ist ein read-only Mobile-Viewer für `library.json`; nächster
+  realistischer Schritt ist Datei- oder Share-Import statt reinem Paste-Flow.
+- `EXPORTFORMAT.md` dokumentiert die Companion-Grenze: keine Logs, keine
+  lokalen Pfade, keine Hotkey-/Store-Konfigurationen und kein Schreibsync.
 
 ## Kurz-Historie
 
