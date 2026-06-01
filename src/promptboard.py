@@ -113,6 +113,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.sort_combo.setCurrentIndex(sort_index)
         self.search_edit = QtWidgets.QLineEdit()
         self.search_edit.setPlaceholderText(tr("filter.search_placeholder"))
+        self._apply_library_filter_accessibility()
         filter_row.addWidget(self.type_filter)
         filter_row.addWidget(self.sort_combo)
         filter_row.addWidget(self.search_edit)
@@ -210,6 +211,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Filter row
         self.type_filter.setItemText(0, tr("filter.all"))
         self.search_edit.setPlaceholderText(tr("filter.search_placeholder"))
+        self._apply_library_filter_accessibility()
         # Buttons
         self.new_button.setText(tr("btn.new"))
         self.delete_button.setText(tr("btn.delete"))
@@ -236,6 +238,19 @@ class MainWindow(QtWidgets.QMainWindow):
         # Active status messages remain as-is (already-formatted).
 
     # ------------------------------------------------------------ helpers
+
+    def _apply_library_filter_accessibility(self) -> None:
+        self.type_filter.setAccessibleName(tr("filter.type_name"))
+        self.type_filter.setAccessibleDescription(tr("filter.type_description"))
+        self.type_filter.setToolTip(tr("filter.type_description"))
+
+        self.sort_combo.setAccessibleName(tr("filter.sort_name"))
+        self.sort_combo.setAccessibleDescription(tr("filter.sort_description"))
+        self.sort_combo.setToolTip(tr("filter.sort_description"))
+
+        self.search_edit.setAccessibleName(tr("filter.search_name"))
+        self.search_edit.setAccessibleDescription(tr("filter.search_description"))
+        self.search_edit.setToolTip(tr("filter.search_description"))
 
     def all_items(self) -> List[LibraryItem]:
         try:
@@ -444,6 +459,15 @@ class MainWindow(QtWidgets.QMainWindow):
             return None
         return self.storage.get_item(self.current_item_id)
 
+    def _resolve_live_item(self, item: Optional[LibraryItem]) -> Optional[LibraryItem]:
+        if item is None:
+            return None
+        if item.id != self.current_item_id:
+            return item
+        self.save_current_item()
+        refreshed = self.storage.get_item(item.id)
+        return refreshed or item
+
     def delete_current_item(self) -> None:
         item = self.current_item()
         if item is None:
@@ -488,6 +512,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self._copy_item_markdown(item)
 
     def _copy_item(self, item: LibraryItem, notify_message: Optional[str] = None) -> bool:
+        resolve_live_item = getattr(self, "_resolve_live_item", None)
+        if callable(resolve_live_item):
+            item = resolve_live_item(item)
+            if item is None:
+                return False
         remember = getattr(self, "_remember_active_item", None)
         if callable(remember):
             remember(item)
@@ -501,6 +530,11 @@ class MainWindow(QtWidgets.QMainWindow):
             return False
 
     def _copy_item_markdown(self, item: LibraryItem) -> bool:
+        resolve_live_item = getattr(self, "_resolve_live_item", None)
+        if callable(resolve_live_item):
+            item = resolve_live_item(item)
+            if item is None:
+                return False
         remember = getattr(self, "_remember_active_item", None)
         if callable(remember):
             remember(item)

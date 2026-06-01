@@ -1,4 +1,4 @@
-# Python
+﻿# Python
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -48,3 +48,9 @@ AUFGABEN.txt
 TEST.txt
 TESTS.txt
 TESTERGEBNISSE.txt
+# ---- Interne Steuerungsdateien ----
+DECISIONS.md
+PORTIERUNGSPLAN.md
+TODO.md
+DONE.md
+_tmp_accessibility_check/

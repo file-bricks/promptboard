@@ -63,6 +63,21 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
         "de": "Suche nach Name, Inhalt oder Kategorie…",
         "en": "Search by name, content, or category…",
     },
+    "filter.type_name": {"de": "Typfilter", "en": "Type filter"},
+    "filter.type_description": {
+        "de": "Bibliothek nach Eintragstyp filtern",
+        "en": "Filter the library by entry type",
+    },
+    "filter.sort_name": {"de": "Sortierung", "en": "Sort order"},
+    "filter.sort_description": {
+        "de": "Sortierung der Bibliothek ändern",
+        "en": "Change the library sort order",
+    },
+    "filter.search_name": {"de": "Bibliothek durchsuchen", "en": "Search library"},
+    "filter.search_description": {
+        "de": "Bibliothek nach Name, Inhalt oder Kategorie durchsuchen",
+        "en": "Search the library by name, content, or category",
+    },
 
     # ----- Form-Labels ---------------------------------------------------
     "form.type": {"de": "Typ", "en": "Type"},

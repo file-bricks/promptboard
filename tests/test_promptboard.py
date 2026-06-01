@@ -12,6 +12,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 from PySide6 import QtCore, QtWidgets
 
+from i18n import set_language
 from models import ItemType, LibraryItem
 from promptboard import MainWindow
 from settings_manager import SettingsManager
@@ -199,6 +200,73 @@ def test_materialize_current_item_batches_selected_rows(qapp_isolated, tmp_path)
         assert window.status_label.text().startswith("2 Einträge materialisiert")
         assert str(export_dir) in window.status_label.text()
     finally:
+        window.close()
+
+
+def test_copy_double_clicked_item_flushes_pending_editor_changes(qapp_isolated, tmp_path):
+    data_dir = tmp_path / "library"
+
+    settings = SettingsManager()
+    settings.qs.setValue("paths/data", str(data_dir))
+    settings.qs.sync()
+
+    storage = Storage(data_dir)
+    item = LibraryItem(
+        id="copy-live-item",
+        item_type=ItemType.PROMPT,
+        name="Live Copy",
+        content="ALT",
+    )
+    storage.upsert_item(item)
+
+    window = MainWindow(storage, settings)
+    try:
+        copied: list[str] = []
+        window.clipboard_service = SimpleNamespace(
+            copy_item=lambda current_item: copied.append(current_item.content) or True,
+            copy_item_markdown=lambda current_item: False,
+        )
+
+        window.item_list.setCurrentRow(0)
+        window.content_edit.setPlainText("NEU")
+
+        widget_item = window.item_list.item(0)
+        window.copy_double_clicked_item(widget_item)
+
+        assert copied == ["NEU"]
+        assert storage.get_item(item.id).content == "NEU"
+    finally:
+        window.close()
+
+
+def test_library_filter_controls_expose_translated_accessible_context(qapp_isolated, tmp_path):
+    data_dir = tmp_path / "library"
+
+    settings = SettingsManager()
+    settings.qs.setValue("paths/data", str(data_dir))
+    settings.qs.sync()
+
+    storage = Storage(data_dir)
+    window = MainWindow(storage, settings)
+    try:
+        assert window.type_filter.accessibleName() == "Typfilter"
+        assert window.type_filter.toolTip() == "Bibliothek nach Eintragstyp filtern"
+        assert window.sort_combo.accessibleName() == "Sortierung"
+        assert window.search_edit.accessibleName() == "Bibliothek durchsuchen"
+
+        set_language("en")
+        window.relabel_ui()
+
+        assert window.type_filter.accessibleName() == "Type filter"
+        assert window.type_filter.toolTip() == "Filter the library by entry type"
+        assert window.sort_combo.accessibleName() == "Sort order"
+        assert window.search_edit.accessibleName() == "Search library"
+        assert (
+            window.search_edit.accessibleDescription()
+            == "Search the library by name, content, or category"
+        )
+    finally:
+        set_language("de")
         window.close()
 
 

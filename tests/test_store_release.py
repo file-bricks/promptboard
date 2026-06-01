@@ -191,6 +191,7 @@ def test_ensure_store_assets_copies_expected_logo_names(tmp_path):
 
 
 def test_latest_wack_report_uses_newest_xml(tmp_path):
+    import os, time
     module = load_module()
     report_dir = tmp_path / "reports"
     report_dir.mkdir()
@@ -198,8 +199,9 @@ def test_latest_wack_report_uses_newest_xml(tmp_path):
     newer = report_dir / "wack_20260527_101500.xml"
     older.write_text("<REPORT><OVERALL_RESULT>PASS</OVERALL_RESULT></REPORT>", encoding="utf-8")
     newer.write_text("<REPORT><OVERALL_RESULT>FAIL</OVERALL_RESULT></REPORT>", encoding="utf-8")
-    older.touch()
-    newer.touch()
+    t_now = time.time()
+    os.utime(older, (t_now - 2, t_now - 2))
+    os.utime(newer, (t_now, t_now))
 
     latest = module.latest_wack_report(report_dir=report_dir)
 

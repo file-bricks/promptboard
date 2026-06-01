@@ -4,6 +4,13 @@ Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
 ## [Unreleased] - 2026-05-24
 
+### Behoben
+
+- **Copy-Flow nutzt wieder den sichtbaren Editorzustand**: Listenaktionen wie
+  Doppelklick-Schnellkopie holen bei noch ausstehendem Autosave jetzt erst den
+  aktuellen Editorinhalt in den Storage, statt veralteten Bibliotheksstand in
+  die Zwischenablage zu legen.
+
 ### Verändert
 
 - **Windows-Store-Workflow gehärtet**: `_tools/store_release.py` erhält
