@@ -1,40 +1,25 @@
-# PromptBoard Flutter Companion
+# PromptBoard Flutter Prototype
 
-Read-only Android/iOS-Companion für `PromptBoard`. Der Mobile-Strang lädt die
-Desktop-Datei `library.json` ohne Cloud-Zwang und zeigt Einträge für schnelle
-Unterwegs-Sicht, Suche und Kopierpfade mobil an.
+Status: gestrichen seit 2026-06-02.
 
-## Aktueller Umfang
+Dieser Ordner enthält einen read-only Flutter-Prototyp für `library.json`.
+Android und iOS sind aber keine aktive PromptBoard-Produktlinie mehr.
 
-- Demo-Daten für schnelle UI-Smokes
-- Import aus der Zwischenablage
-- Manuelle JSON-Eingabe für `library.json`
-- Suche über Name, Inhalt, Tags und Quelle
-- Filter nach Eintragstyp
-- Detailansicht mit Copy-Button
+## Warum gestoppt?
 
-## Start
+PromptBoards Kernnutzen sitzt am Desktop: Tray, Hotkeys, Clipboard,
+Dateisystemzugriff und Markdown-Materialisierung. Eine native Mobile-App würde
+diesen Nutzen nur schwach abbilden.
 
-```powershell
-cd 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\REL-PUB_PromptBoard\flutter_port'
-flutter pub get
-flutter run
-```
+Der stärkere neue Usecase liegt bei Teams, die eine gemeinsame Promptbase per
+Web/PWA und Server-Synchronisierung betreiben wollen. Diese Idee wird als eigene
+Applinie gedacht, siehe `../TEAM_SERVER_KONZEPT.md`.
 
-## Tests
+## Keine aktiven Aufgaben
 
-```powershell
-flutter test
-```
+- keinen Android-Build starten
+- keinen iOS-Build starten
+- keinen Dateiimport oder Share-Intent weiterentwickeln
+- keine Mobile-Spracherweiterung daraus ableiten
 
-## Nächste sinnvolle Schritte
-
-- Echten Dateiupload oder Share-Intent für `library.json` ergänzen
-- Lokalen Offline-Cache für die zuletzt geladene Bibliothek ergänzen
-- Android- und iOS-Smoke mit realer Desktop-Exportdatei dokumentieren
-
-## Grenze
-
-Der Companion bleibt read-only. Er soll `library.json` dateibasiert übernehmen,
-aber keine Einträge zurück in die Desktop-Bibliothek schreiben und keine direkte
-Server-Synchronisierung einführen.
+Der Ordner kann später entfernt oder archiviert werden.

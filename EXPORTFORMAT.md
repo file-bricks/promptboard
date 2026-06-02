@@ -4,9 +4,10 @@ Stand: 2026-06-02
 
 ## Zweck
 
-`library.json` ist das lokale Bibliotheksformat von PromptBoard und zugleich das
-dateibasierte Austauschformat für den Android-/iOS-Companion. Es transportiert
-Prompts, Skills, Workflows, Rollen und Agenten ohne Cloud-Zwang.
+`library.json` ist das lokale Bibliotheksformat von PromptBoard und das
+dateibasierte Austauschformat für Backups, Tool-Importe und eine mögliche
+spätere Team-Server-Linie. Es transportiert Prompts, Skills, Workflows, Rollen
+und Agenten ohne Cloud-Zwang.
 
 ## Datei
 
@@ -16,9 +17,10 @@ Standardpfad in der Desktop-App:
 %APPDATA%/PromptBoard/library.json
 ```
 
-Der Companion soll diese Datei über Dateiauswahl, Share-Intent, Zwischenablage
-oder manuelle JSON-Eingabe lesen können. Schreibzugriff vom Companion zurück in
-die Desktop-Bibliothek ist vorerst kein Ziel.
+Das Format ist eine Datei-Brücke, kein Live-Sync-Protokoll. Eine mögliche
+Web-/Server-Linie darf `library.json` importieren oder exportieren, sollte aber
+für Team-Rechte, Versionen, Freigaben und Synchronisierung ein eigenes
+serverseitiges Datenmodell nutzen.
 
 ## Struktur
 
@@ -65,6 +67,14 @@ die Desktop-Bibliothek ist vorerst kein Ziel.
 - Inhalte bleiben unverändert; Inline-Variablen wie `{{name}}` werden erst im
   Copy-Flow aufgelöst.
 - Der Companion darf für read-only Anzeige unbekannte Felder ignorieren.
+
+## Server-/Team-Grenze
+
+`library.json` kann eine Team-Promptbase initial befüllen oder einzelne
+Bibliotheken aus ihr exportieren. Es soll aber keine direkte Mehrnutzer-
+Synchronisierung abbilden. Für kollaborative Nutzung braucht eine separate
+Server-Linie zusätzliche Objekte wie Nutzer, Rollen, Rechte, Versionen,
+Review-Status und Änderungsverlauf.
 
 ## Datenschutzgrenze
 

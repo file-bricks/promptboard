@@ -4,22 +4,22 @@ type: state-snapshot
 version: 1.1.1
 updated: 2026-06-02
 updated_by: GPT
-current_phase: REL-PUB v1.1.1 stabilisiert; Portierungsplan usecase-basiert geprüft
+current_phase: REL-PUB v1.1.1 stabilisiert; Mobile gestrichen, Team-Server-Linie geprüft
 last_verified: 2026-06-02
 description: |
   PromptBoard ist als öffentliches Desktop-Tool veröffentlicht. Die aktuelle
   Linie steht bei v1.1.1 inklusive Hotfix für den Import-Crash,
   vollständiger Release-Artefakte und lokalem REL-PUB-Lifecycle.
   Batch-Materialisierung, Typvorlagen, Inline-Variablen, globale Hotkeys sowie
-  der Store-Workflow stehen; dazu kommt ein erster read-only Flutter-Companion
-  für Android und iOS. Der Portierungsplan wurde am 2026-06-02 auf Features,
-  Usecases und getrennte Usecase-Settings zurückgeführt.
+  der Store-Workflow stehen. Android/iOS wurden gestrichen; Web/PWA plus direkte
+  Server-Synchronisierung wird als mögliche eigene Team-Server-Linie geprüft.
 ---
 
 # STATE.md - Aktueller Projekt-Stand
 
-**Next review:** nach dem ersten Android-/iOS-Smoke mit echter `library.json`
-oder nach dem ersten erhöhten WACK-Lauf über `_tools\run_wack.ps1`.
+**Next review:** nach dem ersten erhöhten WACK-Lauf über `_tools\run_wack.ps1`
+oder nach einer Entscheidung, ob `PromptBase Team Server` als eigenes Projekt
+angelegt wird.
 
 ## Current Phase
 
@@ -29,27 +29,26 @@ Lifecycle `REL-PUB_PromptBoard`.
 
 ## Focus gerade
 
-Die Bugfix-Runde ist abgeschlossen. Der aktuelle Fokus liegt auf zwei klar
-getrennten Plattformpfaden: der Windows-Store-Vorbereitung und einem ersten
-Flutter-Mobile-Companion für Android/iOS. Metadaten, Privacy-Text,
-Build-Wrapper, reproduzierbare Screenshots, lokaler MSIX-Preflight und jetzt
-auch ein projektlokaler WACK-Start-/Review-Flow sind da; im Mobile-Strang gibt
-es nun einen read-only Viewer für `library.json` per Demo, Zwischenablage oder
-manueller JSON-Eingabe. Offen bleiben Partner-Center-Werte, der erhöhte echte
-WACK-Lauf, macOS-/Linux-Source-Smokes und ein echter Datei-/Share-Import im
-Flutter-Companion.
+Die Bugfix-Runde ist abgeschlossen. Der aktuelle Fokus liegt auf der
+Windows-Store-Vorbereitung und auf der Produktabgrenzung. Metadaten,
+Privacy-Text, Build-Wrapper, reproduzierbare Screenshots, lokaler MSIX-Preflight
+und ein projektlokaler WACK-Start-/Review-Flow sind da. Android/iOS werden nicht
+weitergeführt. Web/PWA plus direkte Server-Synchronisierung bleibt als eigene
+Team-Server-Linie interessant, aber nicht als Desktop-Companion.
 
 ## Letzte bedeutsame Aktion
 
 2026-06-02:
+- **User-Korrektur eingearbeitet**: Android/iOS gestrichen. Der Flutter-Port
+  bleibt nur als gestoppter Prototyp dokumentiert.
+- **Team-Server-Linie identifiziert**: Web/PWA und direkte Server-
+  Synchronisierung können für Teams einen eigenen Usecase bilden. `TEAM_SERVER_KONZEPT.md`
+  hält die Abgrenzung als mögliche eigene Applinie fest.
 - **Portierungsplan geprüft und geschärft**: `PORTIERUNGSPLAN.md` leitet die
   Plattformentscheidung jetzt aus Features, Usecases und getrennten
   Usecase-Settings ab.
 - **Austauschformat dokumentiert**: `EXPORTFORMAT.md` beschreibt `library.json`
-  als lokales, dateibasiertes Format für den read-only Companion.
-- **Mobile-Grenze festgelegt**: Android/iOS bleiben Companion für Lesen, Suchen
-  und Kopieren. Schreibsync und direkte Server-Synchronisierung sind Nicht-Ziele
-  ohne belegten Live-Mehrgerätebedarf.
+  als lokales, dateibasiertes Format und Brücke zu möglichen Folgeprodukten.
 
 2026-05-27:
 - **Flutter-Mobile-Companion als MVP umgesetzt**: Das vorhandene
@@ -128,12 +127,12 @@ Flutter-Companion.
 - [x] Inline-Variablen `{{name}}` im Copy-Flow umsetzen.
 - [x] Windows-Store-Einreichung als MSIX technisch prüfen.
 - [x] Store-Screenshots für Tray, Bibliothek, Editor und Einstellungen erzeugen.
-- [x] Flutter-Companion als read-only Android/iOS-MVP aus dem Scaffold bauen.
 - [x] Portierungsplan usecase-basiert prüfen und aktualisieren.
+- [x] Android/iOS als aktive Produktlinie streichen.
+- [x] Web/PWA + Server-Synchronisierung als mögliche eigene Team-Linie abgrenzen.
 - [ ] Partner-Center-Werte eintragen und WACK-Report prüfen.
 - [ ] macOS-/Linux-Source-Smokes dokumentieren.
-- [ ] Flutter-Companion um Dateiimport oder Share-Intent für `library.json`
-      erweitern.
+- [ ] Entscheiden, ob `PromptBase Team Server` als neues Projekt angelegt wird.
 
 ## Aktuelle Blocker
 
@@ -144,8 +143,7 @@ Flutter-Companion.
 - Der WACK-Lauf benötigt weiter erhöhte Rechte; `_tools\run_wack.ps1`
   standardisiert jetzt nur den Aufruf, ersetzt aber nicht die nötige UAC-
   Bestätigung und keinen echten Admin-Durchlauf.
-- Der Mobile-Companion lädt `library.json` noch nicht direkt als Datei oder
-  Share-Intent; aktuell laufen Demo, Zwischenablage und manuelle JSON-Eingabe.
+- Keine Mobile-Blocker mehr: Android/iOS sind gestrichen.
 
 ## Notizen für nächste Session
 
@@ -171,10 +169,12 @@ Flutter-Companion.
   `_STORE`-MSIX-Builder die erwarteten Logos.
 - Store-Screenshots liegen unter `README/screenshots/store/` und können per
   `_tools/generate_store_screenshots.py` neu erzeugt werden.
-- `flutter_port/` ist ein read-only Mobile-Viewer für `library.json`; nächster
-  realistischer Schritt ist Datei- oder Share-Import statt reinem Paste-Flow.
-- `EXPORTFORMAT.md` dokumentiert die Companion-Grenze: keine Logs, keine
-  lokalen Pfade, keine Hotkey-/Store-Konfigurationen und kein Schreibsync.
+- `flutter_port/` ist nur noch ein gestrichener Flutter-Prototyp. Keine Android-
+  oder iOS-Aufgaben daraus ableiten.
+- `TEAM_SERVER_KONZEPT.md` dokumentiert die mögliche eigene Web/PWA-Server-Linie
+  für Teams.
+- `EXPORTFORMAT.md` dokumentiert `library.json` als Datei-Brücke, nicht als
+  Live-Sync-Protokoll.
 
 ## Kurz-Historie
 
@@ -188,3 +188,5 @@ Flutter-Companion.
 - 2026-05-22 — Reproduzierbare Store-Screenshots und Screenshot-Smoke-Test ergänzt.
 - 2026-05-27 — Flutter-Companion-MVP für Android/iOS mit JSON-Import,
   Suche, Typfilter und Detailansicht umgesetzt.
+- 2026-06-02 — Android/iOS als Produktlinie gestrichen; Team-Server-Web/PWA als
+  mögliche eigene Applinie abgegrenzt.

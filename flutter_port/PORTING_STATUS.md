@@ -1,30 +1,21 @@
 # PromptBoard Flutter Companion - Porting Status
 
-## Stand 2026-05-27
+## Status 2026-06-02: gestrichen
 
-Die vorhandene Android-/iOS-Linie war bislang nur ein leeres Flutter-Scaffold.
-Jetzt existiert ein erster nutzbarer Mobile-MVP:
+Die Android-/iOS-Linie wird nicht weitergeführt. Der vorhandene Flutter-MVP war
+ein brauchbarer read-only Prototyp für `library.json`, bildet aber keinen
+ausreichend starken eigenständigen Endnutzer-Usecase.
 
-- read-only Viewer für PromptBoard-`library.json`
-- Laden per Demo, Zwischenablage oder manueller JSON-Eingabe
-- mobile Suche und Typfilter
-- Detailansicht mit Copy-Flow
+## Begründung
 
-## Bewusste Grenzen des aktuellen Schritts
+- Mobile Nutzung wäre nur ein kleiner Ausschnitt der Desktop-App.
+- Der Kernnutzen von PromptBoard liegt in Tray, Hotkeys, Clipboard,
+  Dateisystem-Workflows und Markdown-Materialisierung.
+- Für Teams ist Web/PWA mit Server-Synchronisierung interessanter, aber das ist
+  eine eigene Applinie, kein Mobile-Companion.
 
-- kein Schreibzugriff zurück in die Desktop-Bibliothek
-- noch kein echter Datei-Picker oder Share-Intent
-- noch kein lokaler Persistenz-Cache
+## Umgang mit dem Ordner
 
-## Nächste Aufgaben
-
-- reale `library.json` über Datei oder Share-Intent importieren
-- Android- und iOS-Smoke mit echter Exportdatei dokumentieren
-- später optional Offline-Cache für zuletzt geladene Bibliothek ergänzen
-
-## Portierungsentscheidung 2026-06-02
-
-Der Mobile-Strang bleibt Companion, nicht Voll-App. Android und iOS erfüllen
-den mobilen Referenz-Usecase: vorhandene Desktop-Bausteine lesen, suchen und
-kopieren. Schreibzugriff, Konfliktauflösung und direkte Server-Synchronisierung
-werden erst geprüft, wenn echter Live-Mehrgerätebedarf belegt ist.
+`flutter_port/` bleibt vorerst als technischer Prototyp und historische Notiz im
+Repo. Keine neuen Android-/iOS-Aufgaben aus diesem Ordner ableiten. Später kann
+der Ordner entfernt oder in ein Archiv verschoben werden.
