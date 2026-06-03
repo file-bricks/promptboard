@@ -38,6 +38,14 @@ Team-Server-Linie interessant, aber nicht als Desktop-Companion.
 
 ## Letzte bedeutsame Aktion
 
+2026-06-03:
+- **Repo-Hygiene nachgezogen**: `pyproject.toml` mit Projektmetadaten,
+  Dev-Extras, pytest-Konfiguration und `promptboard`-Console-Script ergänzt.
+- **Test-CI ergänzt**: `.github/workflows/tests.yml` prüft Windows/Python
+  3.11 und 3.12 mit editable install, Compile-Smoke und Pytest.
+- **Doku-Teststand aktualisiert**: README, CHANGELOG und `AUFGABEN.txt`
+  nennen jetzt den lokalen Stand 66/66 pytest-Tests.
+
 2026-06-02:
 - **User-Korrektur eingearbeitet**: Android/iOS gestrichen. Der Flutter-Port
   bleibt nur als gestoppter Prototyp dokumentiert.

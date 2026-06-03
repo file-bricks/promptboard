@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-06-03
+
+### Hinzugefügt
+
+- `pyproject.toml` mit Projektmetadaten, Dev-Extras, pytest-Konfiguration und
+  `promptboard`-Console-Script ergänzt.
+- GitHub-Actions-Workflow `PromptBoard tests` für Windows und Python 3.11/3.12
+  ergänzt.
+
+### Tests
+
+- Lokaler Teststand auf 66/66 pytest-Tests aktualisiert.
+
 ## [Unreleased] - 2026-05-24
 
 ### Behoben

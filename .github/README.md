@@ -1,3 +1,6 @@
 # .github/README.md
 
-GitHub-spezifische Dateien für PromptBoard kommen hier hinein, sobald das Projekt als Repository initialisiert wird.
+GitHub-spezifische Dateien für PromptBoard liegen hier.
+
+- `workflows/tests.yml`: Windows-Testlauf mit editable install, Compile-Smoke
+  und Pytest.

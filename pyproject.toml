@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "promptboard"
+version = "1.1.1"
+description = "Local Windows tray app for reusable prompts, skills, workflows, roles and agents."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Lukas Geiger" }]
+dependencies = [
+  "PySide6>=6.6",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pyinstaller>=6.0",
+]
+
+[project.scripts]
+promptboard = "promptboard:main"
+
+[tool.setuptools]
+py-modules = [
+  "clipboard_service",
+  "explorerpro_adapter",
+  "hotkeys",
+  "i18n",
+  "inline_variables",
+  "item_templates",
+  "library_query",
+  "logging_setup",
+  "materializer",
+  "models",
+  "profiprompt_adapter",
+  "promptboard",
+  "settings_dialog",
+  "settings_manager",
+  "storage",
+  "theme",
+]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

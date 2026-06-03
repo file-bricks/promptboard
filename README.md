@@ -15,7 +15,9 @@ searchable and copy-ready without requiring a cloud account.
 ## Status
 
 **Phase:** öffentlich released (`v1.1.1`), erster v1.2-Fokus im lokalen Entwicklungsstand umgesetzt  
-**Code:** PySide6-Desktop-App mit 56/56 pytest-Tests
+**Code:** PySide6-Desktop-App mit 66/66 pytest-Tests
+
+**CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml)
 **Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
 **Aktueller Ordnerstatus:** `LLM/REL-PUB_PromptBoard`
 
@@ -84,7 +86,7 @@ optionale ProfiPrompt-Nähe sind die naheliegendsten Kandidaten.
 
 ```powershell
 cd 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\REL-PUB_PromptBoard'
-python -m pip install -r requirements.txt
+python -m pip install -e ".[dev]"
 python src\promptboard.py
 ```
 
