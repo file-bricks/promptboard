@@ -2,6 +2,31 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-06-04
+
+### Hinzugefügt
+
+- Neuer reproduzierbarer Desktop-Source-Smoke `tests/source_platform_smoke.py`
+  für den plattformübergreifenden Startpfad mit echtem Umlaut-Content,
+  Materialisierung und Hotkey-/Tray-Grundverhalten.
+- GitHub-Actions-Job `platform-smoke` für `ubuntu-latest` und `macos-latest`
+  ergänzt.
+
+### Verändert
+
+- `create_tray()` fällt ohne verfügbares System-Tray jetzt sauber auf `None`
+  zurück, statt Headless- oder Nicht-Windows-Umgebungen unnötig hart zu
+  behandeln.
+- `_tools/generate_store_screenshots.py` rendert das Tray-Bild bei fehlendem
+  System-Tray jetzt über ein äquivalentes Vorschau-Menü und bleibt dadurch
+  auch im Offscreen-Testpfad reproduzierbar.
+
+### Tests
+
+- Neuer Regressionstest für den Tray-Fallback in `tests/test_promptboard.py`.
+- Lokaler Teststand auf 67/67 pytest-Tests erhöht.
+- `python tests/source_platform_smoke.py` lokal grün.
+
 ## [Unreleased] - 2026-06-03
 
 ### Hinzugefügt
@@ -10,10 +35,6 @@ Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
   `promptboard`-Console-Script ergänzt.
 - GitHub-Actions-Workflow `PromptBoard tests` für Windows und Python 3.11/3.12
   ergänzt.
-
-### Tests
-
-- Lokaler Teststand auf 66/66 pytest-Tests aktualisiert.
 
 ## [Unreleased] - 2026-05-24
 

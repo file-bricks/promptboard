@@ -14,7 +14,7 @@ from PySide6 import QtCore, QtWidgets
 
 from i18n import set_language
 from models import ItemType, LibraryItem
-from promptboard import MainWindow
+from promptboard import MainWindow, create_tray
 from settings_manager import SettingsManager
 from storage import Storage
 
@@ -562,5 +562,28 @@ def test_toggle_visibility_from_hotkey_hides_and_shows_window(qapp_isolated, tmp
 
         window.toggle_visibility_from_hotkey()
         assert window.isVisible()
+    finally:
+        window.close()
+
+
+def test_create_tray_skips_unavailable_system_tray(qapp_isolated, tmp_path, monkeypatch):
+    data_dir = tmp_path / "library"
+    settings = SettingsManager()
+    settings.qs.setValue("paths/data", str(data_dir))
+    settings.qs.sync()
+
+    storage = Storage(data_dir)
+    window = MainWindow(storage, settings)
+    try:
+        monkeypatch.setattr(
+            QtWidgets.QSystemTrayIcon,
+            "isSystemTrayAvailable",
+            staticmethod(lambda: False),
+        )
+
+        tray = create_tray(window)
+
+        assert tray is None
+        assert window.tray_icon is None
     finally:
         window.close()

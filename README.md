@@ -14,10 +14,10 @@ searchable and copy-ready without requiring a cloud account.
 
 ## Status
 
-**Phase:** öffentlich released (`v1.1.1`), erster v1.2-Fokus im lokalen Entwicklungsstand umgesetzt  
-**Code:** PySide6-Desktop-App mit 66/66 pytest-Tests
+**Phase:** öffentlich released (`v1.1.1`), Store- und Plattformhärtung im lokalen Entwicklungsstand aktiv
+**Code:** PySide6-Desktop-App mit 67/67 pytest-Tests
 
-**CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml)
+**CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) mit Windows-Pytest sowie macOS-/Linux-Source-Smoke
 **Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
 **Aktueller Ordnerstatus:** `LLM/REL-PUB_PromptBoard`
 
@@ -78,9 +78,10 @@ zuletzt benutzten Eintrag schnell in die Zwischenablage.
 
 ## Nächster sinnvoller Schritt
 
-Der nächste sinnvolle Schritt ist kein weiterer Lifecycle-Task mehr, sondern
-ein kleiner v1.2-Fokus: globale Hotkeys, Windows-Store-Einreichung oder
-optionale ProfiPrompt-Nähe sind die naheliegendsten Kandidaten.
+Der nächste sinnvolle Schritt ist jetzt der verbleibende Store-P1-Pfad:
+reale Partner-Center-Werte eintragen und den erhöhten WACK-Lauf gegen
+`releases/PromptBoard.msix` dokumentieren. Die macOS-/Linux-Source-Smokes sind
+ab jetzt reproduzierbar im Projekt und in CI verankert.
 
 ## Projekt starten
 

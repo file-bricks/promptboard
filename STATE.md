@@ -2,10 +2,10 @@
 name: promptboard-state
 type: state-snapshot
 version: 1.1.1
-updated: 2026-06-02
+updated: 2026-06-04
 updated_by: GPT
-current_phase: REL-PUB v1.1.1 stabilisiert; Mobile gestrichen, Team-Server-Linie geprüft
-last_verified: 2026-06-02
+current_phase: REL-PUB v1.1.1 stabilisiert; Desktop-Plattform-Smokes stehen, Store-P1 bleibt offen
+last_verified: 2026-06-04
 description: |
   PromptBoard ist als öffentliches Desktop-Tool veröffentlicht. Die aktuelle
   Linie steht bei v1.1.1 inklusive Hotfix für den Import-Crash,
@@ -13,6 +13,7 @@ description: |
   Batch-Materialisierung, Typvorlagen, Inline-Variablen, globale Hotkeys sowie
   der Store-Workflow stehen. Android/iOS wurden gestrichen; Web/PWA plus direkte
   Server-Synchronisierung wird als mögliche eigene Team-Server-Linie geprüft.
+  Neu sind reproduzierbare macOS-/Linux-Source-Smokes samt CI-Absicherung.
 ---
 
 # STATE.md - Aktueller Projekt-Stand
@@ -32,11 +33,24 @@ Lifecycle `REL-PUB_PromptBoard`.
 Die Bugfix-Runde ist abgeschlossen. Der aktuelle Fokus liegt auf der
 Windows-Store-Vorbereitung und auf der Produktabgrenzung. Metadaten,
 Privacy-Text, Build-Wrapper, reproduzierbare Screenshots, lokaler MSIX-Preflight
-und ein projektlokaler WACK-Start-/Review-Flow sind da. Android/iOS werden nicht
-weitergeführt. Web/PWA plus direkte Server-Synchronisierung bleibt als eigene
-Team-Server-Linie interessant, aber nicht als Desktop-Companion.
+und ein projektlokaler WACK-Start-/Review-Flow sind da. Die Desktop-Linie hat
+jetzt zusätzlich reproduzierbare macOS-/Linux-Source-Smokes mit Tray-/Hotkey-
+Fallback. Android/iOS werden nicht weitergeführt. Web/PWA plus direkte
+Server-Synchronisierung bleibt als eigene Team-Server-Linie interessant, aber
+nicht als Desktop-Companion.
 
 ## Letzte bedeutsame Aktion
+
+2026-06-04:
+- **Plattform-Smokes ergänzt**: neuer `tests/source_platform_smoke.py` deckt
+  den Offscreen-Start der Desktop-App, echten Umlaut-Content, Materialisierung
+  sowie Hotkey-/Tray-Grundverhalten ab.
+- **CI auf macOS/Linux erweitert**: `.github/workflows/tests.yml` enthält jetzt
+  zusätzlich einen Source-Smoke-Job für `ubuntu-latest` und `macos-latest`.
+- **Tray-Fallback gehärtet**: `create_tray()` fällt ohne System-Tray sauber auf
+  `None` zurück; der Screenshot-Generator rendert in diesem Fall ein
+  äquivalentes Tray-Vorschau-Menü.
+- **Teststand erhöht**: lokaler Pytest-Stand jetzt 67/67, `python tests/source_platform_smoke.py` grün.
 
 2026-06-03:
 - **Repo-Hygiene nachgezogen**: `pyproject.toml` mit Projektmetadaten,
@@ -44,7 +58,7 @@ Team-Server-Linie interessant, aber nicht als Desktop-Companion.
 - **Test-CI ergänzt**: `.github/workflows/tests.yml` prüft Windows/Python
   3.11 und 3.12 mit editable install, Compile-Smoke und Pytest.
 - **Doku-Teststand aktualisiert**: README, CHANGELOG und `AUFGABEN.txt`
-  nennen jetzt den lokalen Stand 66/66 pytest-Tests.
+  nennen jetzt den damaligen lokalen Stand 66/66 pytest-Tests.
 
 2026-06-02:
 - **User-Korrektur eingearbeitet**: Android/iOS gestrichen. Der Flutter-Port
@@ -139,7 +153,7 @@ Team-Server-Linie interessant, aber nicht als Desktop-Companion.
 - [x] Android/iOS als aktive Produktlinie streichen.
 - [x] Web/PWA + Server-Synchronisierung als mögliche eigene Team-Linie abgrenzen.
 - [ ] Partner-Center-Werte eintragen und WACK-Report prüfen.
-- [ ] macOS-/Linux-Source-Smokes dokumentieren.
+- [x] macOS-/Linux-Source-Smokes dokumentieren.
 - [ ] Entscheiden, ob `PromptBase Team Server` als neues Projekt angelegt wird.
 
 ## Aktuelle Blocker

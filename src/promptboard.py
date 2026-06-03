@@ -814,7 +814,11 @@ class MainWindow(QtWidgets.QMainWindow):
         super().closeEvent(event)
 
 
-def create_tray(window: MainWindow) -> QtWidgets.QSystemTrayIcon:
+def create_tray(window: MainWindow) -> Optional[QtWidgets.QSystemTrayIcon]:
+    if not QtWidgets.QSystemTrayIcon.isSystemTrayAvailable():
+        logger.info("System-Tray ist auf dieser Plattform oder im aktuellen Modus nicht verfuegbar.")
+        window.tray_icon = None
+        return None
     app = QtWidgets.QApplication.instance()
     icon = load_app_icon()
     tray = QtWidgets.QSystemTrayIcon(icon, window)

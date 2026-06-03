@@ -134,6 +134,32 @@ def _render_tray_menu(tray: QtWidgets.QSystemTrayIcon, target: Path) -> None:
     menu.hide()
 
 
+def _build_tray_preview_menu(window: MainWindow) -> QtWidgets.QMenu:
+    menu = QtWidgets.QMenu()
+    menu.addAction(tr("tray.open"), window.showNormal)
+    menu.addAction(tr("tray.hide"), window.hide)
+    menu.addSeparator()
+    app = QtWidgets.QApplication.instance()
+    if app is not None:
+        menu.addAction(tr("tray.quit"), app.quit)
+    return menu
+
+
+def _render_tray_preview(
+    window: MainWindow,
+    tray: QtWidgets.QSystemTrayIcon | None,
+    target: Path,
+) -> None:
+    if tray is not None:
+        _render_tray_menu(tray, target)
+        return
+    menu = _build_tray_preview_menu(window)
+    menu.ensurePolished()
+    menu.adjustSize()
+    _save_widget(menu, target)
+    menu.hide()
+
+
 def _build_settings_dialog(window: MainWindow) -> SettingsDialog:
     dialog = SettingsDialog(
         window.settings,
@@ -192,7 +218,7 @@ def generate_store_screenshots(output_dir: Path) -> list[Path]:
         ]
 
         try:
-            _render_tray_menu(tray, targets[0])
+            _render_tray_preview(window, tray, targets[0])
 
             window.current_item_id = "__library_preview__"
             window.type_filter.setCurrentText(tr("filter.all"))
@@ -211,8 +237,9 @@ def generate_store_screenshots(output_dir: Path) -> list[Path]:
             _save_widget(dialog, targets[3])
             dialog.close()
         finally:
-            tray.hide()
-            tray.deleteLater()
+            if tray is not None:
+                tray.hide()
+                tray.deleteLater()
             window.close()
             _process_events(app)
 
