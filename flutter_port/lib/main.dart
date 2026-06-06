@@ -65,6 +65,7 @@ class PromptBoardCompanionApp extends StatelessWidget {
         colorScheme: scheme,
         scaffoldBackgroundColor: const Color(0xFFF4EFE6),
         useMaterial3: true,
+        splashFactory: InkRipple.splashFactory,
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
@@ -114,6 +115,7 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
 
   Future<void> _loadFromClipboard() async {
     final data = await Clipboard.getData('text/plain');
+    if (!mounted) return;
     final text = data?.text?.trim() ?? '';
     if (text.isEmpty) {
       _showMessage(
@@ -125,64 +127,13 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
   }
 
   Future<void> _openManualImport() async {
-    final controller = TextEditingController();
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            8,
-            16,
-            MediaQuery.of(context).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'PromptBoard-JSON einfügen',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Erwartet wird die Desktop-Datei `library.json` mit einem `items`-Array.',
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                minLines: 10,
-                maxLines: 16,
-                decoration: const InputDecoration(
-                  hintText: '{ "items": [ ... ] }',
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Abbrechen'),
-                  ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: () {
-                      _applyLibrary(
-                        controller.text,
-                        source: 'Manuelle Eingabe',
-                      );
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text('Bibliothek laden'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (context) => _ManualImportSheet(
+        onApply: (text) => _applyLibrary(text, source: 'Manuelle Eingabe'),
+      ),
     );
   }
 
@@ -683,6 +634,77 @@ class _StatCard extends StatelessWidget {
             style: Theme.of(
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ManualImportSheet extends StatefulWidget {
+  const _ManualImportSheet({required this.onApply});
+
+  final void Function(String text) onApply;
+
+  @override
+  State<_ManualImportSheet> createState() => _ManualImportSheetState();
+}
+
+class _ManualImportSheetState extends State<_ManualImportSheet> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'PromptBoard-JSON einfügen',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Erwartet wird die Desktop-Datei `library.json` mit einem `items`-Array.',
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            minLines: 10,
+            maxLines: 16,
+            decoration: const InputDecoration(
+              hintText: '{ "items": [ ... ] }',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Abbrechen'),
+              ),
+              const Spacer(),
+              FilledButton(
+                onPressed: () {
+                  widget.onApply(_controller.text);
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Bibliothek laden'),
+              ),
+            ],
           ),
         ],
       ),
