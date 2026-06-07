@@ -1,0 +1,57 @@
+{
+  "@@locale": "en",
+  "appTitle": "PromptBoard Companion",
+  "notLoaded": "Not loaded",
+  "sourceClipboard": "Clipboard",
+  "sourceManual": "Manual entry",
+  "sourceDemo": "Demo",
+  "clipboardInvalid": "Clipboard does not contain valid PromptBoard JSON.",
+  "itemsLoaded": "{count} entries from {source} loaded.",
+  "@itemsLoaded": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "source": {"type": "String"}
+    }
+  },
+  "tagsLabel": "Tags: {tags}",
+  "@tagsLabel": {
+    "placeholders": {
+      "tags": {"type": "String"}
+    }
+  },
+  "copiedToClipboard": "{name} was copied to clipboard.",
+  "@copiedToClipboard": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "copyToClipboard": "Copy to clipboard",
+  "statEntries": "Entries",
+  "statTypes": "Types",
+  "statTagged": "Tagged",
+  "searchHint": "Search by name, content, tags or source",
+  "typeAll": "ALL",
+  "heroTitle": "Android/iOS Companion for PromptBoard",
+  "heroDescription": "Loads Desktop `library.json` read-only via Demo, Clipboard or manual JSON entry — no cloud required.",
+  "loadDemo": "Load demo",
+  "clipboardButton": "Clipboard",
+  "enterJson": "Enter JSON",
+  "reset": "Reset",
+  "sourceLabel": "Source: {src}",
+  "@sourceLabel": {
+    "placeholders": {
+      "src": {"type": "String"}
+    }
+  },
+  "emptyTitle": "No library loaded",
+  "emptyDescription": "For the first mobile smoke test, the Desktop file `library.json` is enough. The companion shows types, search and detail view intentionally read-only.",
+  "noResults": "No entries found for this filter.",
+  "manualImportTitle": "Paste PromptBoard JSON",
+  "manualImportHint": "Expects the Desktop file `library.json` with an `items` array.",
+  "cancel": "Cancel",
+  "loadLibrary": "Load library",
+  "unnamedEntry": "UNNAMED ENTRY",
+  "parseErrorInvalidRoot": "Invalid JSON: root must be object or list.",
+  "parseErrorInvalidItems": "Invalid PromptBoard format: `items` must be a list.",
+  "parseErrorInvalidEntry": "Invalid PromptBoard format: entry is not an object."
+}

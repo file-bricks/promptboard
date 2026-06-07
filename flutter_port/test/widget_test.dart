@@ -8,7 +8,11 @@ void main() {
   testWidgets('Demo-Bibliothek lädt und Suche filtert mobil', (
     WidgetTester tester,
   ) async {
+    tester.platformDispatcher.localesTestValue = [const Locale('de')];
+    addTearDown(() => tester.platformDispatcher.clearLocalesTestValue());
+
     await tester.pumpWidget(const PromptBoardCompanionApp());
+    await tester.pump();
 
     expect(find.text('Demo laden'), findsOneWidget);
     expect(find.text('Noch keine Bibliothek geladen'), findsOneWidget);
@@ -52,7 +56,11 @@ void main() {
   testWidgets(
     'Bug-1-Regression: manueller Import öffnet, lädt und schließt ohne Fehler',
     (WidgetTester tester) async {
+      tester.platformDispatcher.localesTestValue = [const Locale('de')];
+      addTearDown(() => tester.platformDispatcher.clearLocalesTestValue());
+
       await tester.pumpWidget(const PromptBoardCompanionApp());
+      await tester.pump();
 
       await tester.tap(find.text('JSON eingeben'));
       await tester.pumpAndSettle();
@@ -79,6 +87,9 @@ void main() {
   testWidgets(
     'Bug-2-Regression: Zwischenablage lädt PromptBoard-JSON ohne Fehler',
     (WidgetTester tester) async {
+      tester.platformDispatcher.localesTestValue = [const Locale('de')];
+      addTearDown(() => tester.platformDispatcher.clearLocalesTestValue());
+
       const testJson =
           '{"items":[{"id":"c1","item_type":"PROMPT","name":"ClipTest","content":"Clip","category":"","tags":[],"source":""}]}';
 
@@ -93,6 +104,7 @@ void main() {
       );
 
       await tester.pumpWidget(const PromptBoardCompanionApp());
+      await tester.pump();
       await tester.tap(find.text('Zwischenablage'));
       await tester.pumpAndSettle();
 
@@ -110,7 +122,11 @@ void main() {
   );
 
   testWidgets('Detailansicht zeigt Copy-Button', (WidgetTester tester) async {
+    tester.platformDispatcher.localesTestValue = [const Locale('de')];
+    addTearDown(() => tester.platformDispatcher.clearLocalesTestValue());
+
     await tester.pumpWidget(const PromptBoardCompanionApp());
+    await tester.pump();
     await tester.tap(find.text('Demo laden'));
     await tester.pumpAndSettle();
 

@@ -3,9 +3,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:promptboard/l10n/app_localizations.dart';
+
 void main() {
   runApp(const PromptBoardCompanionApp());
 }
+
+enum _PromptBoardParseException { invalidRoot, invalidItems, invalidEntry }
 
 const String sampleLibraryJson = '''
 {
@@ -59,8 +63,10 @@ class PromptBoardCompanionApp extends StatelessWidget {
     );
 
     return MaterialApp(
-      title: 'PromptBoard Companion',
+      onGenerateTitle: (ctx) => AppLocalizations.of(ctx).appTitle,
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(
         colorScheme: scheme,
         scaffoldBackgroundColor: const Color(0xFFF4EFE6),
@@ -91,23 +97,19 @@ class PromptBoardCompanionPage extends StatefulWidget {
 class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
   PromptBoardLibrary? _library;
   String _searchQuery = '';
+  // Interner Filterkey bleibt immer 'ALLE' (Vergleich in _visibleItems).
   String _activeType = 'ALLE';
-  String _importSource = 'Noch nicht geladen';
+  // null = noch nicht geladen; gesetzt auf l10n-String beim Laden.
+  String? _importSource;
 
   List<PromptBoardItem> get _visibleItems {
     final library = _library;
-    if (library == null) {
-      return const [];
-    }
-
+    if (library == null) return const [];
     return library.items.where((item) {
-      final matchesType = _activeType == 'ALLE' || item.itemType == _activeType;
-      if (!matchesType) {
-        return false;
-      }
-      if (_searchQuery.trim().isEmpty) {
-        return true;
-      }
+      final matchesType =
+          _activeType == 'ALLE' || item.itemType == _activeType;
+      if (!matchesType) return false;
+      if (_searchQuery.trim().isEmpty) return true;
       final query = _searchQuery.trim().toLowerCase();
       return item.searchText.contains(query);
     }).toList();
@@ -116,46 +118,60 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
   Future<void> _loadFromClipboard() async {
     final data = await Clipboard.getData('text/plain');
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
     final text = data?.text?.trim() ?? '';
     if (text.isEmpty) {
-      _showMessage(
-        'Die Zwischenablage enthält kein lesbares PromptBoard-JSON.',
-      );
+      _showMessage(l10n.clipboardInvalid);
       return;
     }
-    _applyLibrary(text, source: 'Zwischenablage');
+    _applyLibrary(text, source: l10n.sourceClipboard);
   }
 
   Future<void> _openManualImport() async {
+    final l10n = AppLocalizations.of(context);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => _ManualImportSheet(
-        onApply: (text) => _applyLibrary(text, source: 'Manuelle Eingabe'),
+        onApply: (text) => _applyLibrary(text, source: l10n.sourceManual),
       ),
     );
   }
 
   void _applyLibrary(String rawJson, {required String source}) {
+    final l10n = AppLocalizations.of(context);
     try {
-      final parsed = PromptBoardLibrary.fromJsonText(rawJson);
+      final parsed = PromptBoardLibrary.fromJsonText(
+        rawJson,
+        unnamedEntry: l10n.unnamedEntry,
+      );
       setState(() {
         _library = parsed;
         _importSource = source;
         _activeType = 'ALLE';
         _searchQuery = '';
       });
-      _showMessage('${parsed.items.length} Einträge aus $source geladen.');
-    } on FormatException catch (error) {
-      _showMessage(error.message);
+      _showMessage(l10n.itemsLoaded(parsed.items.length, source));
+    } on _PromptBoardParseException catch (e) {
+      _showMessage(_translateException(e, l10n));
+    } on FormatException {
+      _showMessage(l10n.parseErrorInvalidRoot);
     }
   }
 
+  String _translateException(
+    _PromptBoardParseException e,
+    AppLocalizations l10n,
+  ) =>
+      switch (e) {
+        _PromptBoardParseException.invalidRoot => l10n.parseErrorInvalidRoot,
+        _PromptBoardParseException.invalidItems => l10n.parseErrorInvalidItems,
+        _PromptBoardParseException.invalidEntry => l10n.parseErrorInvalidEntry,
+      };
+
   void _showMessage(String message) {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
@@ -166,7 +182,8 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (context) {
+      builder: (modalContext) {
+        final l10n = AppLocalizations.of(modalContext);
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
@@ -188,20 +205,20 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
                   const SizedBox(height: 12),
                   Text(
                     item.name,
-                    style: Theme.of(context).textTheme.headlineSmall,
+                    style: Theme.of(modalContext).textTheme.headlineSmall,
                   ),
                   if (item.tags.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text(
-                      'Tags: ${item.tags.join(', ')}',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      l10n.tagsLabel(item.tags.join(', ')),
+                      style: Theme.of(modalContext).textTheme.bodyMedium,
                     ),
                   ],
                   const SizedBox(height: 12),
                   SelectableText(
                     item.content,
                     style: Theme.of(
-                      context,
+                      modalContext,
                     ).textTheme.bodyLarge?.copyWith(height: 1.45),
                   ),
                   const SizedBox(height: 20),
@@ -210,15 +227,13 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
                       await Clipboard.setData(
                         ClipboardData(text: item.content),
                       );
-                      if (context.mounted) {
-                        Navigator.of(context).pop();
+                      if (modalContext.mounted) {
+                        Navigator.of(modalContext).pop();
                       }
-                      _showMessage(
-                        '${item.name} wurde in die Zwischenablage kopiert.',
-                      );
+                      _showMessage(l10n.copiedToClipboard(item.name));
                     },
                     icon: const Icon(Icons.content_copy),
-                    label: const Text('In Zwischenablage kopieren'),
+                    label: Text(l10n.copyToClipboard),
                   ),
                 ],
               ),
@@ -231,13 +246,14 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final library = _library;
     final items = _visibleItems;
     final typeCounts = library?.typeCounts ?? const <String, int>{};
     final typeOptions = <String>['ALLE', ...typeCounts.keys];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('PromptBoard Companion')),
+      appBar: AppBar(title: Text(l10n.appTitle)),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -252,10 +268,10 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
             child: Column(
               children: [
                 _HeroPanel(
-                  importSource: _importSource,
+                  importSource: _importSource ?? l10n.notLoaded,
                   hasData: library != null,
                   onLoadDemo: () =>
-                      _applyLibrary(sampleLibraryJson, source: 'Demo'),
+                      _applyLibrary(sampleLibraryJson, source: l10n.sourceDemo),
                   onLoadClipboard: _loadFromClipboard,
                   onManualImport: _openManualImport,
                   onReset: () {
@@ -263,7 +279,7 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
                       _library = null;
                       _searchQuery = '';
                       _activeType = 'ALLE';
-                      _importSource = 'Noch nicht geladen';
+                      _importSource = null;
                     });
                   },
                 ),
@@ -281,15 +297,15 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
                             runSpacing: 10,
                             children: [
                               _StatCard(
-                                title: 'Einträge',
+                                title: l10n.statEntries,
                                 value: '${library.items.length}',
                               ),
                               _StatCard(
-                                title: 'Typen',
+                                title: l10n.statTypes,
                                 value: '${typeCounts.length}',
                               ),
                               _StatCard(
-                                title: 'Mit Tags',
+                                title: l10n.statTagged,
                                 value: '${library.taggedCount}',
                               ),
                             ],
@@ -299,10 +315,9 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
                         TextField(
                           onChanged: (value) =>
                               setState(() => _searchQuery = value),
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.search),
-                            hintText:
-                                'Suche nach Name, Inhalt, Tags oder Quelle',
+                          decoration: InputDecoration(
+                            prefixIcon: const Icon(Icons.search),
+                            hintText: l10n.searchHint,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -315,8 +330,11 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
                                 const SizedBox(width: 8),
                             itemBuilder: (context, index) {
                               final option = typeOptions[index];
+                              // Nur die Anzeige lokalisieren; 'ALLE' bleibt interner Key.
+                              final label =
+                                  option == 'ALLE' ? l10n.typeAll : option;
                               return ChoiceChip(
-                                label: Text(option),
+                                label: Text(label),
                                 selected: _activeType == option,
                                 onSelected: (_) =>
                                     setState(() => _activeType = option),
@@ -351,7 +369,9 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
                                         children: [
                                           _InlineBadge(label: item.itemType),
                                           if (item.category.isNotEmpty)
-                                            _InlineBadge(label: item.category),
+                                            _InlineBadge(
+                                              label: item.category,
+                                            ),
                                         ],
                                       ),
                                       const SizedBox(height: 8),
@@ -385,7 +405,10 @@ class PromptBoardLibrary {
 
   final List<PromptBoardItem> items;
 
-  factory PromptBoardLibrary.fromJsonText(String rawJson) {
+  factory PromptBoardLibrary.fromJsonText(
+    String rawJson, {
+    String unnamedEntry = 'UNBENANNTER EINTRAG',
+  }) {
     final decoded = jsonDecode(rawJson);
     final dynamic rawItems;
     if (decoded is Map<String, dynamic>) {
@@ -393,24 +416,18 @@ class PromptBoardLibrary {
     } else if (decoded is List<dynamic>) {
       rawItems = decoded;
     } else {
-      throw const FormatException(
-        'Ungültiges JSON: Wurzel muss Objekt oder Liste sein.',
-      );
+      throw _PromptBoardParseException.invalidRoot;
     }
 
     if (rawItems is! List<dynamic>) {
-      throw const FormatException(
-        'Ungültiges PromptBoard-Format: `items` muss eine Liste sein.',
-      );
+      throw _PromptBoardParseException.invalidItems;
     }
 
     final items = rawItems.map((entry) {
       if (entry is! Map<String, dynamic>) {
-        throw const FormatException(
-          'Ungültiges PromptBoard-Format: Eintrag ist kein Objekt.',
-        );
+        throw _PromptBoardParseException.invalidEntry;
       }
-      return PromptBoardItem.fromMap(entry);
+      return PromptBoardItem.fromMap(entry, unnamedEntry: unnamedEntry);
     }).toList();
 
     return PromptBoardLibrary(items: items);
@@ -446,7 +463,10 @@ class PromptBoardItem {
   final List<String> tags;
   final String source;
 
-  factory PromptBoardItem.fromMap(Map<String, dynamic> data) {
+  factory PromptBoardItem.fromMap(
+    Map<String, dynamic> data, {
+    String unnamedEntry = 'UNBENANNTER EINTRAG',
+  }) {
     final rawTags = data['tags'];
     final tags = rawTags is List<dynamic>
         ? rawTags
@@ -459,7 +479,7 @@ class PromptBoardItem {
     return PromptBoardItem(
       id: data['id']?.toString() ?? '',
       itemType: _normalizeType(data['item_type']?.toString()),
-      name: rawName.isNotEmpty ? rawName.toUpperCase() : 'UNBENANNTER EINTRAG',
+      name: rawName.isNotEmpty ? rawName.toUpperCase() : unnamedEntry,
       content: data['content']?.toString().trim() ?? '',
       category: data['category']?.toString().trim() ?? '',
       tags: tags,
@@ -497,6 +517,7 @@ class _HeroPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -508,7 +529,7 @@ class _HeroPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Android/iOS-Companion für PromptBoard',
+            l10n.heroTitle,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w700,
@@ -516,7 +537,7 @@ class _HeroPanel extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Lädt Desktop-`library.json` read-only per Demo, Zwischenablage oder manueller JSON-Eingabe und bleibt damit ohne Cloud nutzbar.',
+            l10n.heroDescription,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: const Color(0xFFDCEBE5),
               height: 1.45,
@@ -529,28 +550,28 @@ class _HeroPanel extends StatelessWidget {
             children: [
               FilledButton.tonal(
                 onPressed: onLoadDemo,
-                child: const Text('Demo laden'),
+                child: Text(l10n.loadDemo),
               ),
               FilledButton.tonalIcon(
                 onPressed: onLoadClipboard,
                 icon: const Icon(Icons.paste),
-                label: const Text('Zwischenablage'),
+                label: Text(l10n.clipboardButton),
               ),
               FilledButton(
                 onPressed: onManualImport,
-                child: const Text('JSON eingeben'),
+                child: Text(l10n.enterJson),
               ),
               if (hasData)
                 TextButton(
                   onPressed: onReset,
                   style: TextButton.styleFrom(foregroundColor: Colors.white),
-                  child: const Text('Zurücksetzen'),
+                  child: Text(l10n.reset),
                 ),
             ],
           ),
           const SizedBox(height: 14),
           Text(
-            'Quelle: $importSource',
+            l10n.sourceLabel(importSource),
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: const Color(0xFFC5DDD5)),
@@ -566,6 +587,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -577,17 +599,13 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Noch keine Bibliothek geladen',
+            l10n.emptyTitle,
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              'Für den ersten Mobile-Smoke reicht die Desktop-Datei `library.json`. '
-              'Der Companion zeigt Typen, Suche und Detailansicht bewusst read-only.',
-              textAlign: TextAlign.center,
-            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(l10n.emptyDescription, textAlign: TextAlign.center),
           ),
         ],
       ),
@@ -602,7 +620,7 @@ class _NoResultsState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Text(
-        'Keine Einträge für diesen Filter gefunden.',
+        AppLocalizations.of(context).noResults,
         style: Theme.of(context).textTheme.titleMedium,
       ),
     );
@@ -661,6 +679,7 @@ class _ManualImportSheetState extends State<_ManualImportSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(
         16,
@@ -673,13 +692,11 @@ class _ManualImportSheetState extends State<_ManualImportSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'PromptBoard-JSON einfügen',
+            l10n.manualImportTitle,
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Erwartet wird die Desktop-Datei `library.json` mit einem `items`-Array.',
-          ),
+          Text(l10n.manualImportHint),
           const SizedBox(height: 12),
           TextField(
             controller: _controller,
@@ -694,7 +711,7 @@ class _ManualImportSheetState extends State<_ManualImportSheet> {
             children: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Abbrechen'),
+                child: Text(l10n.cancel),
               ),
               const Spacer(),
               FilledButton(
@@ -702,7 +719,7 @@ class _ManualImportSheetState extends State<_ManualImportSheet> {
                   widget.onApply(_controller.text);
                   Navigator.of(context).pop();
                 },
-                child: const Text('Bibliothek laden'),
+                child: Text(l10n.loadLibrary),
               ),
             ],
           ),
