@@ -179,6 +179,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         layout.addLayout(left, 2)
         layout.addLayout(right, 3)
+
+        self._apply_library_buttons_and_form_accessibility()
         return root
 
     def _connect_signals(self) -> None:
@@ -212,10 +214,20 @@ class MainWindow(QtWidgets.QMainWindow):
         self.type_filter.setItemText(0, tr("filter.all"))
         self.search_edit.setPlaceholderText(tr("filter.search_placeholder"))
         self._apply_library_filter_accessibility()
-        # Buttons
+        # Buttons (re-evaluate translated texts)
         self.new_button.setText(tr("btn.new"))
         self.delete_button.setText(tr("btn.delete"))
         self.copy_button.setText(tr("btn.copy"))
+        self.materialize_button.setText(tr("btn.materialize"))
+
+        self.content_edit.setPlaceholderText(tr("form.content_placeholder"))
+        # Status (only re-translate if it's the default "Ready")
+        if self.status_label.text() in {
+            "Bereit", "Ready", "Listo", "就绪", "準備完了", "Готово"
+        }:
+            self.status_label.setText(tr("status.ready"))
+
+        self._apply_library_buttons_and_form_accessibility()
         self.copy_markdown_action.setText(tr("btn.copy_markdown"))
         self.materialize_button.setText(tr("btn.materialize"))
         self.materialize_current_action.setText(tr("btn.materialize_current"))
@@ -251,6 +263,49 @@ class MainWindow(QtWidgets.QMainWindow):
         self.search_edit.setAccessibleName(tr("filter.search_name"))
         self.search_edit.setAccessibleDescription(tr("filter.search_description"))
         self.search_edit.setToolTip(tr("filter.search_description"))
+
+    def _apply_library_buttons_and_form_accessibility(self) -> None:
+        # Buttons on the left
+        self.new_button.setAccessibleName(tr("menu.file.new"))
+        self.new_button.setAccessibleDescription(tr("btn.new.tooltip"))
+        self.new_button.setToolTip(tr("btn.new.tooltip"))
+
+        self.delete_button.setAccessibleName(tr("dialog.delete.title"))
+        self.delete_button.setAccessibleDescription(tr("btn.delete.tooltip"))
+        self.delete_button.setToolTip(tr("btn.delete.tooltip"))
+
+        self.copy_button.setAccessibleName(tr("btn.copy"))
+        self.copy_button.setAccessibleDescription(tr("btn.copy.tooltip"))
+        self.copy_button.setToolTip(tr("btn.copy.tooltip"))
+
+        self.materialize_button.setAccessibleName(tr("btn.materialize"))
+        self.materialize_button.setAccessibleDescription(tr("btn.materialize.tooltip"))
+        self.materialize_button.setToolTip(tr("btn.materialize.tooltip"))
+
+        # Form fields on the right
+        self.type_combo.setAccessibleName(tr("form.type"))
+        self.type_combo.setAccessibleDescription(tr("form.type.tooltip"))
+        self.type_combo.setToolTip(tr("form.type.tooltip"))
+
+        self.name_edit.setAccessibleName(tr("form.name"))
+        self.name_edit.setAccessibleDescription(tr("form.name.tooltip"))
+        self.name_edit.setToolTip(tr("form.name.tooltip"))
+
+        self.category_edit.setAccessibleName(tr("form.category"))
+        self.category_edit.setAccessibleDescription(tr("form.category.tooltip"))
+        self.category_edit.setToolTip(tr("form.category.tooltip"))
+
+        self.tags_edit.setAccessibleName(tr("form.tags"))
+        self.tags_edit.setAccessibleDescription(tr("form.tags.tooltip"))
+        self.tags_edit.setToolTip(tr("form.tags.tooltip"))
+
+        self.source_edit.setAccessibleName(tr("form.source"))
+        self.source_edit.setAccessibleDescription(tr("form.source.tooltip"))
+        self.source_edit.setToolTip(tr("form.source.tooltip"))
+
+        self.content_edit.setAccessibleName(tr("form.content"))
+        self.content_edit.setAccessibleDescription(tr("form.content.tooltip"))
+        self.content_edit.setToolTip(tr("form.content.tooltip"))
 
     def all_items(self) -> List[LibraryItem]:
         try:

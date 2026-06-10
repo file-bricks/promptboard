@@ -249,11 +249,35 @@ def test_library_filter_controls_expose_translated_accessible_context(qapp_isola
     storage = Storage(data_dir)
     window = MainWindow(storage, settings)
     try:
+        # Default (DE)
         assert window.type_filter.accessibleName() == "Typfilter"
         assert window.type_filter.toolTip() == "Bibliothek nach Eintragstyp filtern"
         assert window.sort_combo.accessibleName() == "Sortierung"
         assert window.search_edit.accessibleName() == "Bibliothek durchsuchen"
 
+        assert window.new_button.accessibleName() == "&Neuer Eintrag"
+        assert window.new_button.toolTip() == "Erstellt einen neuen Bibliothekseintrag"
+        assert window.delete_button.accessibleName() == "Eintrag löschen"
+        assert window.delete_button.toolTip() == "Löscht den aktuell ausgewählten Eintrag"
+        assert window.copy_button.accessibleName() == "&Kopieren"
+        assert window.copy_button.toolTip() == "Kopiert den Inhalt in die Zwischenablage"
+        assert window.materialize_button.accessibleName() == "&Materialisieren"
+        assert window.materialize_button.toolTip() == "Schreibt den Eintrag als Markdown-Datei"
+
+        assert window.type_combo.accessibleName() == "Typ"
+        assert window.type_combo.toolTip() == "Wähle den Typ des Eintrags (z. B. PROMPT, SKILL, AGENT)"
+        assert window.name_edit.accessibleName() == "Name"
+        assert window.name_edit.toolTip() == "Gib den Namen des Eintrags ein"
+        assert window.category_edit.accessibleName() == "Kategorie"
+        assert window.category_edit.toolTip() == "Gib eine Kategorie zur Organisation des Eintrags ein"
+        assert window.tags_edit.accessibleName() == "Tags"
+        assert window.tags_edit.toolTip() == "Gib Tags ein, getrennt durch Kommata"
+        assert window.source_edit.accessibleName() == "Quelle"
+        assert window.source_edit.toolTip() == "Gib die Herkunft des Eintrags an (z. B. lokal, ProfiPrompt)"
+        assert window.content_edit.accessibleName() == "Inhalt"
+        assert window.content_edit.toolTip() == "Gib den Textinhalt des Eintrags ein"
+
+        # Switch to English
         set_language("en")
         window.relabel_ui()
 
@@ -265,6 +289,28 @@ def test_library_filter_controls_expose_translated_accessible_context(qapp_isola
             window.search_edit.accessibleDescription()
             == "Search the library by name, content, or category"
         )
+
+        assert window.new_button.accessibleName() == "&New entry"
+        assert window.new_button.toolTip() == "Create a new library entry"
+        assert window.delete_button.accessibleName() == "Delete entry"
+        assert window.delete_button.toolTip() == "Delete the currently selected entry"
+        assert window.copy_button.accessibleName() == "&Copy"
+        assert window.copy_button.toolTip() == "Copy the content to the clipboard"
+        assert window.materialize_button.accessibleName() == "&Materialize"
+        assert window.materialize_button.toolTip() == "Write the entry as a Markdown file"
+
+        assert window.type_combo.accessibleName() == "Type"
+        assert window.type_combo.toolTip() == "Select the type of the entry (e.g., PROMPT, SKILL, AGENT)"
+        assert window.name_edit.accessibleName() == "Name"
+        assert window.name_edit.toolTip() == "Enter the name of the entry"
+        assert window.category_edit.accessibleName() == "Category"
+        assert window.category_edit.toolTip() == "Enter a category to organize the entry"
+        assert window.tags_edit.accessibleName() == "Tags"
+        assert window.tags_edit.toolTip() == "Enter tags, separated by commas"
+        assert window.source_edit.accessibleName() == "Source"
+        assert window.source_edit.toolTip() == "Specify the origin of the entry (e.g., local, ProfiPrompt)"
+        assert window.content_edit.accessibleName() == "Content"
+        assert window.content_edit.toolTip() == "Enter the text content of the entry"
     finally:
         set_language("de")
         window.close()
@@ -587,3 +633,49 @@ def test_create_tray_skips_unavailable_system_tray(qapp_isolated, tmp_path, monk
         assert window.tray_icon is None
     finally:
         window.close()
+
+
+def test_settings_dialog_accessibility_and_live_relabeling(qapp_isolated, tmp_path):
+    from src.settings_dialog import SettingsDialog
+    data_dir = tmp_path / "library"
+    settings = SettingsManager()
+    settings.qs.setValue("paths/data", str(data_dir))
+    settings.qs.sync()
+
+    dialog = SettingsDialog(settings)
+    try:
+        # Default German assertions
+        assert dialog.windowTitle() == "PromptBoard – Einstellungen"
+        assert dialog.paths_group.title() == "Pfade"
+        assert dialog.io_group.title() == "Import / Export"
+        assert dialog.view_group.title() == "Ansicht"
+        assert dialog.info_group.title() == "Info"
+
+        assert dialog.materialize_path_edit.accessibleName() == "Materialisierung"
+        assert dialog.materialize_path_edit.toolTip() == "Pfad, in den Markdown-Dateien geschrieben werden"
+        assert dialog.change_materialize_button.accessibleName() == "Materialisierungspfad ändern"
+
+        assert dialog.theme_combo.accessibleName() == "Farbschema"
+        assert dialog.theme_combo.toolTip() == "Wähle das Farbschema"
+
+        # Change language dynamically to English
+        idx = dialog.language_combo.findData("en")
+        assert idx >= 0
+        dialog.language_combo.setCurrentIndex(idx)
+
+        # Check English assertions after dynamic relabel
+        assert dialog.windowTitle() == "PromptBoard — Settings"
+        assert dialog.paths_group.title() == "Paths"
+        assert dialog.io_group.title() == "Import / Export"
+        assert dialog.view_group.title() == "Appearance"
+        assert dialog.info_group.title() == "Info"
+
+        assert dialog.materialize_path_edit.accessibleName() == "Materialization"
+        assert dialog.materialize_path_edit.toolTip() == "Path where Markdown files are written"
+        assert dialog.change_materialize_button.accessibleName() == "Change materialize path"
+
+        assert dialog.theme_combo.accessibleName() == "Color theme"
+        assert dialog.theme_combo.toolTip() == "Select the color theme"
+    finally:
+        set_language("de")
+        dialog.close()

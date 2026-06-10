@@ -54,13 +54,13 @@ class SettingsDialog(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(self)
 
         # Pfade
-        paths_group = QtWidgets.QGroupBox(tr("settings.group.paths"))
-        paths_form = QtWidgets.QFormLayout(paths_group)
+        self.paths_group = QtWidgets.QGroupBox(tr("settings.group.paths"))
+        self.paths_form = QtWidgets.QFormLayout(self.paths_group)
 
         self.materialize_path_edit = QtWidgets.QLineEdit(str(self.settings.get_materialize_path()))
         self.materialize_path_edit.setReadOnly(True)
         self.change_materialize_button = QtWidgets.QPushButton(tr("btn.change"))
-        paths_form.addRow(
+        self.paths_form.addRow(
             tr("settings.path.materialize"),
             self._row(self.materialize_path_edit, self.change_materialize_button),
         )
@@ -68,7 +68,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.profiprompt_path_edit = QtWidgets.QLineEdit(str(self.settings.get_profiprompt_data_path()))
         self.profiprompt_path_edit.setReadOnly(True)
         self.change_profiprompt_button = QtWidgets.QPushButton(tr("btn.change"))
-        paths_form.addRow(
+        self.paths_form.addRow(
             tr("settings.path.profiprompt"),
             self._row(self.profiprompt_path_edit, self.change_profiprompt_button),
         )
@@ -76,27 +76,27 @@ class SettingsDialog(QtWidgets.QDialog):
         self.explorerpro_path_edit = QtWidgets.QLineEdit(str(self.settings.get_explorerpro_data_path()))
         self.explorerpro_path_edit.setReadOnly(True)
         self.change_explorerpro_button = QtWidgets.QPushButton(tr("btn.change"))
-        paths_form.addRow(
+        self.paths_form.addRow(
             tr("settings.path.explorerpro"),
             self._row(self.explorerpro_path_edit, self.change_explorerpro_button),
         )
 
-        layout.addWidget(paths_group)
+        layout.addWidget(self.paths_group)
 
         # Import/Export
-        io_group = QtWidgets.QGroupBox(tr("settings.group.io"))
-        io_layout = QtWidgets.QHBoxLayout(io_group)
+        self.io_group = QtWidgets.QGroupBox(tr("settings.group.io"))
+        io_layout = QtWidgets.QHBoxLayout(self.io_group)
         self.import_profiprompt_button = QtWidgets.QPushButton(tr("settings.io.import_profiprompt"))
         self.import_explorerpro_button = QtWidgets.QPushButton(tr("settings.io.import_explorerpro"))
         self.export_explorerpro_button = QtWidgets.QPushButton(tr("settings.io.export_explorerpro"))
         io_layout.addWidget(self.import_profiprompt_button)
         io_layout.addWidget(self.import_explorerpro_button)
         io_layout.addWidget(self.export_explorerpro_button)
-        layout.addWidget(io_group)
+        layout.addWidget(self.io_group)
 
         # Ansicht
-        view_group = QtWidgets.QGroupBox(tr("settings.group.view"))
-        view_form = QtWidgets.QFormLayout(view_group)
+        self.view_group = QtWidgets.QGroupBox(tr("settings.group.view"))
+        self.view_form = QtWidgets.QFormLayout(self.view_group)
 
         self.theme_combo = QtWidgets.QComboBox()
         for mode in SettingsManager.THEME_CHOICES:
@@ -105,7 +105,7 @@ class SettingsDialog(QtWidgets.QDialog):
         idx = self.theme_combo.findData(current_theme)
         if idx >= 0:
             self.theme_combo.setCurrentIndex(idx)
-        view_form.addRow(tr("settings.view.theme"), self.theme_combo)
+        self.view_form.addRow(tr("settings.view.theme"), self.theme_combo)
 
         self.language_combo = QtWidgets.QComboBox()
         for code in SettingsManager.LANGUAGE_CHOICES:
@@ -114,20 +114,20 @@ class SettingsDialog(QtWidgets.QDialog):
         idx = self.language_combo.findData(current_lang)
         if idx >= 0:
             self.language_combo.setCurrentIndex(idx)
-        view_form.addRow(tr("settings.view.language"), self.language_combo)
+        self.view_form.addRow(tr("settings.view.language"), self.language_combo)
 
         self.confirm_overwrite_check = QtWidgets.QCheckBox(tr("settings.view.confirm_overwrite"))
         self.confirm_overwrite_check.setChecked(self.settings.get_confirm_overwrite())
-        view_form.addRow("", self.confirm_overwrite_check)
+        self.view_form.addRow("", self.confirm_overwrite_check)
 
-        layout.addWidget(view_group)
+        layout.addWidget(self.view_group)
 
         # Info
-        info_group = QtWidgets.QGroupBox(tr("settings.group.info"))
-        info_form = QtWidgets.QFormLayout(info_group)
-        info_form.addRow(tr("settings.info.data_dir"), QtWidgets.QLabel(str(self.settings.get_data_path())))
-        info_form.addRow(tr("settings.info.log_file"), QtWidgets.QLabel(str(default_log_dir() / "promptboard.log")))
-        layout.addWidget(info_group)
+        self.info_group = QtWidgets.QGroupBox(tr("settings.group.info"))
+        self.info_form = QtWidgets.QFormLayout(self.info_group)
+        self.info_form.addRow(tr("settings.info.data_dir"), QtWidgets.QLabel(str(self.settings.get_data_path())))
+        self.info_form.addRow(tr("settings.info.log_file"), QtWidgets.QLabel(str(default_log_dir() / "promptboard.log")))
+        layout.addWidget(self.info_group)
 
         layout.addStretch(1)
 
@@ -137,6 +137,8 @@ class SettingsDialog(QtWidgets.QDialog):
         self.close_button = QtWidgets.QPushButton(tr("btn.ok"))
         button_row.addWidget(self.close_button)
         layout.addLayout(button_row)
+
+        self._apply_accessibility()
 
     @staticmethod
     def _row(*widgets: QtWidgets.QWidget) -> QtWidgets.QWidget:
@@ -173,6 +175,7 @@ class SettingsDialog(QtWidgets.QDialog):
         code = self.language_combo.currentData() or SettingsManager.DEFAULT_LANGUAGE
         self.settings.set_language(code)
         set_global_language(code)
+        self.relabel_ui()
         self.language_changed.emit(code)
 
     # ------------------------------------------------------------ path pickers
@@ -203,3 +206,106 @@ class SettingsDialog(QtWidgets.QDialog):
         if new_path:
             self.settings.set_explorerpro_data_path(Path(new_path))
             self.explorerpro_path_edit.setText(new_path)
+
+    # ------------------------------------------------------------ accessibility & i18n
+
+    def _apply_accessibility(self) -> None:
+        self.materialize_path_edit.setAccessibleName(tr("settings.path.materialize"))
+        self.materialize_path_edit.setAccessibleDescription(tr("settings.path.materialize.tooltip"))
+        self.materialize_path_edit.setToolTip(tr("settings.path.materialize.tooltip"))
+        self.change_materialize_button.setAccessibleName(tr("settings.btn.change.materialize.tooltip"))
+        self.change_materialize_button.setToolTip(tr("settings.btn.change.materialize.tooltip"))
+
+        self.profiprompt_path_edit.setAccessibleName(tr("settings.path.profiprompt"))
+        self.profiprompt_path_edit.setAccessibleDescription(tr("settings.path.profiprompt.tooltip"))
+        self.profiprompt_path_edit.setToolTip(tr("settings.path.profiprompt.tooltip"))
+        self.change_profiprompt_button.setAccessibleName(tr("settings.btn.change.profiprompt.tooltip"))
+        self.change_profiprompt_button.setToolTip(tr("settings.btn.change.profiprompt.tooltip"))
+
+        self.explorerpro_path_edit.setAccessibleName(tr("settings.path.explorerpro"))
+        self.explorerpro_path_edit.setAccessibleDescription(tr("settings.path.explorerpro.tooltip"))
+        self.explorerpro_path_edit.setToolTip(tr("settings.path.explorerpro.tooltip"))
+        self.change_explorerpro_button.setAccessibleName(tr("settings.btn.change.explorerpro.tooltip"))
+        self.change_explorerpro_button.setToolTip(tr("settings.btn.change.explorerpro.tooltip"))
+
+        self.import_profiprompt_button.setAccessibleName(tr("settings.io.import_profiprompt"))
+        self.import_profiprompt_button.setAccessibleDescription(tr("settings.io.import_profiprompt.tooltip"))
+        self.import_profiprompt_button.setToolTip(tr("settings.io.import_profiprompt.tooltip"))
+
+        self.import_explorerpro_button.setAccessibleName(tr("settings.io.import_explorerpro"))
+        self.import_explorerpro_button.setAccessibleDescription(tr("settings.io.import_explorerpro.tooltip"))
+        self.import_explorerpro_button.setToolTip(tr("settings.io.import_explorerpro.tooltip"))
+
+        self.export_explorerpro_button.setAccessibleName(tr("settings.io.export_explorerpro"))
+        self.export_explorerpro_button.setAccessibleDescription(tr("settings.io.export_explorerpro.tooltip"))
+        self.export_explorerpro_button.setToolTip(tr("settings.io.export_explorerpro.tooltip"))
+
+        self.theme_combo.setAccessibleName(tr("settings.view.theme"))
+        self.theme_combo.setAccessibleDescription(tr("settings.view.theme.tooltip"))
+        self.theme_combo.setToolTip(tr("settings.view.theme.tooltip"))
+
+        self.language_combo.setAccessibleName(tr("settings.view.language"))
+        self.language_combo.setAccessibleDescription(tr("settings.view.language.tooltip"))
+        self.language_combo.setToolTip(tr("settings.view.language.tooltip"))
+
+        self.confirm_overwrite_check.setAccessibleName(tr("settings.view.confirm_overwrite"))
+        self.confirm_overwrite_check.setAccessibleDescription(tr("settings.view.confirm_overwrite.tooltip"))
+        self.confirm_overwrite_check.setToolTip(tr("settings.view.confirm_overwrite.tooltip"))
+
+    def relabel_ui(self) -> None:
+        """Apply active language translations to dialog window elements dynamically."""
+        self.setWindowTitle(tr("settings.title"))
+        self.paths_group.setTitle(tr("settings.group.paths"))
+        self.io_group.setTitle(tr("settings.group.io"))
+        self.view_group.setTitle(tr("settings.group.view"))
+        self.info_group.setTitle(tr("settings.group.info"))
+
+        # Re-set buttons text
+        self.change_materialize_button.setText(tr("btn.change"))
+        self.change_profiprompt_button.setText(tr("btn.change"))
+        self.change_explorerpro_button.setText(tr("btn.change"))
+        self.import_profiprompt_button.setText(tr("settings.io.import_profiprompt"))
+        self.import_explorerpro_button.setText(tr("settings.io.import_explorerpro"))
+        self.export_explorerpro_button.setText(tr("settings.io.export_explorerpro"))
+        self.confirm_overwrite_check.setText(tr("settings.view.confirm_overwrite"))
+        self.close_button.setText(tr("btn.ok"))
+
+        # Form labels re-labeling
+        labels_paths = [
+            tr("settings.path.materialize"),
+            tr("settings.path.profiprompt"),
+            tr("settings.path.explorerpro"),
+        ]
+        for i, text in enumerate(labels_paths):
+            label_item = self.paths_form.itemAt(i, QtWidgets.QFormLayout.LabelRole)
+            if label_item and isinstance(label_item.widget(), QtWidgets.QLabel):
+                label_item.widget().setText(text)
+
+        labels_view = [
+            tr("settings.view.theme"),
+            tr("settings.view.language"),
+        ]
+        for i, text in enumerate(labels_view):
+            label_item = self.view_form.itemAt(i, QtWidgets.QFormLayout.LabelRole)
+            if label_item and isinstance(label_item.widget(), QtWidgets.QLabel):
+                label_item.widget().setText(text)
+
+        labels_info = [
+            tr("settings.info.data_dir"),
+            tr("settings.info.log_file"),
+        ]
+        for i, text in enumerate(labels_info):
+            label_item = self.info_form.itemAt(i, QtWidgets.QFormLayout.LabelRole)
+            if label_item and isinstance(label_item.widget(), QtWidgets.QLabel):
+                label_item.widget().setText(text)
+
+        # Combo boxes items
+        for i in range(self.theme_combo.count()):
+            mode = self.theme_combo.itemData(i)
+            self.theme_combo.setItemText(i, tr(f"theme.{mode}"))
+
+        for i in range(self.language_combo.count()):
+            code = self.language_combo.itemData(i)
+            self.language_combo.setItemText(i, tr(f"lang.{code}"))
+
+        self._apply_accessibility()

@@ -30,16 +30,16 @@ DEFAULT_LANGUAGE: LanguageCode = "de"
 _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
     # ----- Menüs ---------------------------------------------------------
     "menu.file": {
-        "de": "Datei", "en": "File",
-        "es": "Archivo", "zh": "文件", "ja": "ファイル", "ru": "Файл",
+        "de": "&Datei", "en": "&File",
+        "es": "&Archivo", "zh": "文件(&F)", "ja": "ファイル(&F)", "ru": "&Файл",
     },
     "menu.settings": {
-        "de": "Einstellungen", "en": "Settings",
-        "es": "Configuración", "zh": "设置", "ja": "設定", "ru": "Настройки",
+        "de": "&Einstellungen", "en": "&Settings",
+        "es": "&Configuración", "zh": "设置(&S)", "ja": "設定(&S)", "ru": "&Настройки",
     },
     "menu.file.new": {
-        "de": "Neuer Eintrag", "en": "New entry",
-        "es": "Nueva entrada", "zh": "新建条目", "ja": "新規項目", "ru": "Новая запись",
+        "de": "&Neuer Eintrag", "en": "&New entry",
+        "es": "&Nueva entrada", "zh": "新建条目(&N)", "ja": "新規項目(&N)", "ru": "&Новая запись",
     },
     "menu.file.import_profiprompt": {
         "de": "Aus ProfiPrompt importieren",
@@ -67,24 +67,24 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
 
     # ----- Toolbar / Buttons --------------------------------------------
     "btn.new": {
-        "de": "Neu", "en": "New",
-        "es": "Nuevo", "zh": "新建", "ja": "新規", "ru": "Создать",
+        "de": "&Neu", "en": "&New",
+        "es": "&Nuevo", "zh": "新建(&N)", "ja": "新規(&N)", "ru": "&Создать",
     },
     "btn.delete": {
-        "de": "Löschen", "en": "Delete",
-        "es": "Eliminar", "zh": "删除", "ja": "削除", "ru": "Удалить",
+        "de": "&Löschen", "en": "&Delete",
+        "es": "&Eliminar", "zh": "删除(&D)", "ja": "削除(&D)", "ru": "&Удалить",
     },
     "btn.copy": {
-        "de": "Kopieren", "en": "Copy",
-        "es": "Copiar", "zh": "复制", "ja": "コピー", "ru": "Копировать",
+        "de": "&Kopieren", "en": "&Copy",
+        "es": "&Copiar", "zh": "复制(&C)", "ja": "コピー(&C)", "ru": "&Копировать",
     },
     "btn.copy_markdown": {
         "de": "Als Markdown kopieren", "en": "Copy as Markdown",
         "es": "Copiar como Markdown", "zh": "复制为 Markdown", "ja": "Markdown としてコピー", "ru": "Копировать как Markdown",
     },
     "btn.materialize": {
-        "de": "Materialisieren", "en": "Materialize",
-        "es": "Materializar", "zh": "实体化", "ja": "マテリアライズ", "ru": "Материализовать",
+        "de": "&Materialisieren", "en": "&Materialize",
+        "es": "&Materializar", "zh": "实体化(&M)", "ja": "マテリアライズ(&M)", "ru": "&Материализовать",
     },
     "btn.materialize_current": {
         "de": "Aktuellen Eintrag materialisieren",
@@ -97,16 +97,16 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
         "es": "Materializar entradas seleccionadas", "zh": "实体化选中条目", "ja": "選択した項目をマテリアライズ", "ru": "Материализовать выбранные записи",
     },
     "btn.change": {
-        "de": "Ändern…", "en": "Change…",
-        "es": "Cambiar…", "zh": "更改…", "ja": "変更…", "ru": "Изменить…",
+        "de": "Ä&ndern…", "en": "&Change…",
+        "es": "&Cambiar…", "zh": "更改(&C)", "ja": "変更(&C)", "ru": "&Изменить…",
     },
     "btn.ok": {
-        "de": "OK", "en": "OK",
-        "es": "Aceptar", "zh": "确定", "ja": "OK", "ru": "ОК",
+        "de": "&OK", "en": "&OK",
+        "es": "&Aceptar", "zh": "确定(&O)", "ja": "&OK", "ru": "&ОК",
     },
     "btn.cancel": {
-        "de": "Abbrechen", "en": "Cancel",
-        "es": "Cancelar", "zh": "取消", "ja": "キャンセル", "ru": "Отмена",
+        "de": "&Abbrechen", "en": "&Cancel",
+        "es": "&Cancelar", "zh": "取消(&C)", "ja": "キャンセル(&C)", "ru": "&Отмена",
     },
 
     # ----- Filter / Liste ------------------------------------------------
@@ -548,6 +548,100 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
     "tray.quit": {
         "de": "Beenden", "en": "Quit",
         "es": "Salir", "zh": "退出", "ja": "終了", "ru": "Выйти",
+    },
+
+    # ----- Tooltips & Accessible Names ------------------------------------
+    "btn.new.tooltip": {
+        "de": "Erstellt einen neuen Bibliothekseintrag", "en": "Create a new library entry",
+        "es": "Crear una nueva entrada en la biblioteca", "zh": "创建新的库条目", "ja": "新しいライブラリ項目を作成します", "ru": "Создать новую запись в библиотеке",
+    },
+    "btn.delete.tooltip": {
+        "de": "Löscht den aktuell ausgewählten Eintrag", "en": "Delete the currently selected entry",
+        "es": "Eliminar la entrada actualmente seleccionada", "zh": "删除当前选中的条目", "ja": "現在選択されている項目を削除します", "ru": "Удалить текущую выбранную запись",
+    },
+    "btn.copy.tooltip": {
+        "de": "Kopiert den Inhalt in die Zwischenablage", "en": "Copy the content to the clipboard",
+        "es": "Copiar el contenido al portapapeles", "zh": "将内容复制到剪贴板", "ja": "内容をクリップボードにコピーします", "ru": "Копировать содержимое в буфер обмена",
+    },
+    "btn.materialize.tooltip": {
+        "de": "Schreibt den Eintrag als Markdown-Datei", "en": "Write the entry as a Markdown file",
+        "es": "Escribir la entrada como un archivo Markdown", "zh": "将条目写入为 Markdown 文件", "ja": "項目を Markdown ファイルとして書き出します", "ru": "Записать запись как файл Markdown",
+    },
+    "form.type.tooltip": {
+        "de": "Wähle den Typ des Eintrags (z. B. PROMPT, SKILL, AGENT)", "en": "Select the type of the entry (e.g., PROMPT, SKILL, AGENT)",
+        "es": "Seleccione el tipo de entrada (p. ej., PROMPT, SKILL, AGENT)", "zh": "选择条目类型 (如 PROMPT, SKILL, AGENT)", "ja": "項目のタイプを選択します (例: PROMPT, SKILL, AGENT)", "ru": "Выберите тип записи (например, PROMPT, SKILL, AGENT)",
+    },
+    "form.name.tooltip": {
+        "de": "Gib den Namen des Eintrags ein", "en": "Enter the name of the entry",
+        "es": "Introduzca el nombre de la entrada", "zh": "输入条目名称", "ja": "項目の名前を入力します", "ru": "Введите имя записи",
+    },
+    "form.category.tooltip": {
+        "de": "Gib eine Kategorie zur Organisation des Eintrags ein", "en": "Enter a category to organize the entry",
+        "es": "Introduzca una categoría para organizar la entrada", "zh": "输入分类以组织条目", "ja": "項目を整理するためのカテゴリを入力します", "ru": "Введите категорию для организации записи",
+    },
+    "form.tags.tooltip": {
+        "de": "Gib Tags ein, getrennt durch Kommata", "en": "Enter tags, separated by commas",
+        "es": "Introduzca etiquetas, separadas por comas", "zh": "输入标签，用逗号分隔", "ja": "カンマで区切られたタグを入力します", "ru": "Введите теги через запятую",
+    },
+    "form.source.tooltip": {
+        "de": "Gib die Herkunft des Eintrags an (z. B. lokal, ProfiPrompt)", "en": "Specify the origin of the entry (e.g., local, ProfiPrompt)",
+        "es": "Especifique el origen de la entrada (p. ej., local, ProfiPrompt)", "zh": "指定条目的来源 (如 local, ProfiPrompt)", "ja": "項目の取得元を指定します (例: local, ProfiPrompt)", "ru": "Укажите источник записи (например, local, PromptBoard)",
+    },
+    "form.content": {
+        "de": "Inhalt", "en": "Content",
+        "es": "Contenido", "zh": "内容", "ja": "内容", "ru": "Содержимое",
+    },
+    "form.content.tooltip": {
+        "de": "Gib den Textinhalt des Eintrags ein", "en": "Enter the text content of the entry",
+        "es": "Introduzca el contenido de texto de la entrada", "zh": "输入条目的文本内容", "ja": "項目のテキスト内容を入力します", "ru": "Введите текстовое содержимое записи",
+    },
+    "settings.path.materialize.tooltip": {
+        "de": "Pfad, in den Markdown-Dateien geschrieben werden", "en": "Path where Markdown files are written",
+        "es": "Ruta donde se escriben los archivos Markdown", "zh": "写入 Markdown 文件的路径", "ja": "Markdown ファイルが書き出されるパス", "ru": "Путь, по которому записываются файлы Markdown",
+    },
+    "settings.btn.change.materialize.tooltip": {
+        "de": "Materialisierungspfad ändern", "en": "Change materialize path",
+        "es": "Cambiar ruta de materialización", "zh": "更改实体化路径", "ja": "マテリアライズパスを変更します", "ru": "Изменить путь материализации",
+    },
+    "settings.path.profiprompt.tooltip": {
+        "de": "Pfad zum ProfiPrompt-Datenordner", "en": "Path to the ProfiPrompt data folder",
+        "es": "Ruta a la carpeta de datos de ProfiPrompt", "zh": "ProfiPrompt 数据文件夹路径", "ja": "ProfiPrompt データフォルダへのパス", "ru": "Путь к папке данных ProfiPrompt",
+    },
+    "settings.btn.change.profiprompt.tooltip": {
+        "de": "ProfiPrompt-Pfad ändern", "en": "Change ProfiPrompt path",
+        "es": "Cambiar ruta de ProfiPrompt", "zh": "更改 ProfiPrompt 路径", "ja": "ProfiPrompt パスを変更します", "ru": "Изменить путь ProfiPrompt",
+    },
+    "settings.path.explorerpro.tooltip": {
+        "de": "Pfad zum ExplorerPro-Datenordner", "en": "Path to the ExplorerPro data folder",
+        "es": "Ruta a la carpeta de datos de ExplorerPro", "zh": "ExplorerPro 数据文件夹路径", "ja": "ExplorerPro データフォルダへのパス", "ru": "Путь к папке данных ExplorerPro",
+    },
+    "settings.btn.change.explorerpro.tooltip": {
+        "de": "ExplorerPro-Pfad ändern", "en": "Change ExplorerPro path",
+        "es": "Change ExplorerPro path", "zh": "更改 ExplorerPro 路径", "ja": "ExplorerPro パスを変更します", "ru": "Изменить путь ExplorerPro",
+    },
+    "settings.io.import_profiprompt.tooltip": {
+        "de": "Einträge aus ProfiPrompt importieren", "en": "Import entries from ProfiPrompt",
+        "es": "Importar entradas desde ProfiPrompt", "zh": "从 ProfiPrompt 导入条目", "ja": "ProfiPrompt から項目をインポートします", "ru": "Импортировать записи из ProfiPrompt",
+    },
+    "settings.io.import_explorerpro.tooltip": {
+        "de": "Einträge aus ExplorerPro importieren", "en": "Import entries from ExplorerPro",
+        "es": "Importar entradas desde ExplorerPro", "zh": "从 ExplorerPro 导入条目", "ja": "ExplorerPro から項目をインポートします", "ru": "Импортировать записи из ExplorerPro",
+    },
+    "settings.io.export_explorerpro.tooltip": {
+        "de": "PROMPT-Einträge nach ExplorerPro exportieren", "en": "Export PROMPT entries to ExplorerPro",
+        "es": "Exportar entradas de PROMPT a ExplorerPro", "zh": "将 PROMPT 条目导出到 ExplorerPro", "ja": "PROMPT 項目を ExplorerPro へエクスポートします", "ru": "Экспортировать записи PROMPT в ExplorerPro",
+    },
+    "settings.view.theme.tooltip": {
+        "de": "Wähle das Farbschema", "en": "Select the color theme",
+        "es": "Seleccionar el tema de color", "zh": "选择颜色主题", "ja": "カラーテーマを選択します", "ru": "Выбрать цветовую тему",
+    },
+    "settings.view.language.tooltip": {
+        "de": "Wähle die Sprache", "en": "Select the language",
+        "es": "Seleccionar el idioma", "zh": "选择语言", "ja": "言語を選択します", "ru": "Выбрать язык",
+    },
+    "settings.view.confirm_overwrite.tooltip": {
+        "de": "Nachfragen, bevor eine Datei überschrieben wird", "en": "Ask before overwriting a file",
+        "es": "Preguntar antes de sobrescribir un archivo", "zh": "覆盖文件前进行确认", "ja": "ファイルを上書きする前に確認します", "ru": "Спрашивать перед перезаписью файла",
     },
 }
 
