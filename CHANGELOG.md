@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-06-10
+
+### Dokumentation & Hygiene
+
+- `README.md` auf Englisch umstrukturiert (English-first) und Übersetzung nach `README_de.md` verschoben.
+- `llms.txt` im Root-Verzeichnis hinzugefügt, um Entdeckung und Indexierung durch KI-Crawler zu verbessern.
+
 ## [Unreleased] - 2026-06-04
 
 ### Hinzugefügt

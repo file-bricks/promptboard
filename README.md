@@ -1,89 +1,74 @@
+[🇩🇪 Deutsche Version](./README_de.md) | 🇬🇧 English Version
+
 # PromptBoard
 
-> Ein leichtgewichtiges Systemtray-Board für Prompts, Skills, Workflows, Rollen und Agenten.
+> A lightweight system tray board for prompts, skills, workflows, roles, and agents.
 
-PromptBoard ist als schnelles Desktop-Werkzeug für wiederverwendbare
-LLM-Bausteine gedacht. Im Unterschied zu umfangreicheren Prompt-Managern steht
-hier nicht Versionierung oder Board-Komplexität im Vordergrund, sondern
-schneller Zugriff: öffnen, filtern, kopieren, direkt editieren und bei Bedarf
-als `.md`-Datei materialisieren.
+PromptBoard is designed as a fast desktop utility for reusable LLM building blocks. Unlike larger prompt managers, the focus here is not on versioning or complex board systems, but on rapid access: open, filter, copy, edit directly, and materialize as `.md` files when needed.
 
-PromptBoard is a local prompt manager and Windows tray app for reusable LLM
-prompts, skills, workflows, roles and agents. It keeps prompt libraries offline,
-searchable and copy-ready without requiring a cloud account.
+PromptBoard is a local prompt manager and Windows tray application for reusable LLM prompts, skills, workflows, roles, and agents. It keeps your prompt libraries offline, searchable, and copy-ready without requiring a cloud account or external API connections.
 
 ## Status
 
-**Phase:** öffentlich released (`v1.1.1`), Store- und Plattformhärtung im lokalen Entwicklungsstand aktiv
-**Code:** PySide6-Desktop-App mit 67/67 pytest-Tests
+**Phase:** public release (`v1.1.1`), store and platform hardening active in local development  
+**Code:** PySide6 desktop application with 68/68 passing pytest tests  
 
-**CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) mit Windows-Pytest sowie macOS-/Linux-Source-Smoke
+**CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) running Windows Pytest and macOS/Linux source smoke checks  
 **Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
-**Aktueller Ordnerstatus:** `LLM/REL-PUB_PromptBoard`
+**Current Folder Status:** `LLM/REL-PUB_PromptBoard`  
 
 ## Screenshots
 
-Die lokale README-Vorschau und die vier Store-Ansichten werden aus dem
-aktuellen UI-Stand erzeugt.
+The local README preview and the four store views are generated directly from the live UI state.
 
-![PromptBoard Hauptansicht](README/screenshots/main.png)
+![PromptBoard Main View](README/screenshots/main.png)
 
-![PromptBoard Tray-Ansicht](README/screenshots/store/tray.png)
-![PromptBoard Bibliothek](README/screenshots/store/library.png)
+![PromptBoard Tray View](README/screenshots/store/tray.png)
+![PromptBoard Library](README/screenshots/store/library.png)
 ![PromptBoard Editor](README/screenshots/store/editor.png)
-![PromptBoard Einstellungen](README/screenshots/store/settings.png)
+![PromptBoard Settings](README/screenshots/store/settings.png)
 
-Die Store-Bilder lassen sich reproduzierbar über
-`_tools/generate_store_screenshots.py` neu erzeugen.
+These store screenshots can be reproducibly regenerated via `_tools/generate_store_screenshots.py`.
 
-## Zielbild
+## Key Features & Goals
 
-PromptBoard ist ein kleines Tray-Tool zur lokalen Verwaltung von
-Wissensbausteinen:
+PromptBoard serves as a compact tray tool for managing local knowledge blocks:
 
 - Prompts
 - Skills
 - Workflows
-- Rollen
-- Agenten
+- Roles
+- Agents
 
-Jeder Eintrag ist direkt editierbar, nach Typ und Name sortierbar und per
-Klick in die Zwischenablage kopierbar. Per Rechtsklick kann ein Eintrag
-zusätzlich als Markdown-Datei an einen konfigurierbaren Ort materialisiert
-werden, standardmäßig auf den Desktop. Der Export bleibt inhaltszentriert:
-H1, kompakter Metadatenkopf, dann der eigentliche Inhalt.
+Every entry is directly editable, sortable by type and name, and copyable to the clipboard with a single click. A right-click option lets you materialize an entry as a clean Markdown file (`.md`) to a configured location (defaulting to the Desktop). The exported file is content-focused: H1 header, compact metadata block, followed by the actual prompt text.
 
-Globale Hotkeys blenden das Tray-Fenster ein oder aus und kopieren den
-zuletzt benutzten Eintrag schnell in die Zwischenablage.
+Global hotkeys allow you to show/hide the tray window and quickly copy the last used entry.
 
-## Abgrenzung
+## Comparison
 
-- **Leichter als ProfiPrompt:** keine große Versionshistorie, kein schweres Board-System als Kern.
-- **Robuster als AutoPrompter:** keine fragile Keyboard-/Daemon-Logik als Kern.
-- **Lokaler als Cloud-Tools:** keine Pflicht zu Online-Sync oder externen APIs.
+- **Lighter than ProfiPrompt:** No large version history or heavy board system at the core.
+- **More Robust than AutoPrompter:** No fragile keyboard or daemon hook logic.
+- **More Private than Cloud Tools:** Purely offline, no account sync, external APIs, or telemetry.
 
 ## Onboarding
 
-| Für... | lies... |
+| For... | Read... |
 |---|---|
-| Erste Session | [START.md](./START.md) |
-| Aktueller Stand | [STATE.md](./STATE.md) |
-| Aktive Aufgaben | [TODO.md](./TODO.md) und [AUFGABEN.txt](./AUFGABEN.txt) |
-| Produktbild | [KONZEPT.md](./KONZEPT.md) |
-| Feature-Überblick | [Feature_Analyse_PromptBoard.md](./Feature_Analyse_PromptBoard.md) |
-| Architektur | [ARCHITECTURE.md](./ARCHITECTURE.md) |
-| Entscheidungen | [DECISIONS.md](./DECISIONS.md) |
-| Begriffe | [GLOSSARY.md](./GLOSSARY.md) |
-| Agentenregeln | [AGENTS.md](./AGENTS.md) und [CLAUDE.md](./CLAUDE.md) |
+| First Session | [START.md](./START.md) |
+| Current State | [STATE.md](./STATE.md) |
+| Active Tasks | [TODO.md](./TODO.md) and [AUFGABEN.txt](./AUFGABEN.txt) |
+| Product Vision | [KONZEPT.md](./KONZEPT.md) |
+| Feature Overview | [Feature_Analyse_PromptBoard.md](./Feature_Analyse_PromptBoard.md) |
+| Architecture | [ARCHITECTURE.md](./ARCHITECTURE.md) |
+| Decisions | [DECISIONS.md](./DECISIONS.md) |
+| Glossary | [GLOSSARY.md](./GLOSSARY.md) |
+| Agent Guidelines | [AGENTS.md](./AGENTS.md) and [CLAUDE.md](./CLAUDE.md) |
 
-## Nächster sinnvoller Schritt
+## Next Steps
 
-Der nächste sinnvolle Schritt ist jetzt der verbleibende Store-P1-Pfad:
-reale Partner-Center-Werte eintragen und den erhöhten WACK-Lauf gegen
-`releases/PromptBoard.msix` dokumentieren. Die macOS-/Linux-Source-Smokes sind
-ab jetzt reproduzierbar im Projekt und in CI verankert.
+The next primary focus is completing the Store-P1 path: entering real Partner Center values and documenting the elevated WACK run against `releases/PromptBoard.msix`. The macOS/Linux source smoke tests are now integrated into the project and CI pipeline.
 
-## Projekt starten
+## Running the Project
 
 ```powershell
 cd 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\REL-PUB_PromptBoard'
@@ -91,4 +76,4 @@ python -m pip install -e ".[dev]"
 python src\promptboard.py
 ```
 
-Unter Windows alternativ per Doppelklick auf `start.bat`.
+Under Windows, you can alternatively start the app by double-clicking `start.bat`.

@@ -1,0 +1,35 @@
+# PromptBoard
+
+PromptBoard is a local prompt manager and Windows tray app for reusable LLM prompts, skills, workflows, roles, and agents. It keeps prompt libraries offline, searchable, and copy-ready without requiring a cloud account or external API connections.
+
+Canonical repository: https://github.com/file-bricks/promptboard
+Default branch: main
+Package name: promptboard
+CLI script: promptboard (via `src\promptboard.py`)
+
+Important boundaries:
+- Purely local, runs offline on Windows (via PySide6 tray app).
+- No cloud account, external APIs, or telemetry required.
+- Keeps libraries in local JSON format.
+- Offscreen startup checks, system tray integration, and global hotkeys are Windows-native.
+- Verified cross-compatible offscreen startup (smoke tests) on macOS/Linux.
+
+Primary commands:
+- python src\promptboard.py (run the desktop app)
+- python -m pip install -e ".[dev]" (install developer dependencies)
+- python _tools\generate_store_screenshots.py (regenerate tray/store screenshots)
+- python _tools\store_release.py msix-preflight --use-test-identity (run local MSIX preflight build)
+- powershell -ExecutionPolicy Bypass -File "_tools\run_wack.ps1" (run Microsoft WACK validations)
+
+Verification:
+- python -m compileall -q src tests
+- python -m pytest
+
+Public documentation:
+- README.md: English-first overview, key features, global hotkeys, installation, and quickstart
+- README_de.md: German translation of the project overview
+- ARCHITECTURE.md: module structure, PySide6 components, and adapter design
+- TODO.md: active tasks and v1.2+ backlog items
+- DECISIONS.md: chronological architecture decisions and history
+
+Last-checked: 2026-06-10
