@@ -89,7 +89,8 @@ def _resolve_language(language: str | None = None) -> LanguageCode:
 def get_item_template(item_type: ItemType, language: str | None = None) -> ItemTemplate:
     resolved_type = ItemType.from_value(item_type)
     resolved_language = _resolve_language(language)
-    return _TEMPLATES[resolved_type][resolved_language]
+    lang_map = _TEMPLATES[resolved_type]
+    return lang_map[resolved_language] if resolved_language in lang_map else lang_map[DEFAULT_LANGUAGE]
 
 
 def build_default_name(

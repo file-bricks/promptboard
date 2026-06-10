@@ -679,3 +679,130 @@ def test_settings_dialog_accessibility_and_live_relabeling(qapp_isolated, tmp_pa
     finally:
         set_language("de")
         dialog.close()
+
+
+# --- Regression: Bug #1 — QMessageBox.StandardButton.Yes/No ---
+
+def test_confirm_delete_uses_standard_button_enum():
+    """Bug #1: QMessageBox.Yes/No deprecated in PySide6 6.4+; must use StandardButton."""
+    import inspect
+    import promptboard as pb_module
+    src = inspect.getsource(pb_module.MainWindow._confirm_delete_item)
+    assert "StandardButton.Yes" in src, "_confirm_delete_item muss StandardButton.Yes nutzen"
+    assert "StandardButton.No" in src, "_confirm_delete_item muss StandardButton.No nutzen"
+    assert "QMessageBox.Yes |" not in src, "_confirm_delete_item darf kein veraltetes QMessageBox.Yes| nutzen"
+
+
+def test_materialize_overwrite_dialog_uses_standard_button_enum():
+    """Bug #1 (2. Stelle): _materialize_items muss StandardButton.Yes/No nutzen."""
+    import inspect
+    import promptboard as pb_module
+    src = inspect.getsource(pb_module.MainWindow._materialize_items)
+    assert "StandardButton.Yes" in src, "_materialize_items muss StandardButton.Yes nutzen"
+    assert "StandardButton.No" in src, "_materialize_items muss StandardButton.No nutzen"
+
+
+# --- Regression: Bug #2 — QMenu parent in create_tray ---
+
+def test_create_tray_menu_has_window_as_parent():
+    """Bug #2: QMenu in create_tray ohne Parent wird nach Funktionsrückkehr GC'd.
+    Qt's setContextMenu() übernimmt keine Ownership — Menu braucht einen Python-Parent.
+    """
+    import inspect
+    import promptboard as pb_module
+    src = inspect.getsource(pb_module.create_tray)
+    assert "QtWidgets.QMenu(window)" in src, (
+        "create_tray muss QMenu(window) erstellen, nicht QMenu() ohne Parent"
+    )
+
+
+# --- Regression: Bug #3 — i18n copy-paste: Spanish tooltip nicht übersetzt ---
+
+def test_explorerpro_change_tooltip_spanish_is_not_english():
+    """Bug #3: 'settings.btn.change.explorerpro.tooltip' enthielt englischen Text im
+    Spanisch-Slot ('Change ExplorerPro path' statt 'Cambiar ruta de ExplorerPro').
+    """
+    from i18n import tr
+    spanish = tr("settings.btn.change.explorerpro.tooltip", lang="es")
+    english = tr("settings.btn.change.explorerpro.tooltip", lang="en")
+    assert spanish != english, (
+        "Spanische Übersetzung darf nicht mit englischer identisch sein"
+    )
+    assert "Cambiar" in spanish, (
+        f"Spanische Übersetzung erwartet 'Cambiar', bekommen: {spanish!r}"
+    )
+
+
+# --- Regression: Bug #4 — item_templates KeyError bei Nicht-DE/EN-Sprachen ---
+
+def test_get_item_template_fallback_for_unsupported_languages():
+    """Bug #4: get_item_template() wirft KeyError für Sprachen ohne eigenen
+    Template-Eintrag (es, zh, ja, ru). Fallback auf DEFAULT_LANGUAGE nötig.
+    """
+    from item_templates import get_item_template
+    from models import ItemType
+    for lang in ("es", "zh", "ja", "ru"):
+        for item_type in ItemType:
+            try:
+                tmpl = get_item_template(item_type, language=lang)
+            except KeyError as exc:
+                raise AssertionError(
+                    f"get_item_template({item_type!r}, lang={lang!r}) wirft KeyError: {exc}"
+                )
+            assert tmpl is not None, (
+                f"get_item_template({item_type!r}, lang={lang!r}) gab None zurück"
+            )
+
+
+# --- Regression: Bug #5 — profiprompt_adapter._load_json_object fängt kein OSError ---
+
+# --- Regression: Bug #6 — QSystemTrayIcon deprecated enum access ---
+
+def test_announce_status_uses_message_icon_enum():
+    """Bug #6: _announce_status nutzte QSystemTrayIcon.Information statt
+    QSystemTrayIcon.MessageIcon.Information (deprecated in PySide6 6.4+).
+    """
+    import inspect
+    import promptboard as pb_module
+    src = inspect.getsource(pb_module.MainWindow._announce_status)
+    assert "QSystemTrayIcon.Information" not in src, (
+        "_announce_status darf nicht QSystemTrayIcon.Information nutzen"
+    )
+    assert "MessageIcon.Information" in src, (
+        "_announce_status muss MessageIcon.Information nutzen"
+    )
+
+
+def test_create_tray_uses_activation_reason_enum():
+    """Bug #6: create_tray nutzte QSystemTrayIcon.Trigger statt
+    QSystemTrayIcon.ActivationReason.Trigger (deprecated in PySide6 6.4+).
+    """
+    import inspect
+    import promptboard as pb_module
+    src = inspect.getsource(pb_module.create_tray)
+    assert "ActivationReason.Trigger" in src, (
+        "create_tray muss QSystemTrayIcon.ActivationReason.Trigger nutzen"
+    )
+
+
+def test_profiprompt_load_json_object_handles_os_error(tmp_path):
+    """Bug #5: _load_json_object fing nur JSONDecodeError, nicht OSError.
+    Auf Windows/OneDrive-Lockings würde ein OSError unbehandelt durch landen.
+    """
+    import sys
+    sys.path.insert(0, str(tmp_path.parent.parent / "src"))
+    from profiprompt_adapter import _load_json_object
+    locked_path = tmp_path / "unreadable.json"
+    locked_path.write_text("{}", encoding="utf-8")
+    if hasattr(locked_path, "chmod"):
+        try:
+            locked_path.chmod(0o000)
+            result = _load_json_object(locked_path)
+            assert result == {}, "Soll {} zurückgeben statt Exception bei OS-Fehler"
+        except PermissionError:
+            pass  # Windows: chmod funktioniert nicht immer aus Tests
+        finally:
+            try:
+                locked_path.chmod(0o644)
+            except Exception:
+                pass

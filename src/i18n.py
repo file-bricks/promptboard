@@ -617,7 +617,7 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
     },
     "settings.btn.change.explorerpro.tooltip": {
         "de": "ExplorerPro-Pfad ändern", "en": "Change ExplorerPro path",
-        "es": "Change ExplorerPro path", "zh": "更改 ExplorerPro 路径", "ja": "ExplorerPro パスを変更します", "ru": "Изменить путь ExplorerPro",
+        "es": "Cambiar ruta de ExplorerPro", "zh": "更改 ExplorerPro 路径", "ja": "ExplorerPro パスを変更します", "ru": "Изменить путь ExplorerPro",
     },
     "settings.io.import_profiprompt.tooltip": {
         "de": "Einträge aus ProfiPrompt importieren", "en": "Import entries from ProfiPrompt",

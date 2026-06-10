@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any, Optional
 
 from models import ItemType, LibraryItem, gen_id, normalize_name, now_iso, parse_tags
+
+logger = logging.getLogger(__name__)
 
 
 def _load_json_object(path: Path) -> dict[str, Any]:
@@ -13,7 +16,8 @@ def _load_json_object(path: Path) -> dict[str, Any]:
         return {}
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.error("ProfiPrompt %s konnte nicht gelesen werden: %s", path, exc)
         return {}
     return payload if isinstance(payload, dict) else {}
 

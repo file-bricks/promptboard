@@ -547,10 +547,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self,
             tr("dialog.delete.title"),
             tr("dialog.delete.body", name=item.name),
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-            QtWidgets.QMessageBox.No,
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No,
         )
-        return answer == QtWidgets.QMessageBox.Yes
+        return answer == QtWidgets.QMessageBox.StandardButton.Yes
 
     def copy_current_item(self) -> None:
         self.save_current_item()
@@ -655,10 +655,10 @@ class MainWindow(QtWidgets.QMainWindow):
                     self,
                     tr("dialog.overwrite.title"),
                     tr("dialog.overwrite.body", name=target_path.name),
-                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-                    QtWidgets.QMessageBox.No,
+                    QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                    QtWidgets.QMessageBox.StandardButton.No,
                 )
-                if answer != QtWidgets.QMessageBox.Yes:
+                if answer != QtWidgets.QMessageBox.StandardButton.Yes:
                     continue
             items_to_write.append(item)
 
@@ -831,7 +831,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tray_icon.showMessage(
                 "PromptBoard",
                 text,
-                QtWidgets.QSystemTrayIcon.Information,
+                QtWidgets.QSystemTrayIcon.MessageIcon.Information,
                 2500,
             )
 
@@ -879,7 +879,7 @@ def create_tray(window: MainWindow) -> Optional[QtWidgets.QSystemTrayIcon]:
     tray = QtWidgets.QSystemTrayIcon(icon, window)
     tray.setToolTip("PromptBoard")
 
-    menu = QtWidgets.QMenu()
+    menu = QtWidgets.QMenu(window)
     menu.addAction(tr("tray.open"), window.showNormal)
     menu.addAction(tr("tray.hide"), window.hide)
     menu.addSeparator()
@@ -887,7 +887,7 @@ def create_tray(window: MainWindow) -> Optional[QtWidgets.QSystemTrayIcon]:
     tray.setContextMenu(menu)
     tray.activated.connect(
         lambda reason: window.showNormal()
-        if reason == QtWidgets.QSystemTrayIcon.Trigger
+        if reason == QtWidgets.QSystemTrayIcon.ActivationReason.Trigger
         else None
     )
     tray.show()
