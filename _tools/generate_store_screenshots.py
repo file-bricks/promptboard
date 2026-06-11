@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import tempfile
 from pathlib import Path
+
+# QT_SCALE_FACTOR MUSS vor QApplication-Erzeugung gesetzt werden (Qt6!)
+os.environ.setdefault("QT_SCALE_FACTOR", "2")
+# Offscreen-Fallback für CI / kopflosen Betrieb; wird ggf. durch vorhandenen
+# Display überschrieben, wenn gesetzt – daher nur setdefault.
+# Nicht erzwingen, damit echtes Rendering auf dem Desktop möglich bleibt.
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -26,6 +33,8 @@ SCREENSHOT_NAMES = {
     "editor": "editor.png",
     "settings": "settings.png",
 }
+
+THEME = "dark"
 
 
 def apply_screenshot_font(app: QtWidgets.QApplication) -> None:
@@ -119,6 +128,8 @@ def _save_widget(widget: QtWidgets.QWidget, target: Path) -> None:
     pixmap = widget.grab()
     if pixmap.isNull():
         raise RuntimeError(f"Screenshot für {target.name} konnte nicht erzeugt werden")
+    # Pixel-Dimensionen ausgeben – beweist, ob 2x-DPI griff
+    print(f"  {target.name}: {pixmap.width()}×{pixmap.height()} px (physikalisch)")
     target.parent.mkdir(parents=True, exist_ok=True)
     if not pixmap.save(str(target)):
         raise RuntimeError(f"Screenshot {target} konnte nicht gespeichert werden")
@@ -169,7 +180,7 @@ def _build_settings_dialog(window: MainWindow) -> SettingsDialog:
         on_export_explorerpro=lambda: None,
     )
     dialog.theme_combo.setCurrentIndex(
-        max(dialog.theme_combo.findData("vibrant"), 0)
+        max(dialog.theme_combo.findData(THEME), 0)
     )
     dialog.language_combo.setCurrentIndex(
         max(dialog.language_combo.findData("de"), 0)
@@ -178,6 +189,7 @@ def _build_settings_dialog(window: MainWindow) -> SettingsDialog:
 
 
 def generate_store_screenshots(output_dir: Path) -> list[Path]:
+    """Erzeugt die vier Store-Screenshots (tray, library, editor, settings)."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -188,7 +200,7 @@ def generate_store_screenshots(output_dir: Path) -> list[Path]:
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
         app.setApplicationName("PromptBoard Screenshot Generator")
         apply_screenshot_font(app)
-        apply_theme(app, "vibrant")
+        apply_theme(app, THEME)
 
         settings = SettingsManager()
         data_dir = temp_root / "data"
@@ -200,7 +212,7 @@ def generate_store_screenshots(output_dir: Path) -> list[Path]:
         settings.qs.setValue("imports/profiprompt_data", str(profiprompt_dir))
         settings.qs.setValue("imports/explorerpro_data", str(explorerpro_dir))
         settings.qs.setValue("view/language", "de")
-        settings.qs.setValue("view/theme", "vibrant")
+        settings.qs.setValue("view/theme", THEME)
         settings.qs.sync()
 
         storage = Storage(data_dir)
@@ -220,17 +232,17 @@ def generate_store_screenshots(output_dir: Path) -> list[Path]:
         try:
             _render_tray_preview(window, tray, targets[0])
 
-            window.current_item_id = "__library_preview__"
+            # library.png: Liste + Detail beide befüllt (store-skill ausgewählt)
             window.type_filter.setCurrentText(tr("filter.all"))
             window.search_edit.setText("")
             window.reload_list()
-            window.item_list.clearSelection()
-            window.clear_editor()
+            window._select_item_by_id("store-skill")
             window.status_label.setText("Bibliothek mit lokalen Prompt-Bausteinen")
             _save_widget(window, targets[1])
 
-            window._select_item_by_id("store-prompt")
-            window.status_label.setText("Editor mit ausgewähltem Prompt-Eintrag")
+            # editor.png: anderer Eintrag als main.png (store-agent)
+            window._select_item_by_id("store-agent")
+            window.status_label.setText("Editor mit ausgewähltem Agenten-Eintrag")
             _save_widget(window, targets[2])
 
             dialog = _build_settings_dialog(window)
@@ -244,6 +256,62 @@ def generate_store_screenshots(output_dir: Path) -> list[Path]:
             _process_events(app)
 
     return targets
+
+
+def generate_main_screenshot(main_path: Path) -> Path:
+    """Erzeugt das Hero-Bild README/screenshots/main.png im dark-Theme.
+
+    Zeigt das Haupt-Fenster mit dem inhaltlich reichsten Eintrag (store-prompt)
+    ausgewählt – bewusst ein anderes Element als editor.png (store-agent).
+    """
+    main_path = Path(main_path)
+    main_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="promptboard-main-shot-") as temp_dir:
+        temp_root = Path(temp_dir)
+        configure_qsettings(temp_root)
+
+        app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+        app.setApplicationName("PromptBoard Screenshot Generator")
+        apply_screenshot_font(app)
+        apply_theme(app, THEME)
+
+        settings = SettingsManager()
+        data_dir = temp_root / "data"
+        materialize_dir = temp_root / "exports"
+        profiprompt_dir = temp_root / "profiprompt"
+        explorerpro_dir = temp_root / "explorerpro"
+        settings.qs.setValue("paths/data", str(data_dir))
+        settings.qs.setValue("paths/materialize", str(materialize_dir))
+        settings.qs.setValue("imports/profiprompt_data", str(profiprompt_dir))
+        settings.qs.setValue("imports/explorerpro_data", str(explorerpro_dir))
+        settings.qs.setValue("view/language", "de")
+        settings.qs.setValue("view/theme", THEME)
+        settings.qs.sync()
+
+        storage = Storage(data_dir)
+        storage.upsert_many(build_demo_items())
+
+        window = MainWindow(storage, settings)
+        window.resize(1480, 920)
+        tray = create_tray(window)
+
+        try:
+            window.type_filter.setCurrentText(tr("filter.all"))
+            window.search_edit.setText("")
+            window.reload_list()
+            # Hero-Eintrag: store-prompt (inhaltreich, klar strukturiert)
+            window._select_item_by_id("store-prompt")
+            window.status_label.setText("PromptBoard – lokale Prompt-Bausteine verwalten")
+            _save_widget(window, main_path)
+        finally:
+            if tray is not None:
+                tray.hide()
+                tray.deleteLater()
+            window.close()
+            _process_events(app)
+
+    return main_path
 
 
 def tr(key: str) -> str:
@@ -262,14 +330,34 @@ def parse_args() -> argparse.Namespace:
         default=str(PROJECT_ROOT / "README" / "screenshots" / "store"),
         help="Zielordner für tray.png, library.png, editor.png und settings.png",
     )
+    parser.add_argument(
+        "--main",
+        default=str(PROJECT_ROOT / "README" / "screenshots" / "main.png"),
+        help="Pfad für das Hero-Bild main.png",
+    )
+    parser.add_argument(
+        "--no-main",
+        action="store_true",
+        help="main.png NICHT erzeugen (nur Store-Screenshots)",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+
+    print("=== Store-Screenshots ===")
     targets = generate_store_screenshots(Path(args.output))
     for target in targets:
-        print(target)
+        size = target.stat().st_size if target.exists() else 0
+        print(f"  → {target}  ({size // 1024} KB)")
+
+    if not args.no_main:
+        print("=== Hero-Bild (main.png) ===")
+        main_path = generate_main_screenshot(Path(args.main))
+        size = main_path.stat().st_size if main_path.exists() else 0
+        print(f"  → {main_path}  ({size // 1024} KB)")
+
     return 0
 
 
