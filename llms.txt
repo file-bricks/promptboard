@@ -1,3 +1,5 @@
+## Last-checked: 2026-06-12
+
 # PromptBoard
 
 PromptBoard is a local prompt manager and Windows tray app for reusable LLM prompts, skills, workflows, roles, and agents. It keeps prompt libraries offline, searchable, and copy-ready without requiring a cloud account or external API connections.
@@ -29,7 +31,16 @@ Public documentation:
 - README.md: English-first overview, key features, global hotkeys, installation, and quickstart
 - README_de.md: German translation of the project overview
 - ARCHITECTURE.md: module structure, PySide6 components, and adapter design
-- TODO.md: active tasks and v1.2+ backlog items
-- DECISIONS.md: chronological architecture decisions and history
 
-Last-checked: 2026-06-10
+## Audience
+
+Developers and power users building LLM-assisted workflows on Windows. Suitable for AI engineers, prompt engineers, and anyone managing reusable text blocks for language models.
+
+## Search Phrases
+
+```
+promptboard windows tray
+local prompt manager LLM
+offline prompt library PySide6
+reusable prompts skills workflows agents desktop
+```

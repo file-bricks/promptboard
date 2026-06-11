@@ -54,3 +54,6 @@ PORTIERUNGSPLAN.md
 TODO.md
 DONE.md
 _tmp_accessibility_check/
+
+# Bugsweep artefacts
+*_BUGSWEEP_*.py

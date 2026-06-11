@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-06-12
+
+### Dokumentation & Hygiene
+
+- `llms.txt` auf Standard-Format gebracht: `## Last-checked` an Zeile 1, `## Audience`- und `## Search Phrases`-Block ergänzt; Verweise auf gitignorierte Dateien entfernt.
+- `README.md`: Internen OneDrive-Pfad (`Current Folder Status`) entfernt; `cd`-Zeile mit lokalem Pfad aus dem Quickstart entfernt; Onboarding-Tabelle bereinigt (Links auf gitignorierte Dateien entfernt).
+- `.gitignore`: Pattern `*_BUGSWEEP_*.py` ergänzt.
+
 ## [Unreleased] - 2026-06-10
 
 ### Dokumentation & Hygiene

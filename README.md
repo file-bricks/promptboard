@@ -15,7 +15,6 @@ PromptBoard is a local prompt manager and Windows tray application for reusable 
 
 **CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) running Windows Pytest and macOS/Linux source smoke checks  
 **Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
-**Current Folder Status:** `LLM/REL-PUB_PromptBoard`  
 
 ## Screenshots
 
@@ -56,11 +55,9 @@ Global hotkeys allow you to show/hide the tray window and quickly copy the last 
 |---|---|
 | First Session | [START.md](./START.md) |
 | Current State | [STATE.md](./STATE.md) |
-| Active Tasks | [TODO.md](./TODO.md) and [AUFGABEN.txt](./AUFGABEN.txt) |
 | Product Vision | [KONZEPT.md](./KONZEPT.md) |
 | Feature Overview | [Feature_Analyse_PromptBoard.md](./Feature_Analyse_PromptBoard.md) |
 | Architecture | [ARCHITECTURE.md](./ARCHITECTURE.md) |
-| Decisions | [DECISIONS.md](./DECISIONS.md) |
 | Glossary | [GLOSSARY.md](./GLOSSARY.md) |
 | Agent Guidelines | [AGENTS.md](./AGENTS.md) and [CLAUDE.md](./CLAUDE.md) |
 
@@ -71,7 +68,6 @@ The next primary focus is completing the Store-P1 path: entering real Partner Ce
 ## Running the Project
 
 ```powershell
-cd 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\REL-PUB_PromptBoard'
 python -m pip install -e ".[dev]"
 python src\promptboard.py
 ```
