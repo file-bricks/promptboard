@@ -1,4 +1,4 @@
-# .github/README.md
+# .github/CONTENTS.md
 
 GitHub-spezifische Dateien für PromptBoard liegen hier.
 
