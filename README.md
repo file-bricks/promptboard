@@ -1,3 +1,5 @@
+<img src="assets/banner.svg" width="100%" alt="PromptBoard Banner">
+
 [🇩🇪 Deutsche Version](./README_de.md) | 🇬🇧 English Version
 
 # PromptBoard
