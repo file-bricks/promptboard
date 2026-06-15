@@ -1,20 +1,26 @@
-<img src="assets/banner.svg" width="100%" alt="PromptBoard Banner">
+<img src="assets/banner.svg" width="100%" alt="PromptBoard">
 
-🇩🇪 Deutsche Version | [🇬🇧 English Version](./README.md)
+<p>
+  <b>🇩🇪 Deutsch</b> &nbsp;·&nbsp; <a href="./README.md">🇬🇧 English</a>
+</p>
+
+<p>
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="Lizenz: MIT">
+  <img src="https://img.shields.io/badge/version-v1.1.1-blue" alt="Version v1.1.1">
+  <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Plattform: Windows">
+  <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Gebaut mit Python und PySide6">
+  <img src="https://img.shields.io/badge/tests-68%2F68%20passing-success" alt="Tests: 68/68 bestanden">
+</p>
 
 # PromptBoard
 
-> Ein leichtgewichtiges Systemtray-Board für Prompts, Skills, Workflows, Rollen und Agenten.
+**Deine lokale Prompt-Bibliothek — schnell, offline, tray-ready.**
 
-PromptBoard ist als schnelles Desktop-Werkzeug für wiederverwendbare
-LLM-Bausteine gedacht. Im Unterschied zu umfangreicheren Prompt-Managern steht
-hier nicht Versionierung oder Board-Komplexität im Vordergrund, sondern
-schneller Zugriff: öffnen, filtern, kopieren, direkt editieren und bei Bedarf
-als `.md`-Datei materialisieren.
+[Features](#zielbild) &nbsp;·&nbsp; [Screenshots](#screenshots) &nbsp;·&nbsp; [Installation](#projekt-starten) &nbsp;·&nbsp; [Doku](#onboarding)
 
-PromptBoard ist ein lokaler Prompt-Manager und eine Windows-Tray-App für wiederverwendbare
-LLM-Prompts, Skills, Workflows, Rollen und Agenten. Die Prompt-Bibliotheken bleiben offline,
-durchsuchbar und kopierbereit, ohne dass ein Cloud-Konto erforderlich ist.
+---
+
+PromptBoard ist ein schnelles Desktop-Werkzeug und eine Windows-Tray-App für wiederverwendbare LLM-Bausteine: Prompts, Skills, Workflows, Rollen und Agenten. Im Unterschied zu umfangreicheren Prompt-Managern steht nicht Versionierung oder Board-Komplexität im Vordergrund, sondern schneller Zugriff: öffnen, filtern, kopieren, direkt editieren und bei Bedarf als `.md`-Datei materialisieren. Die Prompt-Bibliotheken bleiben offline, durchsuchbar und kopierbereit, ohne dass ein Cloud-Konto erforderlich ist.
 
 ## Status
 

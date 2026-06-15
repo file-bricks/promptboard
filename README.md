@@ -1,14 +1,26 @@
-<img src="assets/banner.svg" width="100%" alt="PromptBoard Banner">
+<img src="assets/banner.svg" width="100%" alt="PromptBoard">
 
-[🇩🇪 Deutsche Version](./README_de.md) | 🇬🇧 English Version
+<p>
+  <a href="./README_de.md">🇩🇪 Deutsch</a> &nbsp;·&nbsp; <b>🇬🇧 English</b>
+</p>
+
+<p>
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
+  <img src="https://img.shields.io/badge/version-v1.1.1-blue" alt="Version v1.1.1">
+  <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows">
+  <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Built with Python and PySide6">
+  <img src="https://img.shields.io/badge/tests-68%2F68%20passing-success" alt="Tests: 68/68 passing">
+</p>
 
 # PromptBoard
 
-> A lightweight system tray board for prompts, skills, workflows, roles, and agents.
+**Your local prompt library — fast, offline, tray-ready.**
 
-PromptBoard is designed as a fast desktop utility for reusable LLM building blocks. Unlike larger prompt managers, the focus here is not on versioning or complex board systems, but on rapid access: open, filter, copy, edit directly, and materialize as `.md` files when needed.
+[Features](#key-features--goals) &nbsp;·&nbsp; [Screenshots](#screenshots) &nbsp;·&nbsp; [Install & Run](#running-the-project) &nbsp;·&nbsp; [Docs](#onboarding)
 
-PromptBoard is a local prompt manager and Windows tray application for reusable LLM prompts, skills, workflows, roles, and agents. It keeps your prompt libraries offline, searchable, and copy-ready without requiring a cloud account or external API connections.
+---
+
+PromptBoard is a fast desktop utility and Windows tray application for reusable LLM building blocks: prompts, skills, workflows, roles, and agents. Unlike larger prompt managers, the focus is not on versioning or complex board systems, but on rapid access: open, filter, copy, edit directly, and materialize as `.md` files when needed. Your prompt libraries stay offline, searchable, and copy-ready without requiring a cloud account or external API connections.
 
 ## Status
 
