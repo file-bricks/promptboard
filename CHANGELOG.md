@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-06-17
+
+### Verändert
+
+- Store-/MSIX-Logos lassen sich jetzt reproduzierbar mit
+  `python _tools/store_release.py refresh-icons` aus dem kanonischen
+  Skateboard-Icon `PromptBoard.png` regenerieren.
+- Die versionierten `store_assets/`-Logos wurden aus `PromptBoard.png`
+  aktualisiert, damit Store-Kacheln nicht mehr das alte Dokument-Icon zeigen.
+- `PromptBoard-1.1.1-win64.exe` wurde mit dem aktualisierten Icon neu gebaut
+  und unter `dist/` sowie `releases/v1.1.1/` abgelegt.
+
+### Tests
+
+- Neuer Regressionstest stellt sicher, dass der Store-Icon-Refresh
+  `PromptBoard.png` als Quelle nutzt und alle erwarteten Store-Asset-Dateien
+  neu schreibt.
+- `python -m pytest -q` läuft lokal mit 77/77 Tests grün; der neue EXE-Build
+  bestand einen kurzen Offscreen-Startsmoke.
+
 ## [Unreleased] - 2026-06-12
 
 ### Dokumentation & Hygiene

@@ -174,6 +174,7 @@ def test_prepare_store_package_uses_effective_store_values(tmp_path):
     assert output_dir == instance.output_dir
     assert instance.config["publisher"] == "CN=Tracked Publisher"
     assert instance.config["identity_name"] == "TrackedPublisher.PromptBoard"
+    assert instance.prepared_with["icon_source"].endswith("PromptBoard.png")
     assert instance.prepared_with["exe_path"] == str(exe_path.resolve())
 
 
@@ -188,6 +189,49 @@ def test_ensure_store_assets_copies_expected_logo_names(tmp_path):
 
     for target_name in module.STORE_ASSET_FILENAMES.values():
         assert (assets_dir / target_name).exists()
+
+
+def test_refresh_store_icons_uses_promptboard_png_and_updates_store_assets(tmp_path):
+    module = load_module()
+    (tmp_path / "PromptBoard.png").write_bytes(b"png")
+    generated: list[dict[str, Path]] = []
+
+    class DummyPackager:
+        def __init__(self, project_dir, app_name=None, config_file=None):
+            self.project_dir = Path(project_dir)
+            self.output_dir = self.project_dir / "store_package" / "PromptBoard"
+
+        def set_output_dir(self, path):
+            self.output_dir = Path(path)
+
+        def generate_icons(self, icon_source=None, output_dir=None):
+            icons_dir = Path(output_dir)
+            icons_dir.mkdir(parents=True, exist_ok=True)
+            generated.append(
+                {
+                    "icon_source": Path(icon_source),
+                    "output_dir": icons_dir,
+                }
+            )
+            for source_name in module.STORE_ASSET_FILENAMES:
+                (icons_dir / source_name).write_bytes(source_name.encode("utf-8"))
+            return True
+
+    class DummyModule:
+        StorePackager = DummyPackager
+
+    original_loader = module.load_store_packager
+    try:
+        module.load_store_packager = lambda root=None: DummyModule
+        assets_dir = module.refresh_store_icons(tmp_path)
+    finally:
+        module.load_store_packager = original_loader
+
+    assert generated
+    assert generated[0]["icon_source"] == tmp_path / "PromptBoard.png"
+    assert generated[0]["output_dir"] == tmp_path / "store_package" / "PromptBoard" / "icons"
+    for source_name, target_name in module.STORE_ASSET_FILENAMES.items():
+        assert (assets_dir / target_name).read_bytes() == source_name.encode("utf-8")
 
 
 def test_latest_wack_report_uses_newest_xml(tmp_path):

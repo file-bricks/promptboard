@@ -2,10 +2,10 @@
 name: promptboard-state
 type: state-snapshot
 version: 1.1.1
-updated: 2026-06-04
+updated: 2026-06-17
 updated_by: GPT
-current_phase: REL-PUB v1.1.1 stabilisiert; Desktop-Plattform-Smokes stehen, Store-P1 bleibt offen
-last_verified: 2026-06-04
+current_phase: REL-PUB v1.1.1 stabilisiert; Icon-Assets vereinheitlicht, Store-P1 bleibt offen
+last_verified: 2026-06-17
 description: |
   PromptBoard ist als öffentliches Desktop-Tool veröffentlicht. Die aktuelle
   Linie steht bei v1.1.1 inklusive Hotfix für den Import-Crash,
@@ -13,7 +13,8 @@ description: |
   Batch-Materialisierung, Typvorlagen, Inline-Variablen, globale Hotkeys sowie
   der Store-Workflow stehen. Android/iOS wurden gestrichen; Web/PWA plus direkte
   Server-Synchronisierung wird als mögliche eigene Team-Server-Linie geprüft.
-  Neu sind reproduzierbare macOS-/Linux-Source-Smokes samt CI-Absicherung.
+  Neu sind reproduzierbare macOS-/Linux-Source-Smokes samt CI-Absicherung und
+  reproduzierbar aus dem Skateboard-Icon erzeugte Store-/MSIX-Logos.
 ---
 
 # STATE.md - Aktueller Projekt-Stand
@@ -40,6 +41,21 @@ Server-Synchronisierung bleibt als eigene Team-Server-Linie interessant, aber
 nicht als Desktop-Companion.
 
 ## Letzte bedeutsame Aktion
+
+2026-06-17:
+- **Icon-Linie vereinheitlicht**: `PromptBoard.ico` und `PromptBoard.png`
+  zeigen das Skateboard-Icon; die alten Dokument-Logos in `store_assets/`
+  wurden aus `PromptBoard.png` ersetzt.
+- **Store-Icon-Refresh ergänzt**: `_tools/store_release.py refresh-icons`
+  erzeugt Store-/MSIX-Logos reproduzierbar neu, ohne Partner-Center-Werte oder
+  WACK-Lauf zu benötigen.
+- **v1.1.1-EXE neu gebaut**: `dist/PromptBoard-1.1.1-win64.exe` und
+  `releases/v1.1.1/PromptBoard-1.1.1-win64.exe` wurden aus einer lokalen
+  Build-Venv unter `C:\_Local_DEV\codex_build\promptboard-icon\` neu erzeugt.
+  SHA256: `70dc711f2eae7a3d25053a27ab6afa445be4f1786b6965b60e1cffef17226159`.
+- **Teststand aktualisiert**: Regressionstest im Store-Helper prüft die
+  Skateboard-Icon-Quelle für Store-Assets; `python -m pytest -q` läuft mit
+  77/77 Tests grün, Source-Smoke und EXE-Offscreen-Smoke sind grün.
 
 2026-06-04:
 - **Plattform-Smokes ergänzt**: neuer `tests/source_platform_smoke.py` deckt

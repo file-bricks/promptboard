@@ -16,6 +16,7 @@ STORE_VERSION = "1.1.1.0"
 APP_EXECUTABLE = f"{APP_NAME}-{APP_VERSION}-win64.exe"
 STORE_CONFIG_NAME = "store_package.json"
 LOCAL_STORE_CONFIG_NAME = "store_package.local.json"
+STORE_ICON_SOURCE_NAME = "PromptBoard.png"
 STORE_CONFIG_DEFAULTS = {
     "app_name": APP_NAME,
     "publisher": "CN=YourPublisher",
@@ -77,6 +78,11 @@ def store_config_path(root: Path | None = None) -> Path:
 def local_store_config_path(root: Path | None = None) -> Path:
     base = root or project_root()
     return base / LOCAL_STORE_CONFIG_NAME
+
+
+def store_icon_source_path(root: Path | None = None) -> Path:
+    base = root or project_root()
+    return base / STORE_ICON_SOURCE_NAME
 
 
 def read_json_file(path: Path) -> dict[str, str]:
@@ -220,6 +226,24 @@ def ensure_store_assets(root: Path | None = None, *, icons_dir: Path | None = No
     return assets_dir
 
 
+def refresh_store_icons(root: Path | None = None) -> Path:
+    """Regenerate Store/MSIX logos from the canonical PromptBoard app icon."""
+    base = root or project_root()
+    source = store_icon_source_path(base)
+    if not source.exists():
+        raise FileNotFoundError(f"Store-Icon-Quelle nicht gefunden: {source}")
+
+    module = load_store_packager(base)
+    packager = module.StorePackager(str(base), app_name=APP_NAME, config_file=str(store_config_path(base)))
+    if hasattr(packager, "set_output_dir"):
+        packager.set_output_dir(base / "store_package" / APP_NAME)
+    icons_dir = base / "store_package" / APP_NAME / "icons"
+    result = packager.generate_icons(str(source), output_dir=icons_dir)
+    if result is False:
+        raise RuntimeError(f"Store-Icon-Generierung fehlgeschlagen: {source}")
+    return ensure_store_assets(base, icons_dir=icons_dir)
+
+
 def resolve_executable(root: Path | None = None, explicit: str | None = None) -> Path:
     base = root or project_root()
     candidates = []
@@ -356,7 +380,7 @@ def prepare_store_package(root: Path | None = None, explicit_exe: str | None = N
     packager = module.StorePackager(str(base), app_name=APP_NAME, config_file=str(config_path))
     packager.config.update(effective_config)
     packager.prepare_package(
-        icon_source=str(base / "PromptBoard.png"),
+        icon_source=str(store_icon_source_path(base)),
         exe_path=str(executable),
     )
     ensure_store_assets(base, icons_dir=packager.output_dir / "icons")
@@ -429,6 +453,10 @@ def main() -> None:
 
     subparsers.add_parser("write-root-files", help="store_package.json und STORE_LISTING.md schreiben")
     subparsers.add_parser("check", help="Store-Konfiguration auf echte Partner-Center-Werte prüfen")
+    subparsers.add_parser(
+        "refresh-icons",
+        help="Store-/MSIX-Logos aus PromptBoard.png neu erzeugen",
+    )
 
     prepare_parser = subparsers.add_parser("prepare", help="Store-Paket-Staging erzeugen")
     prepare_parser.add_argument("--exe", help="Pfad zur PromptBoard-EXE")
@@ -467,6 +495,11 @@ def main() -> None:
             config = load_store_config()
             assert_store_ready(config)
             print("[+] Store-Konfiguration ist für den echten Partner-Center-Lauf bereit.")
+            return
+
+        if args.command == "refresh-icons":
+            assets_dir = refresh_store_icons()
+            print(f"[+] Store-Icons aktualisiert: {assets_dir}")
             return
 
         if args.command == "prepare":
