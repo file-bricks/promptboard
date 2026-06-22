@@ -1,10 +1,28 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from PySide6 import QtCore
 
 from library_query import DEFAULT_SORT_MODE, coerce_sort_mode
+
+logger = logging.getLogger(__name__)
+
+
+def _ensure_dir(path: Path, fallback: Path) -> Path:
+    """BUGSWEEP-38: Verzeichnis sicherstellen, bei OSError auf Default-Pfad ausweichen.
+
+    Ein vom Nutzer gesetzter Pfad auf nicht-existentem Laufwerk / ohne Rechte / als Datei statt
+    Ordner liess mkdir sonst ungefangen werfen -> harter Start-Crash ohne Hinweis.
+    """
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+    except OSError as exc:
+        logger.warning("Pfad %s nicht nutzbar (%s) -> Fallback %s", path, exc, fallback)
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
 
 
 class SettingsManager(QtCore.QObject):
@@ -25,8 +43,7 @@ class SettingsManager(QtCore.QObject):
             self.qs.sync()
             raw = str(default)
         path = Path(raw)
-        path.mkdir(parents=True, exist_ok=True)
-        return path
+        return _ensure_dir(path, Path.home() / ".promptboard")
 
     def get_materialize_path(self) -> Path:
         raw = self.qs.value("paths/materialize", "", type=str)
@@ -36,8 +53,7 @@ class SettingsManager(QtCore.QObject):
             self.qs.sync()
             raw = str(default)
         path = Path(raw)
-        path.mkdir(parents=True, exist_ok=True)
-        return path
+        return _ensure_dir(path, Path.home() / "Desktop")
 
     def set_materialize_path(self, path: Path) -> None:
         self.qs.setValue("paths/materialize", str(Path(path)))

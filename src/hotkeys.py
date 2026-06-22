@@ -189,5 +189,11 @@ class PromptBoardHotkeys(QtCore.QAbstractNativeEventFilter):
         callback = self._callbacks.get(hotkey_id)
         if callback is None:
             return False
-        callback()
+        # BUGSWEEP-38: callback() in try/except — eine ungefangene Exception (z.B. Storage-Fehler im
+        # quick_copy-Hotkey) propagierte sonst durch Qts nativen C++-Event-Dispatch und kann je nach
+        # PySide6-Abort-Verhalten die App terminieren statt nur den Hotkey zu schlucken.
+        try:
+            callback()
+        except Exception:
+            logger.exception("Hotkey-Callback fehlgeschlagen (id=%s)", hotkey_id)
         return True

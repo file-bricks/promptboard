@@ -110,14 +110,19 @@ def item_to_dict(item: LibraryItem) -> Dict[str, Any]:
 
 
 def item_from_dict(data: Dict[str, Any]) -> LibraryItem:
+    # BUGSWEEP-38 (HOCH): `or default` statt nur Default-Arg + `data["id"]`-Direktzugriff. Ein
+    # einzelner JSON-Eintrag mit fehlendem "id" (KeyError) oder Feldwert null (z.B. {"name": null}
+    # -> __post_init__ normalize_name(None)/None.strip() -> AttributeError; {"tags": null} ->
+    # parse_tags(None) -> TypeError) reisst sonst load_items() mit -> GESAMTE Prompt-Bibliothek
+    # unladbar (Crash beim Start). Hand-editierte/importierte/Fremdadapter-library.json.
     return LibraryItem(
-        id=data["id"],
+        id=data.get("id") or gen_id(),
         item_type=ItemType.from_value(data.get("item_type", ItemType.PROMPT.value)),
-        name=data.get("name", ""),
-        content=data.get("content", ""),
-        category=data.get("category", ""),
-        tags=data.get("tags", []),
-        source=data.get("source", ""),
-        created_at=data.get("created_at", now_iso()),
-        updated_at=data.get("updated_at", now_iso()),
+        name=data.get("name") or "",
+        content=data.get("content") or "",
+        category=data.get("category") or "",
+        tags=data.get("tags") or [],
+        source=data.get("source") or "",
+        created_at=data.get("created_at") or now_iso(),
+        updated_at=data.get("updated_at") or now_iso(),
     )
