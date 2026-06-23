@@ -42,8 +42,8 @@ class AppLocalizations {
       : 'Die Zwischenablage enthält kein lesbares PromptBoard-JSON.';
 
   String itemsLoaded(int count, String source) => _isEn
-      ? '$count entries from $source loaded.'
-      : '$count Einträge aus $source geladen.';
+      ? '$count ${count == 1 ? 'entry' : 'entries'} from $source loaded.'
+      : '$count ${count == 1 ? 'Eintrag' : 'Einträge'} aus $source geladen.';
 
   String tagsLabel(String tags) => 'Tags: $tags';
 

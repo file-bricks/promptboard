@@ -116,10 +116,19 @@ class _PromptBoardCompanionPageState extends State<PromptBoardCompanionPage> {
   }
 
   Future<void> _loadFromClipboard() async {
-    final data = await Clipboard.getData('text/plain');
-    if (!mounted) return;
+    String text;
+    try {
+      final data = await Clipboard.getData('text/plain');
+      if (!mounted) return;
+      text = data?.text?.trim() ?? '';
+    } catch (_) {
+      // Clipboard-Plattformkanal kann (selten) mit PlatformException scheitern
+      // -> nicht stumm verschlucken, sondern Hinweis zeigen statt Snackbar-Ausfall.
+      if (!mounted) return;
+      _showMessage(AppLocalizations.of(context).clipboardInvalid);
+      return;
+    }
     final l10n = AppLocalizations.of(context);
-    final text = data?.text?.trim() ?? '';
     if (text.isEmpty) {
       _showMessage(l10n.clipboardInvalid);
       return;

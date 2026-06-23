@@ -42,7 +42,7 @@ void main() {
     final l10n = AppLocalizations(const Locale('de'));
     expect(l10n.itemsLoaded(3, 'Demo'), '3 Einträge aus Demo geladen.');
     expect(l10n.itemsLoaded(1, 'Zwischenablage'),
-        '1 Einträge aus Zwischenablage geladen.');
+        '1 Eintrag aus Zwischenablage geladen.'); // Singular (Bugsweep 2026-06-23)
     expect(l10n.copiedToClipboard('Mein Prompt'),
         'Mein Prompt wurde in die Zwischenablage kopiert.');
     expect(l10n.tagsLabel('flutter, dart'), 'Tags: flutter, dart');
