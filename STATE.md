@@ -42,6 +42,17 @@ nicht als Desktop-Companion.
 
 ## Letzte bedeutsame Aktion
 
+2026-06-19:
+- **Storage-Pfad dokumentiert und abgesichert**: `EXPORTFORMAT.md` nennt jetzt
+  `~/.promptboard/library.json` als Desktop-Standardpfad und AppData nur noch
+  als Legacy-Fallback; ein Settings-Test fixiert den Default auf
+  `Path.home() / ".promptboard"`.
+- **BACH-Interop harmonisiert**: BACH prüft nach `BACH_PROMPTBOARD_LIBRARY`
+  zuerst den Desktop-Standardpfad und erst danach `%APPDATA%\PromptBoard`.
+  Der lokale Smoke findet `C:\Users\lukas\.promptboard\library.json`, nutzt
+  aber weiterhin Default-Prompts, solange die Datei keine nichtleeren
+  `name`+`content`-Einträge enthält.
+
 2026-06-17:
 - **Icon-Linie vereinheitlicht**: `PromptBoard.ico` und `PromptBoard.png`
   zeigen das Skateboard-Icon; die alten Dokument-Logos in `store_assets/`

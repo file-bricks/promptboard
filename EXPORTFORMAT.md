@@ -1,6 +1,6 @@
 # EXPORTFORMAT - PromptBoard `library.json`
 
-Stand: 2026-06-02
+Stand: 2026-06-19
 
 ## Zweck
 
@@ -14,8 +14,15 @@ und Agenten ohne Cloud-Zwang.
 Standardpfad in der Desktop-App:
 
 ```text
-%APPDATA%/PromptBoard/library.json
+~/.promptboard/library.json
 ```
+
+Die Desktop-App legt diesen Ordner über `SettingsManager.get_data_path()` an
+und speichert die Bibliothek darin als `library.json`. Ältere Integrationen
+können noch `%APPDATA%/PromptBoard/library.json` verwenden; dieser Pfad gilt
+nur noch als Legacy-Fallback für lesende Adapter. BACH liest zuerst eine
+explizite `BACH_PROMPTBOARD_LIBRARY`, dann den Desktop-Standardpfad und danach
+den AppData-Fallback.
 
 Das Format ist eine Datei-Brücke, kein Live-Sync-Protokoll. Eine mögliche
 Web-/Server-Linie darf `library.json` importieren oder exportieren, sollte aber

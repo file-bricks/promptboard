@@ -2,6 +2,42 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-06-28
+
+### Fehlerbehebungen
+
+- **BUGSWEEP-41 – ExplorerPro-Export: Silent Data Loss bei ID-losen Einträgen**
+  (`src/explorerpro_adapter.py`, Rebuild-Schleife).
+  Mehrere ExplorerPro-`prompts.json`-Einträge ohne `id`-Feld wurden ab dem
+  zweiten Eintrag still verworfen: `seen_existing.add("")` beim ersten Eintrag
+  ließ alle weiteren durch den `continue`-Zweig fallen.
+  Fix: ID-lose Einträge werden jetzt separat behandelt — direkt in `output`
+  geschrieben ohne Deduplizierungscheck, da ohne ID keine Zuordnung möglich ist.
+  Bestehende Einträge *mit* ID werden weiterhin wie bisher dedupliziert.
+
+### Tests
+
+- Neuer Regressionstest `test_export_preserves_all_idless_existing_entries`
+  in `tests/test_explorerpro_adapter.py` (BUGSWEEP-41): 3 ID-lose Einträge
+  exportieren → alle 3 müssen erhalten bleiben.
+- `python -m pytest -q` läuft lokal mit 85/85 Tests grün.
+
+## [Unreleased] - 2026-06-19
+
+### Dokumentation & Interop
+
+- `EXPORTFORMAT.md` nennt jetzt den tatsächlichen Desktop-Standardpfad
+  `~/.promptboard/library.json`; `%APPDATA%/PromptBoard/library.json` ist nur
+  noch als Legacy-Fallback für lesende Integrationen dokumentiert.
+- Die BACH-Interop-Hinweise nennen die Suchreihenfolge:
+  `BACH_PROMPTBOARD_LIBRARY`, Desktop-Standardpfad, dann AppData-Fallback.
+
+### Tests
+
+- Neuer Settings-Test fixiert den Default von `SettingsManager.get_data_path()`
+  auf `~/.promptboard` und prüft, dass der Ordner angelegt wird.
+- `python -m pytest -q` läuft lokal mit 78/78 Tests grün.
+
 ## [Unreleased] - 2026-06-17
 
 ### Verändert

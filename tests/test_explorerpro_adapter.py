@@ -177,3 +177,29 @@ def test_export_preserves_unrelated_entries(tmp_path):
     titles = [entry["title"] for entry in payload]
     assert "Bleibt" in titles
     assert "NEU" in titles
+
+
+def test_export_preserves_all_idless_existing_entries(tmp_path):
+    """BUGSWEEP-41: Mehrere ExplorerPro-Einträge ohne 'id'-Feld dürfen beim
+    Export nicht durch die ``seen_existing``-Deduplizierung verworfen werden.
+
+    Bug: ``seen_existing.add("")`` beim ersten ID-losen Eintrag ließ alle
+    weiteren ID-losen Einträge durch den ``continue``-Zweig fallen.
+    """
+    _write_prompts(
+        tmp_path,
+        [
+            {"title": "Eintrag Ohne ID Alpha", "content": "Inhalt A", "category": "A", "tags": []},
+            {"title": "Eintrag Ohne ID Beta", "content": "Inhalt B", "category": "B", "tags": []},
+            {"title": "Eintrag Ohne ID Gamma", "content": "Inhalt C", "category": "C", "tags": []},
+        ],
+    )
+    # Kein PromptBoard-Item – nur vorhandene ExplorerPro-Einträge sollen erhalten bleiben.
+    count = export_to_explorerpro([], tmp_path)
+    assert count == 0
+    payload = json.loads((tmp_path / PROMPTS_FILENAME).read_text(encoding="utf-8"))
+    titles = [e.get("title") for e in payload]
+    assert len(payload) == 3, f"Alle 3 ID-losen Einträge erwartet, bekommen: {titles}"
+    assert "Eintrag Ohne ID Alpha" in titles
+    assert "Eintrag Ohne ID Beta" in titles, "Zweiter ID-loser Eintrag wurde verworfen (Bug #41)."
+    assert "Eintrag Ohne ID Gamma" in titles, "Dritter ID-loser Eintrag wurde verworfen (Bug #41)."

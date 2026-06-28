@@ -52,6 +52,15 @@ def test_confirm_overwrite_round_trip():
     assert SettingsManager().get_confirm_overwrite() is True
 
 
+def test_data_path_default_is_home_promptboard(tmp_path, monkeypatch):
+    monkeypatch.setattr("settings_manager.Path.home", lambda: tmp_path)
+
+    settings = SettingsManager()
+
+    assert settings.get_data_path() == tmp_path / ".promptboard"
+    assert (tmp_path / ".promptboard").is_dir()
+
+
 def test_explorerpro_path_round_trip(tmp_path):
     settings = SettingsManager()
     default_path = settings.get_explorerpro_data_path()

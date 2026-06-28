@@ -181,10 +181,17 @@ def export_to_explorerpro(
             written_count += 1
 
     # Rebuild the output array in original order, then append new entries.
+    # BUGSWEEP-41: Einträge ohne 'id'-Feld dürfen nicht dedupliziert werden —
+    # sie alle haben entry_id == "" und würden ab dem zweiten Eintrag durch
+    # ``seen_existing``-Check fallen gelassen (silent data loss).
     output: list[dict[str, Any]] = []
     seen_existing: set[str] = set()
     for entry in existing_entries:
         entry_id = str(entry.get("id", ""))
+        if not entry_id:
+            # Kein ID → keine Deduplizierung möglich, Eintrag immer erhalten.
+            output.append(entry)
+            continue
         if entry_id in seen_existing:
             continue
         seen_existing.add(entry_id)
