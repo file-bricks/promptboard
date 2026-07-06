@@ -210,23 +210,34 @@ class SettingsDialog(QtWidgets.QDialog):
     # ------------------------------------------------------------ accessibility & i18n
 
     def _apply_accessibility(self) -> None:
+        self.paths_group.setAccessibleName(tr("settings.group.paths"))
+        self.paths_group.setAccessibleDescription(tr("settings.group.paths.tooltip"))
+        self.paths_group.setToolTip(tr("settings.group.paths.tooltip"))
+
         self.materialize_path_edit.setAccessibleName(tr("settings.path.materialize"))
         self.materialize_path_edit.setAccessibleDescription(tr("settings.path.materialize.tooltip"))
         self.materialize_path_edit.setToolTip(tr("settings.path.materialize.tooltip"))
         self.change_materialize_button.setAccessibleName(tr("settings.btn.change.materialize.tooltip"))
+        self.change_materialize_button.setAccessibleDescription(tr("settings.btn.change.materialize.tooltip"))
         self.change_materialize_button.setToolTip(tr("settings.btn.change.materialize.tooltip"))
 
         self.profiprompt_path_edit.setAccessibleName(tr("settings.path.profiprompt"))
         self.profiprompt_path_edit.setAccessibleDescription(tr("settings.path.profiprompt.tooltip"))
         self.profiprompt_path_edit.setToolTip(tr("settings.path.profiprompt.tooltip"))
         self.change_profiprompt_button.setAccessibleName(tr("settings.btn.change.profiprompt.tooltip"))
+        self.change_profiprompt_button.setAccessibleDescription(tr("settings.btn.change.profiprompt.tooltip"))
         self.change_profiprompt_button.setToolTip(tr("settings.btn.change.profiprompt.tooltip"))
 
         self.explorerpro_path_edit.setAccessibleName(tr("settings.path.explorerpro"))
         self.explorerpro_path_edit.setAccessibleDescription(tr("settings.path.explorerpro.tooltip"))
         self.explorerpro_path_edit.setToolTip(tr("settings.path.explorerpro.tooltip"))
         self.change_explorerpro_button.setAccessibleName(tr("settings.btn.change.explorerpro.tooltip"))
+        self.change_explorerpro_button.setAccessibleDescription(tr("settings.btn.change.explorerpro.tooltip"))
         self.change_explorerpro_button.setToolTip(tr("settings.btn.change.explorerpro.tooltip"))
+
+        self.io_group.setAccessibleName(tr("settings.group.io"))
+        self.io_group.setAccessibleDescription(tr("settings.group.io.tooltip"))
+        self.io_group.setToolTip(tr("settings.group.io.tooltip"))
 
         self.import_profiprompt_button.setAccessibleName(tr("settings.io.import_profiprompt"))
         self.import_profiprompt_button.setAccessibleDescription(tr("settings.io.import_profiprompt.tooltip"))
@@ -240,6 +251,10 @@ class SettingsDialog(QtWidgets.QDialog):
         self.export_explorerpro_button.setAccessibleDescription(tr("settings.io.export_explorerpro.tooltip"))
         self.export_explorerpro_button.setToolTip(tr("settings.io.export_explorerpro.tooltip"))
 
+        self.view_group.setAccessibleName(tr("settings.group.view"))
+        self.view_group.setAccessibleDescription(tr("settings.group.view.tooltip"))
+        self.view_group.setToolTip(tr("settings.group.view.tooltip"))
+
         self.theme_combo.setAccessibleName(tr("settings.view.theme"))
         self.theme_combo.setAccessibleDescription(tr("settings.view.theme.tooltip"))
         self.theme_combo.setToolTip(tr("settings.view.theme.tooltip"))
@@ -251,6 +266,14 @@ class SettingsDialog(QtWidgets.QDialog):
         self.confirm_overwrite_check.setAccessibleName(tr("settings.view.confirm_overwrite"))
         self.confirm_overwrite_check.setAccessibleDescription(tr("settings.view.confirm_overwrite.tooltip"))
         self.confirm_overwrite_check.setToolTip(tr("settings.view.confirm_overwrite.tooltip"))
+
+        self.info_group.setAccessibleName(tr("settings.group.info"))
+        self.info_group.setAccessibleDescription(tr("settings.group.info.tooltip"))
+        self.info_group.setToolTip(tr("settings.group.info.tooltip"))
+
+        self.close_button.setAccessibleName(tr("settings.btn.close.name"))
+        self.close_button.setAccessibleDescription(tr("settings.btn.close.tooltip"))
+        self.close_button.setToolTip(tr("settings.btn.close.tooltip"))
 
     def relabel_ui(self) -> None:
         """Apply active language translations to dialog window elements dynamically."""

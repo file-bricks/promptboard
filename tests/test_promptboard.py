@@ -650,13 +650,20 @@ def test_settings_dialog_accessibility_and_live_relabeling(qapp_isolated, tmp_pa
         assert dialog.io_group.title() == "Import / Export"
         assert dialog.view_group.title() == "Ansicht"
         assert dialog.info_group.title() == "Info"
+        assert dialog.paths_group.accessibleDescription() == "Einstellungen für Speicher- und Importpfade"
+        assert dialog.io_group.accessibleDescription() == "Import- und Exportaktionen für andere Prompt-Bibliotheken"
+        assert dialog.view_group.accessibleDescription() == "Farbschema, Sprache und Verhalten beim Überschreiben anpassen"
+        assert dialog.info_group.accessibleDescription() == "Zeigt Datenordner und Logdatei der Anwendung"
 
         assert dialog.materialize_path_edit.accessibleName() == "Materialisierung"
         assert dialog.materialize_path_edit.toolTip() == "Pfad, in den Markdown-Dateien geschrieben werden"
         assert dialog.change_materialize_button.accessibleName() == "Materialisierungspfad ändern"
+        assert dialog.change_materialize_button.accessibleDescription() == "Materialisierungspfad ändern"
 
         assert dialog.theme_combo.accessibleName() == "Farbschema"
         assert dialog.theme_combo.toolTip() == "Wähle das Farbschema"
+        assert dialog.close_button.accessibleName() == "Einstellungen schließen"
+        assert dialog.close_button.toolTip() == "Schließt den Einstellungsdialog mit den aktuellen Werten"
 
         # Change language dynamically to English
         idx = dialog.language_combo.findData("en")
@@ -669,13 +676,20 @@ def test_settings_dialog_accessibility_and_live_relabeling(qapp_isolated, tmp_pa
         assert dialog.io_group.title() == "Import / Export"
         assert dialog.view_group.title() == "Appearance"
         assert dialog.info_group.title() == "Info"
+        assert dialog.paths_group.accessibleDescription() == "Settings for storage and import paths"
+        assert dialog.io_group.accessibleDescription() == "Import and export actions for other prompt libraries"
+        assert dialog.view_group.accessibleDescription() == "Adjust theme, language, and overwrite behavior"
+        assert dialog.info_group.accessibleDescription() == "Shows the application's data directory and log file"
 
         assert dialog.materialize_path_edit.accessibleName() == "Materialization"
         assert dialog.materialize_path_edit.toolTip() == "Path where Markdown files are written"
         assert dialog.change_materialize_button.accessibleName() == "Change materialize path"
+        assert dialog.change_materialize_button.accessibleDescription() == "Change materialize path"
 
         assert dialog.theme_combo.accessibleName() == "Color theme"
         assert dialog.theme_combo.toolTip() == "Select the color theme"
+        assert dialog.close_button.accessibleName() == "Close settings"
+        assert dialog.close_button.toolTip() == "Close the settings dialog with the current values"
     finally:
         set_language("de")
         dialog.close()

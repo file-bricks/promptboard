@@ -188,6 +188,11 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
         "de": "Pfade", "en": "Paths",
         "es": "Rutas", "zh": "路径", "ja": "パス", "ru": "Пути",
     },
+    "settings.group.paths.tooltip": {
+        "de": "Einstellungen für Speicher- und Importpfade",
+        "en": "Settings for storage and import paths",
+        "es": "Configuración de rutas de almacenamiento e importación", "zh": "存储和导入路径设置", "ja": "保存先とインポート先の設定", "ru": "Настройки путей хранения и импорта",
+    },
     "settings.path.materialize": {
         "de": "Materialisierung", "en": "Materialization",
         "es": "Materialización", "zh": "实体化", "ja": "マテリアライズ", "ru": "Материализация",
@@ -203,6 +208,11 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
     "settings.group.io": {
         "de": "Import / Export", "en": "Import / Export",
         "es": "Importar / Exportar", "zh": "导入 / 导出", "ja": "インポート / エクスポート", "ru": "Импорт / Экспорт",
+    },
+    "settings.group.io.tooltip": {
+        "de": "Import- und Exportaktionen für andere Prompt-Bibliotheken",
+        "en": "Import and export actions for other prompt libraries",
+        "es": "Acciones de importación y exportación para otras bibliotecas de prompts", "zh": "其他提示词库的导入和导出操作", "ja": "他のプロンプトライブラリ向けのインポートとエクスポート", "ru": "Действия импорта и экспорта для других библиотек промптов",
     },
     "settings.io.import_profiprompt": {
         "de": "Aus ProfiPrompt importieren",
@@ -223,6 +233,11 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
         "de": "Ansicht", "en": "Appearance",
         "es": "Apariencia", "zh": "外观", "ja": "外観", "ru": "Внешний вид",
     },
+    "settings.group.view.tooltip": {
+        "de": "Farbschema, Sprache und Verhalten beim Überschreiben anpassen",
+        "en": "Adjust theme, language, and overwrite behavior",
+        "es": "Ajustar tema, idioma y comportamiento al sobrescribir", "zh": "调整主题、语言和覆盖行为", "ja": "テーマ、言語、上書き動作を調整します", "ru": "Настроить тему, язык и поведение при перезаписи",
+    },
     "settings.view.theme": {
         "de": "Farbschema", "en": "Color theme",
         "es": "Tema de color", "zh": "颜色主题", "ja": "カラーテーマ", "ru": "Цветовая тема",
@@ -239,6 +254,11 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
     "settings.group.info": {
         "de": "Info", "en": "Info",
         "es": "Información", "zh": "关于", "ja": "情報", "ru": "Информация",
+    },
+    "settings.group.info.tooltip": {
+        "de": "Zeigt Datenordner und Logdatei der Anwendung",
+        "en": "Shows the application's data directory and log file",
+        "es": "Muestra la carpeta de datos y el archivo de log de la aplicación", "zh": "显示应用的数据目录和日志文件", "ja": "アプリのデータフォルダとログファイルを表示します", "ru": "Показывает папку данных и файл журнала приложения",
     },
     "settings.info.data_dir": {
         "de": "Datenordner", "en": "Data folder",
@@ -566,6 +586,15 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
     "btn.materialize.tooltip": {
         "de": "Schreibt den Eintrag als Markdown-Datei", "en": "Write the entry as a Markdown file",
         "es": "Escribir la entrada como un archivo Markdown", "zh": "将条目写入为 Markdown 文件", "ja": "項目を Markdown ファイルとして書き出します", "ru": "Записать запись как файл Markdown",
+    },
+    "settings.btn.close.name": {
+        "de": "Einstellungen schließen", "en": "Close settings",
+        "es": "Cerrar configuración", "zh": "关闭设置", "ja": "設定を閉じる", "ru": "Закрыть настройки",
+    },
+    "settings.btn.close.tooltip": {
+        "de": "Schließt den Einstellungsdialog mit den aktuellen Werten",
+        "en": "Close the settings dialog with the current values",
+        "es": "Cerrar el diálogo de configuración con los valores actuales", "zh": "使用当前值关闭设置对话框", "ja": "現在の値で設定ダイアログを閉じます", "ru": "Закрыть диалог настроек с текущими значениями",
     },
     "form.type.tooltip": {
         "de": "Wähle den Typ des Eintrags (z. B. PROMPT, SKILL, AGENT)", "en": "Select the type of the entry (e.g., PROMPT, SKILL, AGENT)",
