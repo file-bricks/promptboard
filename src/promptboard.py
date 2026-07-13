@@ -265,6 +265,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.search_edit.setToolTip(tr("filter.search_description"))
 
     def _apply_library_buttons_and_form_accessibility(self) -> None:
+        self.item_list.setAccessibleName(tr("library.list_name"))
+        self.item_list.setAccessibleDescription(tr("library.list_description"))
+        self.item_list.setToolTip(tr("library.list_description"))
+
         # Buttons on the left
         self.new_button.setAccessibleName(tr("menu.file.new"))
         self.new_button.setAccessibleDescription(tr("btn.new.tooltip"))
@@ -306,6 +310,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.content_edit.setAccessibleName(tr("form.content"))
         self.content_edit.setAccessibleDescription(tr("form.content.tooltip"))
         self.content_edit.setToolTip(tr("form.content.tooltip"))
+
+        self.status_label.setAccessibleName(tr("status.label_name"))
+        self.status_label.setAccessibleDescription(tr("status.label_description"))
+        self.status_label.setToolTip(tr("status.label_description"))
 
     def all_items(self) -> List[LibraryItem]:
         try:

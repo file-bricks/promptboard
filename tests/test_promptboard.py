@@ -254,6 +254,16 @@ def test_library_filter_controls_expose_translated_accessible_context(qapp_isola
         assert window.type_filter.toolTip() == "Bibliothek nach Eintragstyp filtern"
         assert window.sort_combo.accessibleName() == "Sortierung"
         assert window.search_edit.accessibleName() == "Bibliothek durchsuchen"
+        assert window.item_list.accessibleName() == "Bibliothekseinträge"
+        assert (
+            window.item_list.accessibleDescription()
+            == "Zeigt alle Einträge der Bibliothek. Wählen Sie einen Eintrag, um ihn rechts zu bearbeiten."
+        )
+        assert window.status_label.accessibleName() == "Statusmeldungen"
+        assert (
+            window.status_label.toolTip()
+            == "Zeigt Hinweise zum aktuellen Bearbeitungs-, Speicher- oder Kopierstatus."
+        )
 
         assert window.new_button.accessibleName() == "&Neuer Eintrag"
         assert window.new_button.toolTip() == "Erstellt einen neuen Bibliothekseintrag"
@@ -288,6 +298,16 @@ def test_library_filter_controls_expose_translated_accessible_context(qapp_isola
         assert (
             window.search_edit.accessibleDescription()
             == "Search the library by name, content, or category"
+        )
+        assert window.item_list.accessibleName() == "Library entries"
+        assert (
+            window.item_list.accessibleDescription()
+            == "Shows all library entries. Select an entry to edit it on the right."
+        )
+        assert window.status_label.accessibleName() == "Status messages"
+        assert (
+            window.status_label.toolTip()
+            == "Shows hints about the current editing, save, or copy status."
         )
 
         assert window.new_button.accessibleName() == "&New entry"

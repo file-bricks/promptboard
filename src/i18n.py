@@ -146,6 +146,18 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
         "en": "Search the library by name, content, or category",
         "es": "Buscar en la biblioteca por nombre, contenido o categoría", "zh": "按名称、内容或分类搜索库", "ja": "ライブラリを名前、内容、またはカテゴリで検索", "ru": "Поиск по библиотеке по имени, содержимому или категории",
     },
+    "library.list_name": {
+        "de": "Bibliothekseinträge", "en": "Library entries",
+        "es": "Entradas de la biblioteca", "zh": "库条目", "ja": "ライブラリ項目", "ru": "Записи библиотеки",
+    },
+    "library.list_description": {
+        "de": "Zeigt alle Einträge der Bibliothek. Wählen Sie einen Eintrag, um ihn rechts zu bearbeiten.",
+        "en": "Shows all library entries. Select an entry to edit it on the right.",
+        "es": "Muestra todas las entradas de la biblioteca. Seleccione una entrada para editarla a la derecha.",
+        "zh": "显示库中的所有条目。选择一个条目即可在右侧编辑。",
+        "ja": "ライブラリ内のすべての項目を表示します。項目を選択すると右側で編集できます。",
+        "ru": "Показывает все записи библиотеки. Выберите запись, чтобы редактировать её справа.",
+    },
 
     # ----- Form-Labels ---------------------------------------------------
     "form.type": {
@@ -623,6 +635,18 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
     "form.content.tooltip": {
         "de": "Gib den Textinhalt des Eintrags ein", "en": "Enter the text content of the entry",
         "es": "Introduzca el contenido de texto de la entrada", "zh": "输入条目的文本内容", "ja": "項目のテキスト内容を入力します", "ru": "Введите текстовое содержимое записи",
+    },
+    "status.label_name": {
+        "de": "Statusmeldungen", "en": "Status messages",
+        "es": "Mensajes de estado", "zh": "状态消息", "ja": "ステータスメッセージ", "ru": "Сообщения о состоянии",
+    },
+    "status.label_description": {
+        "de": "Zeigt Hinweise zum aktuellen Bearbeitungs-, Speicher- oder Kopierstatus.",
+        "en": "Shows hints about the current editing, save, or copy status.",
+        "es": "Muestra avisos sobre el estado actual de edición, guardado o copia.",
+        "zh": "显示当前编辑、保存或复制状态的提示。",
+        "ja": "現在の編集、保存、またはコピー状態に関する案内を表示します。",
+        "ru": "Показывает подсказки о текущем состоянии редактирования, сохранения или копирования.",
     },
     "settings.path.materialize.tooltip": {
         "de": "Pfad, in den Markdown-Dateien geschrieben werden", "en": "Path where Markdown files are written",
