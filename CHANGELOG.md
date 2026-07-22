@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-07-22
+
+### Dokumentation & Marketing
+
+- **Sichtbarkeit & Discoverability**: `llms.txt` Last-checked Datum auf `2026-07-22` aktualisiert und RAG/LLM-Suchphrasen erweitert.
+- **README & Badges**: Test-Badge und Status-Text in `README.md` & `README_de.md` auf 85/85 bestandene Pytest-Tests synchronisiert.
+- **Architektur-Visualisierung**: Mermaid-Diagramm für System-Tray-, JSON-Store- und Markdown-Materialisierungsfluss in `README.md` und `README_de.md` ergänzt.
+- **Disambiguation**: Abgrenzung gegenüber webbasierten/SaaS PromptBoard-Tools zur Vermeidung von Such- und Agenten-Kollisionen geschärft.
+
 ## [Unreleased] - 2026-06-28
 
 ### Fehlerbehebungen

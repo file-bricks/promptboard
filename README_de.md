@@ -9,14 +9,17 @@
   <img src="https://img.shields.io/badge/version-v1.1.1-blue" alt="Version v1.1.1">
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Plattform: Windows">
   <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Gebaut mit Python und PySide6">
-  <img src="https://img.shields.io/badge/tests-68%2F68%20passing-success" alt="Tests: 68/68 bestanden">
+  <img src="https://img.shields.io/badge/tests-85%2F85%20bestanden-success" alt="Tests: 85/85 bestanden">
 </p>
 
 # PromptBoard
 
 **Deine lokale Prompt-Bibliothek — schnell, offline, tray-ready.**
 
-[Features](#zielbild) &nbsp;·&nbsp; [Screenshots](#screenshots) &nbsp;·&nbsp; [Installation](#projekt-starten) &nbsp;·&nbsp; [Doku](#onboarding)
+> [!NOTE]
+> **Abgrenzung:** `file-bricks/promptboard` ist eine native, lokale Windows-Desktop-Tray-Anwendung (Python & PySide6) zur offline Verwaltung von LLM-Prompts und lokalen Markdown-Materialisierungen. Es ist kein Cloud-Webdienst, keine SaaS-Plattform und keine Browser-Erweiterung.
+
+[Features](#zielbild) &nbsp;·&nbsp; [Architektur](#architektur--datenfluss) &nbsp;·&nbsp; [Screenshots](#screenshots) &nbsp;·&nbsp; [Installation](#projekt-starten) &nbsp;·&nbsp; [Doku](#onboarding)
 
 ---
 
@@ -24,12 +27,25 @@ PromptBoard ist ein schnelles Desktop-Werkzeug und eine Windows-Tray-App für wi
 
 ## Status
 
-**Phase:** öffentlich released (`v1.1.1`), Store- und Plattformhärtung im lokalen Entwicklungsstand aktiv  
-**Code:** PySide6-Desktop-App mit 68/68 pytest-Tests  
+**Phase:** öffentlich released (`v1.1.1`), Store- und Plattformhärtung im lokalen Entwicklungsstand aktiv<br/>
+**Code:** PySide6-Desktop-App mit 85/85 pytest-Tests<br/>
 
 **CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) mit Windows-Pytest sowie macOS-/Linux-Source-Smoke  
 **Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
 **Aktueller Ordnerstatus:** `LLM/REL-PUB_PromptBoard`  
+
+## Architektur & Datenfluss
+
+```mermaid
+flowchart TD
+    Tray["Windows System Tray"] --> UI["PySide6 UI-Fenster"]
+    UI --> Store[("Lokaler JSON-Speicher<br/>~/.promptboard/library.json")]
+    UI --> Exporter["Markdown-Materialisierer<br/>.md Exporter"]
+    Exporter --> Desktop["Desktop / Arbeitsbereich"]
+    UI --> Clipboard["Windows Zwischenablage"]
+    UI <--> AdapterProfiPrompt["ProfiPrompt Adapter"]
+    UI <--> AdapterExplorer["ExplorerPro Adapter"]
+```
 
 ## Screenshots
 
@@ -96,7 +112,6 @@ ab jetzt reproduzierbar im Projekt und in CI verankert.
 ## Projekt starten
 
 ```powershell
-cd 'C:\Users\User\OneDrive\.TOPICS\.SOFTWARE\LLM\REL-PUB_PromptBoard'
 python -m pip install -e ".[dev]"
 python src\promptboard.py
 ```

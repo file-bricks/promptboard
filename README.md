@@ -9,14 +9,17 @@
   <img src="https://img.shields.io/badge/version-v1.1.1-blue" alt="Version v1.1.1">
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows">
   <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Built with Python and PySide6">
-  <img src="https://img.shields.io/badge/tests-68%2F68%20passing-success" alt="Tests: 68/68 passing">
+  <img src="https://img.shields.io/badge/tests-85%2F85%20passing-success" alt="Tests: 85/85 passing">
 </p>
 
 # PromptBoard
 
 **Your local prompt library — fast, offline, tray-ready.**
 
-[Features](#key-features--goals) &nbsp;·&nbsp; [Screenshots](#screenshots) &nbsp;·&nbsp; [Install & Run](#running-the-project) &nbsp;·&nbsp; [Docs](#onboarding)
+> [!NOTE]
+> **Disambiguation:** `file-bricks/promptboard` is a native local-first Windows desktop tray application (Python & PySide6) designed for offline LLM prompt management and local Markdown materialization. It is not a cloud web service, SaaS platform, or browser extension.
+
+[Features](#key-features--goals) &nbsp;·&nbsp; [Architecture](#architecture--data-flow) &nbsp;·&nbsp; [Screenshots](#screenshots) &nbsp;·&nbsp; [Install & Run](#running-the-project) &nbsp;·&nbsp; [Docs](#onboarding)
 
 ---
 
@@ -24,11 +27,24 @@ PromptBoard is a fast desktop utility and Windows tray application for reusable 
 
 ## Status
 
-**Phase:** public release (`v1.1.1`), store and platform hardening active in local development  
-**Code:** PySide6 desktop application with 68/68 passing pytest tests  
+**Phase:** public release (`v1.1.1`), store and platform hardening active in local development<br/>
+**Code:** PySide6 desktop application with 85/85 passing pytest tests<br/>
 
 **CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) running Windows Pytest and macOS/Linux source smoke checks  
 **Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
+
+## Architecture & Data Flow
+
+```mermaid
+flowchart TD
+    Tray["Windows System Tray"] --> UI["PySide6 UI Window"]
+    UI --> Store[("Local JSON Store<br/>~/.promptboard/library.json")]
+    UI --> Exporter["Markdown Materializer<br/>.md Exporter"]
+    Exporter --> Desktop["Desktop / Workspace"]
+    UI --> Clipboard["Windows Clipboard"]
+    UI <--> AdapterProfiPrompt["ProfiPrompt Adapter"]
+    UI <--> AdapterExplorer["ExplorerPro Adapter"]
+```
 
 ## Screenshots
 

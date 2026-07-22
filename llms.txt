@@ -1,4 +1,4 @@
-## Last-checked: 2026-06-12
+## Last-checked: 2026-07-22
 
 # PromptBoard
 
@@ -11,8 +11,9 @@ CLI script: promptboard (via `src\promptboard.py`)
 
 Important boundaries:
 - Purely local, runs offline on Windows (via PySide6 tray app).
+- Disambiguation: Native Windows desktop app (Python/PySide6), NOT a SaaS/cloud web tool.
 - No cloud account, external APIs, or telemetry required.
-- Keeps libraries in local JSON format.
+- Keeps libraries in local JSON format (`~/.promptboard/library.json`).
 - Offscreen startup checks, system tray integration, and global hotkeys are Windows-native.
 - Verified cross-compatible offscreen startup (smoke tests) on macOS/Linux.
 
@@ -25,7 +26,7 @@ Primary commands:
 
 Verification:
 - python -m compileall -q src tests
-- python -m pytest
+- python -m pytest (85/85 passed)
 
 Public documentation:
 - README.md: English-first overview, key features, global hotkeys, installation, and quickstart
@@ -43,4 +44,7 @@ promptboard windows tray
 local prompt manager LLM
 offline prompt library PySide6
 reusable prompts skills workflows agents desktop
+local-first prompt management tool
+native windows tray prompt clipboard manager
+offline LLM prompt library markdown export
 ```

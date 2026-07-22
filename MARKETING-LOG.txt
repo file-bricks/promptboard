@@ -1,0 +1,15 @@
+# Marketing & Discoverability Log - PromptBoard
+
+## Date: 2026-07-22
+
+### Automated Improvements Executed
+1. **Badges & Test Count**: Updated test badge & status text in `README.md` and `README_de.md` from `68/68` to `85/85` passing tests.
+2. **Architecture Visual**: Added Mermaid flow diagram detailing System Tray UI, local JSON store, Markdown materializer, clipboard, and adapters.
+3. **Disambiguation**: Added explicit callouts in `README.md`, `README_de.md`, and `llms.txt` clarifying that PromptBoard is a native local-first Windows tray app, disambiguating from web/SaaS tools.
+4. **LLM Context & RAG**: Updated `llms.txt` `Last-checked: 2026-07-22` and expanded search phrases for LLM agent indexing.
+5. **GitHub Metadata**: Extended GitHub topics to 14 terms (`offline-first`, `productivity`, `prompt-engineering`, `python`, etc.).
+
+### Manual / Next Steps Recommendations
+1. **Interactive Demo GIF**: Record a short 10-second GIF showing the tray icon double-click, prompt search/filter, and right-click "Export to Desktop" `.md` materialization. Add it to the top of `README.md`.
+2. **Windows Store (MSIX) Partner Center Submission**: Proceed with the Store-P1 path by completing Partner Center submission using `releases/PromptBoard.msix`.
+3. **Awesome Lists & Directory Submissions**: Submit `file-bricks/promptboard` to `awesome-pyside`, `awesome-python-applications`, and LLM tool aggregators (Glama, LobeHub).
