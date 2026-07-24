@@ -27,8 +27,27 @@ from theme import apply_theme
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-ICON_PATH = PROJECT_ROOT / "PromptBoard.ico"
-ICON_FALLBACK_PNG = PROJECT_ROOT / "PromptBoard.png"
+
+
+def _resource_base() -> Path:
+    """Directory that holds the bundled icon resources.
+
+    In a PyInstaller build the ``datas`` are unpacked to ``sys._MEIPASS`` (or
+    live next to the executable), so ``__file__.parent.parent`` would miss them
+    and the app would fall back to a generic Qt icon. In a normal source
+    checkout the icons live in the project root next to ``src/``.
+    """
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            return Path(meipass)
+        return Path(sys.executable).resolve().parent
+    return PROJECT_ROOT
+
+
+RESOURCE_ROOT = _resource_base()
+ICON_PATH = RESOURCE_ROOT / "PromptBoard.ico"
+ICON_FALLBACK_PNG = RESOURCE_ROOT / "PromptBoard.png"
 
 
 def load_app_icon() -> QtGui.QIcon:
