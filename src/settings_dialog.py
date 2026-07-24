@@ -133,6 +133,17 @@ class SettingsDialog(QtWidgets.QDialog):
             self.language_combo.setCurrentIndex(idx)
         self.view_form.addRow(tr("settings.view.language"), self.language_combo)
 
+        self.materialize_format_combo = QtWidgets.QComboBox()
+        for fmt in SettingsManager.MATERIALIZE_FORMAT_CHOICES:
+            self.materialize_format_combo.addItem(tr(f"materialize.format.{fmt}"), fmt)
+        current_fmt = self.settings.get_materialize_format()
+        fmt_idx = self.materialize_format_combo.findData(current_fmt)
+        if fmt_idx >= 0:
+            self.materialize_format_combo.setCurrentIndex(fmt_idx)
+        self.view_form.addRow(
+            tr("settings.view.materialize_format"), self.materialize_format_combo
+        )
+
         self.confirm_overwrite_check = QtWidgets.QCheckBox(tr("settings.view.confirm_overwrite"))
         self.confirm_overwrite_check.setChecked(self.settings.get_confirm_overwrite())
         self.view_form.addRow("", self.confirm_overwrite_check)
@@ -180,6 +191,9 @@ class SettingsDialog(QtWidgets.QDialog):
             self.export_explorerpro_button.clicked.connect(self._on_export_explorerpro)
         self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
         self.language_combo.currentIndexChanged.connect(self._on_language_changed)
+        self.materialize_format_combo.currentIndexChanged.connect(
+            self._on_materialize_format_changed
+        )
         self.confirm_overwrite_check.toggled.connect(self.settings.set_confirm_overwrite)
         self.profiprompt_enabled_check.toggled.connect(self.settings.set_profiprompt_enabled)
         self.explorerpro_enabled_check.toggled.connect(self.settings.set_explorerpro_enabled)
@@ -194,6 +208,13 @@ class SettingsDialog(QtWidgets.QDialog):
     def _run_import_explorerpro(self) -> None:
         if self._on_import_explorerpro and self._on_import_explorerpro():
             self.accept()
+
+    def _on_materialize_format_changed(self) -> None:
+        fmt = (
+            self.materialize_format_combo.currentData()
+            or SettingsManager.DEFAULT_MATERIALIZE_FORMAT
+        )
+        self.settings.set_materialize_format(fmt)
 
     def _on_theme_changed(self) -> None:
         mode = self.theme_combo.currentData() or SettingsManager.DEFAULT_THEME
@@ -300,6 +321,10 @@ class SettingsDialog(QtWidgets.QDialog):
         self.language_combo.setAccessibleDescription(tr("settings.view.language.tooltip"))
         self.language_combo.setToolTip(tr("settings.view.language.tooltip"))
 
+        self.materialize_format_combo.setAccessibleName(tr("settings.view.materialize_format"))
+        self.materialize_format_combo.setAccessibleDescription(tr("settings.view.materialize_format.tooltip"))
+        self.materialize_format_combo.setToolTip(tr("settings.view.materialize_format.tooltip"))
+
         self.confirm_overwrite_check.setAccessibleName(tr("settings.view.confirm_overwrite"))
         self.confirm_overwrite_check.setAccessibleDescription(tr("settings.view.confirm_overwrite.tooltip"))
         self.confirm_overwrite_check.setToolTip(tr("settings.view.confirm_overwrite.tooltip"))
@@ -346,6 +371,7 @@ class SettingsDialog(QtWidgets.QDialog):
         labels_view = [
             tr("settings.view.theme"),
             tr("settings.view.language"),
+            tr("settings.view.materialize_format"),
         ]
         for i, text in enumerate(labels_view):
             label_item = self.view_form.itemAt(i, QtWidgets.QFormLayout.LabelRole)
@@ -369,5 +395,9 @@ class SettingsDialog(QtWidgets.QDialog):
         for i in range(self.language_combo.count()):
             code = self.language_combo.itemData(i)
             self.language_combo.setItemText(i, tr(f"lang.{code}"))
+
+        for i in range(self.materialize_format_combo.count()):
+            fmt = self.materialize_format_combo.itemData(i)
+            self.materialize_format_combo.setItemText(i, tr(f"materialize.format.{fmt}"))
 
         self._apply_accessibility()

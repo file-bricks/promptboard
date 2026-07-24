@@ -15,7 +15,7 @@ from i18n import tr
 from item_templates import build_default_name, get_item_template
 from library_query import SORT_MODE_LABELS, query_items
 from logging_setup import configure_logging
-from materializer import materialize_items
+from materializer import materialize_extension, materialize_items
 from models import ItemType, LibraryItem, gen_id, normalize_name, now_iso, parse_tags
 from profiprompt_adapter import load_profiprompt_items
 from settings_dialog import SettingsDialog
@@ -701,9 +701,11 @@ class MainWindow(QtWidgets.QMainWindow):
         if not items:
             return
         target_dir = self.settings.get_materialize_path()
+        fmt = self.settings.get_materialize_format()
+        extension = materialize_extension(fmt)
         items_to_write: list[LibraryItem] = []
         for item in items:
-            target_path = target_dir / f"{item.filename_stem()}.md"
+            target_path = target_dir / f"{item.filename_stem()}{extension}"
             if self.settings.get_confirm_overwrite() and target_path.exists():
                 answer = QtWidgets.QMessageBox.question(
                     self,
@@ -721,7 +723,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         try:
-            targets = materialize_items(items_to_write, target_dir)
+            targets = materialize_items(items_to_write, target_dir, fmt)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Materialisierung fehlgeschlagen")
             self._show_error(tr("error.materialize_failed"), exc)

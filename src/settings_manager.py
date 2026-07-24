@@ -168,6 +168,23 @@ class SettingsManager(QtCore.QObject):
         self.qs.setValue("view/theme", theme)
         self.qs.sync()
 
+    MATERIALIZE_FORMAT_CHOICES = ("markdown", "txt")
+    DEFAULT_MATERIALIZE_FORMAT = "markdown"
+
+    def get_materialize_format(self) -> str:
+        raw = self.qs.value("materialize/format", "", type=str)
+        if raw not in self.MATERIALIZE_FORMAT_CHOICES:
+            self.qs.setValue("materialize/format", self.DEFAULT_MATERIALIZE_FORMAT)
+            self.qs.sync()
+            return self.DEFAULT_MATERIALIZE_FORMAT
+        return raw
+
+    def set_materialize_format(self, value: str) -> None:
+        if value not in self.MATERIALIZE_FORMAT_CHOICES:
+            value = self.DEFAULT_MATERIALIZE_FORMAT
+        self.qs.setValue("materialize/format", value)
+        self.qs.sync()
+
     def get_confirm_overwrite(self) -> bool:
         raw = self.qs.value("materialize/confirm_overwrite", False, type=bool)
         return bool(raw)

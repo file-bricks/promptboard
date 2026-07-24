@@ -276,6 +276,23 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
         "de": "Sprache", "en": "Language",
         "es": "Idioma", "zh": "语言", "ja": "言語", "ru": "Язык",
     },
+    "settings.view.materialize_format": {
+        "de": "Materialisieren als", "en": "Materialize as",
+        "es": "Materializar como", "zh": "实体化为", "ja": "マテリアライズ形式", "ru": "Материализовать как",
+    },
+    "settings.view.materialize_format.tooltip": {
+        "de": "Standardformat beim Materialisieren (Markdown oder reiner Text)",
+        "en": "Default format when materializing (Markdown or plain text)",
+        "es": "Formato predeterminado al materializar (Markdown o texto plano)", "zh": "实体化时的默认格式（Markdown 或纯文本）", "ja": "マテリアライズ時の既定フォーマット（Markdown またはプレーンテキスト）", "ru": "Формат по умолчанию при материализации (Markdown или обычный текст)",
+    },
+    "materialize.format.markdown": {
+        "de": "Markdown (.md)", "en": "Markdown (.md)",
+        "es": "Markdown (.md)", "zh": "Markdown (.md)", "ja": "Markdown (.md)", "ru": "Markdown (.md)",
+    },
+    "materialize.format.txt": {
+        "de": "Text (.txt)", "en": "Text (.txt)",
+        "es": "Texto (.txt)", "zh": "文本 (.txt)", "ja": "テキスト (.txt)", "ru": "Текст (.txt)",
+    },
     "settings.view.confirm_overwrite": {
         "de": "Vor Überschreiben beim Materialisieren nachfragen",
         "en": "Confirm before overwriting on materialize",
