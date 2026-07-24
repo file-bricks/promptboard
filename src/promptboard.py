@@ -49,6 +49,10 @@ RESOURCE_ROOT = _resource_base()
 ICON_PATH = RESOURCE_ROOT / "PromptBoard.ico"
 ICON_FALLBACK_PNG = RESOURCE_ROOT / "PromptBoard.png"
 
+# Upper bound of entries listed per category in the tray menu; the rest is
+# reachable via "… more in the board".
+TRAY_MAX_ITEMS_PER_CATEGORY = 20
+
 
 def load_app_icon() -> QtGui.QIcon:
     if ICON_PATH.exists():
@@ -72,6 +76,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._loading_ui = False
         self._dirty = False
         self.tray_icon: Optional[QtWidgets.QSystemTrayIcon] = None
+        self.tray_menu: Optional[QtWidgets.QMenu] = None
         self.hotkeys: Optional[PromptBoardHotkeys] = None
 
         self.setWindowTitle("PromptBoard")
@@ -831,6 +836,65 @@ class MainWindow(QtWidgets.QMainWindow):
         self.last_active_item_id = item.id
         self.settings.set_last_active_item_id(item.id)
 
+    # ------------------------------------------------------------ tray menu
+
+    def rebuild_tray_menu(self) -> None:
+        """(Re)build the tray context menu from the current library.
+
+        Structure: Open / Hide, then one submenu per category listing the
+        entries; clicking an entry copies it to the clipboard. Rebuilt on every
+        ``aboutToShow`` so the menu reflects the live library.
+        """
+        menu = self.tray_menu
+        if menu is None:
+            return
+        menu.clear()
+        menu.addAction(tr("tray.open"), self.showNormal)
+        menu.addAction(tr("tray.hide"), self.hide)
+
+        items = self.all_items()
+        if items:
+            menu.addSeparator()
+            self._populate_tray_categories(menu, items)
+
+        menu.addSeparator()
+        menu.addAction(tr("tray.quit"), QtWidgets.QApplication.instance().quit)
+
+    def _populate_tray_categories(
+        self, menu: QtWidgets.QMenu, items: List[LibraryItem]
+    ) -> None:
+        by_category: dict[str, list[LibraryItem]] = {}
+        for item in items:
+            category = item.category.strip() or tr("tray.uncategorized")
+            by_category.setdefault(category, []).append(item)
+
+        for category in sorted(by_category, key=lambda name: name.casefold()):
+            # Explicit parent so the submenu keeps its C++ owner (avoids a
+            # "C++ object already deleted" when Qt reaps an unparented QMenu).
+            submenu = QtWidgets.QMenu(category, menu)
+            menu.addMenu(submenu)
+            category_items = sorted(
+                by_category[category], key=lambda entry: entry.name.casefold()
+            )
+            for item in category_items[:TRAY_MAX_ITEMS_PER_CATEGORY]:
+                action = submenu.addAction(item.name)
+                action.setData(item.id)
+                action.triggered.connect(
+                    lambda _checked=False, item_id=item.id: self.copy_item_from_tray(item_id)
+                )
+            if len(category_items) > TRAY_MAX_ITEMS_PER_CATEGORY:
+                submenu.addSeparator()
+                more_action = submenu.addAction(tr("tray.more_in_board"))
+                more_action.triggered.connect(self.bring_to_front)
+
+    def copy_item_from_tray(self, item_id: str) -> None:
+        item = self.storage.get_item(item_id)
+        if item is None:
+            return
+        if self.clipboard_service.copy_item(item):
+            self._remember_active_item(item)
+            self._announce_status(tr("status.copied", name=item.name))
+
     def bring_to_front(self) -> None:
         """Show and focus the window — used by the single-instance guard."""
         self.showNormal()
@@ -908,16 +972,15 @@ def create_tray(window: MainWindow) -> Optional[QtWidgets.QSystemTrayIcon]:
         logger.info("System-Tray ist auf dieser Plattform oder im aktuellen Modus nicht verfuegbar.")
         window.tray_icon = None
         return None
-    app = QtWidgets.QApplication.instance()
     icon = load_app_icon()
     tray = QtWidgets.QSystemTrayIcon(icon, window)
     tray.setToolTip("PromptBoard")
 
     menu = QtWidgets.QMenu(window)
-    menu.addAction(tr("tray.open"), window.showNormal)
-    menu.addAction(tr("tray.hide"), window.hide)
-    menu.addSeparator()
-    menu.addAction(tr("tray.quit"), app.quit)
+    window.tray_menu = menu
+    # Rebuild on every open so category submenus reflect the live library.
+    menu.aboutToShow.connect(window.rebuild_tray_menu)
+    window.rebuild_tray_menu()
     tray.setContextMenu(menu)
     tray.activated.connect(
         lambda reason: window.showNormal()

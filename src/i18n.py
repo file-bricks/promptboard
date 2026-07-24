@@ -581,6 +581,22 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
         "de": "Beenden", "en": "Quit",
         "es": "Salir", "zh": "退出", "ja": "終了", "ru": "Выйти",
     },
+    "tray.uncategorized": {
+        "de": "Ohne Kategorie", "en": "Uncategorized",
+        "es": "Sin categoría", "zh": "未分类", "ja": "カテゴリなし", "ru": "Без категории",
+    },
+    "tray.more_in_board": {
+        "de": "… mehr im Board", "en": "… more in the board",
+        "es": "… más en el tablero", "zh": "… 更多见面板", "ja": "… ボードでさらに表示", "ru": "… больше на доске",
+    },
+    "tray.copy_hint": {
+        "de": "Kategorie → Eintrag wählen kopiert in die Zwischenablage",
+        "en": "Category → pick an entry to copy it to the clipboard",
+        "es": "Categoría → elija una entrada para copiarla al portapapeles",
+        "zh": "分类 → 选择条目即可复制到剪贴板",
+        "ja": "カテゴリ → 項目を選ぶとクリップボードにコピーされます",
+        "ru": "Категория → выберите запись, чтобы скопировать её в буфер обмена",
+    },
 
     # ----- Tooltips & Accessible Names ------------------------------------
     "btn.new.tooltip": {
