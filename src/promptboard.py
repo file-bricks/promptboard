@@ -20,6 +20,7 @@ from models import ItemType, LibraryItem, gen_id, normalize_name, now_iso, parse
 from profiprompt_adapter import load_profiprompt_items
 from settings_dialog import SettingsDialog
 from settings_manager import SettingsManager
+from single_instance import SingleInstance
 from storage import Storage
 from theme import apply_theme
 
@@ -811,6 +812,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.last_active_item_id = item.id
         self.settings.set_last_active_item_id(item.id)
 
+    def bring_to_front(self) -> None:
+        """Show and focus the window — used by the single-instance guard."""
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
     def toggle_visibility_from_hotkey(self) -> None:
         if self.isVisible() and not self.isMinimized():
             self.hide()
@@ -909,12 +916,24 @@ def main() -> int:
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("PromptBoard")
     app.setWindowIcon(load_app_icon())
+
+    # Single-instance guard: a second start wakes the running window and exits,
+    # instead of spawning a second window and a second tray icon.
+    single_instance = SingleInstance()
+    if single_instance.is_another_running():
+        logger.info(
+            "PromptBoard laeuft bereits — bringe die vorhandene Instanz in den Vordergrund."
+        )
+        return 0
+
     settings = SettingsManager()
     set_global_language(settings.get_language())
     apply_theme(app, settings.get_theme())
     storage = Storage(settings.get_data_path())
     window = MainWindow(storage, settings)
     create_tray(window)
+    single_instance.start_server(window.bring_to_front)
+    app.aboutToQuit.connect(single_instance.stop)
     hotkeys = PromptBoardHotkeys(
         on_toggle_visibility=window.toggle_visibility_from_hotkey,
         on_quick_copy=window.quick_copy_last_used_item,

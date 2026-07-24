@@ -39,6 +39,7 @@ py-modules = [
   "promptboard",
   "settings_dialog",
   "settings_manager",
+  "single_instance",
   "storage",
   "theme",
 ]
