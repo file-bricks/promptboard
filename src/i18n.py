@@ -241,6 +241,24 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
         "en": "Export to ExplorerPro",
         "es": "Exportar a ExplorerPro", "zh": "导出到 ExplorerPro", "ja": "ExplorerPro へエクスポート", "ru": "Экспортировать в ExplorerPro",
     },
+    "settings.imports.profiprompt_enabled": {
+        "de": "ProfiPrompt-Import aktivieren", "en": "Enable ProfiPrompt import",
+        "es": "Activar importación de ProfiPrompt", "zh": "启用 ProfiPrompt 导入", "ja": "ProfiPrompt インポートを有効化", "ru": "Включить импорт из ProfiPrompt",
+    },
+    "settings.imports.profiprompt_enabled.tooltip": {
+        "de": "Blendet die ProfiPrompt-Importfunktion im Datei-Menü ein",
+        "en": "Show the ProfiPrompt import entry in the File menu",
+        "es": "Muestra la importación de ProfiPrompt en el menú Archivo", "zh": "在文件菜单中显示 ProfiPrompt 导入项", "ja": "ファイルメニューに ProfiPrompt インポートを表示します", "ru": "Показывать импорт ProfiPrompt в меню Файл",
+    },
+    "settings.imports.explorerpro_enabled": {
+        "de": "ExplorerPro-Import aktivieren", "en": "Enable ExplorerPro import",
+        "es": "Activar importación de ExplorerPro", "zh": "启用 ExplorerPro 导入", "ja": "ExplorerPro インポートを有効化", "ru": "Включить импорт из ExplorerPro",
+    },
+    "settings.imports.explorerpro_enabled.tooltip": {
+        "de": "Blendet die ExplorerPro-Import- und -Exportfunktionen im Datei-Menü ein",
+        "en": "Show the ExplorerPro import and export entries in the File menu",
+        "es": "Muestra la importación y exportación de ExplorerPro en el menú Archivo", "zh": "在文件菜单中显示 ExplorerPro 导入和导出项", "ja": "ファイルメニューに ExplorerPro のインポート/エクスポートを表示します", "ru": "Показывать импорт и экспорт ExplorerPro в меню Файл",
+    },
     "settings.group.view": {
         "de": "Ansicht", "en": "Appearance",
         "es": "Apariencia", "zh": "外观", "ja": "外観", "ru": "Внешний вид",

@@ -85,13 +85,30 @@ class SettingsDialog(QtWidgets.QDialog):
 
         # Import/Export
         self.io_group = QtWidgets.QGroupBox(tr("settings.group.io"))
-        io_layout = QtWidgets.QHBoxLayout(self.io_group)
+        io_layout = QtWidgets.QVBoxLayout(self.io_group)
+
+        # Availability toggles decide which File-menu import entries show (U3).
+        toggles_row = QtWidgets.QHBoxLayout()
+        self.profiprompt_enabled_check = QtWidgets.QCheckBox(
+            tr("settings.imports.profiprompt_enabled")
+        )
+        self.profiprompt_enabled_check.setChecked(self.settings.is_profiprompt_enabled())
+        self.explorerpro_enabled_check = QtWidgets.QCheckBox(
+            tr("settings.imports.explorerpro_enabled")
+        )
+        self.explorerpro_enabled_check.setChecked(self.settings.is_explorerpro_enabled())
+        toggles_row.addWidget(self.profiprompt_enabled_check)
+        toggles_row.addWidget(self.explorerpro_enabled_check)
+        io_layout.addLayout(toggles_row)
+
+        buttons_row = QtWidgets.QHBoxLayout()
         self.import_profiprompt_button = QtWidgets.QPushButton(tr("settings.io.import_profiprompt"))
         self.import_explorerpro_button = QtWidgets.QPushButton(tr("settings.io.import_explorerpro"))
         self.export_explorerpro_button = QtWidgets.QPushButton(tr("settings.io.export_explorerpro"))
-        io_layout.addWidget(self.import_profiprompt_button)
-        io_layout.addWidget(self.import_explorerpro_button)
-        io_layout.addWidget(self.export_explorerpro_button)
+        buttons_row.addWidget(self.import_profiprompt_button)
+        buttons_row.addWidget(self.import_explorerpro_button)
+        buttons_row.addWidget(self.export_explorerpro_button)
+        io_layout.addLayout(buttons_row)
         layout.addWidget(self.io_group)
 
         # Ansicht
@@ -156,15 +173,27 @@ class SettingsDialog(QtWidgets.QDialog):
         self.change_profiprompt_button.clicked.connect(self.change_profiprompt_path)
         self.change_explorerpro_button.clicked.connect(self.change_explorerpro_path)
         if self._on_import_profiprompt:
-            self.import_profiprompt_button.clicked.connect(self._on_import_profiprompt)
+            self.import_profiprompt_button.clicked.connect(self._run_import_profiprompt)
         if self._on_import_explorerpro:
-            self.import_explorerpro_button.clicked.connect(self._on_import_explorerpro)
+            self.import_explorerpro_button.clicked.connect(self._run_import_explorerpro)
         if self._on_export_explorerpro:
             self.export_explorerpro_button.clicked.connect(self._on_export_explorerpro)
         self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
         self.language_combo.currentIndexChanged.connect(self._on_language_changed)
         self.confirm_overwrite_check.toggled.connect(self.settings.set_confirm_overwrite)
+        self.profiprompt_enabled_check.toggled.connect(self.settings.set_profiprompt_enabled)
+        self.explorerpro_enabled_check.toggled.connect(self.settings.set_explorerpro_enabled)
         self.close_button.clicked.connect(self.accept)
+
+    def _run_import_profiprompt(self) -> None:
+        # Close the modal dialog on a successful import so the host window's
+        # auto-refreshed library becomes visible immediately (U1).
+        if self._on_import_profiprompt and self._on_import_profiprompt():
+            self.accept()
+
+    def _run_import_explorerpro(self) -> None:
+        if self._on_import_explorerpro and self._on_import_explorerpro():
+            self.accept()
 
     def _on_theme_changed(self) -> None:
         mode = self.theme_combo.currentData() or SettingsManager.DEFAULT_THEME
@@ -251,6 +280,14 @@ class SettingsDialog(QtWidgets.QDialog):
         self.export_explorerpro_button.setAccessibleDescription(tr("settings.io.export_explorerpro.tooltip"))
         self.export_explorerpro_button.setToolTip(tr("settings.io.export_explorerpro.tooltip"))
 
+        self.profiprompt_enabled_check.setAccessibleName(tr("settings.imports.profiprompt_enabled"))
+        self.profiprompt_enabled_check.setAccessibleDescription(tr("settings.imports.profiprompt_enabled.tooltip"))
+        self.profiprompt_enabled_check.setToolTip(tr("settings.imports.profiprompt_enabled.tooltip"))
+
+        self.explorerpro_enabled_check.setAccessibleName(tr("settings.imports.explorerpro_enabled"))
+        self.explorerpro_enabled_check.setAccessibleDescription(tr("settings.imports.explorerpro_enabled.tooltip"))
+        self.explorerpro_enabled_check.setToolTip(tr("settings.imports.explorerpro_enabled.tooltip"))
+
         self.view_group.setAccessibleName(tr("settings.group.view"))
         self.view_group.setAccessibleDescription(tr("settings.group.view.tooltip"))
         self.view_group.setToolTip(tr("settings.group.view.tooltip"))
@@ -291,6 +328,8 @@ class SettingsDialog(QtWidgets.QDialog):
         self.import_explorerpro_button.setText(tr("settings.io.import_explorerpro"))
         self.export_explorerpro_button.setText(tr("settings.io.export_explorerpro"))
         self.confirm_overwrite_check.setText(tr("settings.view.confirm_overwrite"))
+        self.profiprompt_enabled_check.setText(tr("settings.imports.profiprompt_enabled"))
+        self.explorerpro_enabled_check.setText(tr("settings.imports.explorerpro_enabled"))
         self.close_button.setText(tr("btn.ok"))
 
         # Form labels re-labeling

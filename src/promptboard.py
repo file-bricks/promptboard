@@ -105,12 +105,31 @@ class MainWindow(QtWidgets.QMainWindow):
         self.file_menu = menubar.addMenu(tr("menu.file"))
         self.action_new = self.file_menu.addAction(tr("menu.file.new"))
         self.action_new.triggered.connect(self.create_item)
-        self.action_import_profiprompt = self.file_menu.addAction(tr("menu.file.import_profiprompt"))
-        self.action_import_profiprompt.triggered.connect(self.import_profiprompt_library)
-        self.action_import_explorerpro = self.file_menu.addAction(tr("menu.file.import_explorerpro"))
-        self.action_import_explorerpro.triggered.connect(self.import_explorerpro_library)
-        self.action_export_explorerpro = self.file_menu.addAction(tr("menu.file.export_explorerpro"))
-        self.action_export_explorerpro.triggered.connect(self.export_to_explorerpro_library)
+
+        # Import/export entries appear only when the source software is
+        # configured or auto-detected (U3); otherwise they only confuse users.
+        self.action_import_profiprompt = None
+        self.action_import_explorerpro = None
+        self.action_export_explorerpro = None
+        show_profiprompt = self.settings.is_profiprompt_enabled()
+        show_explorerpro = self.settings.is_explorerpro_enabled()
+        if show_profiprompt or show_explorerpro:
+            self.file_menu.addSeparator()
+        if show_profiprompt:
+            self.action_import_profiprompt = self.file_menu.addAction(
+                tr("menu.file.import_profiprompt")
+            )
+            self.action_import_profiprompt.triggered.connect(self.import_profiprompt_library)
+        if show_explorerpro:
+            self.action_import_explorerpro = self.file_menu.addAction(
+                tr("menu.file.import_explorerpro")
+            )
+            self.action_import_explorerpro.triggered.connect(self.import_explorerpro_library)
+            self.action_export_explorerpro = self.file_menu.addAction(
+                tr("menu.file.export_explorerpro")
+            )
+            self.action_export_explorerpro.triggered.connect(self.export_to_explorerpro_library)
+
         self.file_menu.addSeparator()
         self.action_quit = self.file_menu.addAction(tr("menu.file.quit"))
         self.action_quit.triggered.connect(QtWidgets.QApplication.instance().quit)
@@ -530,6 +549,8 @@ class MainWindow(QtWidgets.QMainWindow):
         dialog.theme_changed.connect(self._on_theme_changed)
         dialog.language_changed.connect(self._on_language_changed)
         dialog.exec()
+        # Import-source toggles may have changed which File-menu entries apply.
+        self._build_menubar()
 
     def _on_theme_changed(self, mode: str) -> None:
         app = QtWidgets.QApplication.instance()
@@ -760,29 +781,31 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # ------------------------------------------------------------ import/export
 
-    def import_profiprompt_library(self) -> None:
+    def import_profiprompt_library(self) -> bool:
         # Save any pending edits before swapping out the library state.
+        # Returns True when entries were imported; callers (e.g. the settings
+        # dialog) use it to close so the auto-refreshed board becomes visible.
         self.save_current_item()
         try:
             imported_items = load_profiprompt_items(self.settings.get_profiprompt_data_path())
         except Exception as exc:  # noqa: BLE001
             logger.exception("ProfiPrompt-Import fehlgeschlagen")
             self._show_error(tr("error.profiprompt_failed"), exc)
-            return
+            return False
         if not imported_items:
             QtWidgets.QMessageBox.warning(
                 self,
                 tr("dialog.import_failed.title"),
                 tr("dialog.import_failed.profiprompt"),
             )
-            return
+            return False
 
         try:
             self.storage.upsert_many(imported_items)
         except Exception as exc:  # noqa: BLE001
             logger.exception("ProfiPrompt-Import: Speichern fehlgeschlagen")
             self._show_error(tr("error.profiprompt_failed"), exc)
-            return
+            return False
 
         latest_item = max(
             (item for item in imported_items if item.item_type == ItemType.PROMPT),
@@ -798,34 +821,36 @@ class MainWindow(QtWidgets.QMainWindow):
         self.reload_list()
         self._select_item_by_id(latest_item.id)
         self.status_label.setText(tr("status.imported_profiprompt", count=len(imported_items)))
+        return True
 
-    def import_explorerpro_library(self) -> None:
+    def import_explorerpro_library(self) -> bool:
         self.save_current_item()
         try:
             imported_items = load_explorerpro_items(self.settings.get_explorerpro_data_path())
         except Exception as exc:  # noqa: BLE001
             logger.exception("ExplorerPro-Import fehlgeschlagen")
             self._show_error(tr("error.explorerpro_import_failed"), exc)
-            return
+            return False
         if not imported_items:
             QtWidgets.QMessageBox.warning(
                 self,
                 tr("dialog.import_failed.title"),
                 tr("dialog.import_failed.explorerpro"),
             )
-            return
+            return False
 
         try:
             self.storage.upsert_many(imported_items)
         except Exception as exc:  # noqa: BLE001
             logger.exception("ExplorerPro-Import: Speichern fehlgeschlagen")
             self._show_error(tr("error.explorerpro_import_failed"), exc)
-            return
+            return False
 
         self.current_item_id = None
         self.reload_list()
         self._select_item_by_id(imported_items[0].id)
         self.status_label.setText(tr("status.imported_explorerpro", count=len(imported_items)))
+        return True
 
     def _select_item_by_id(self, item_id: str) -> None:
         row = self._find_list_row_by_id(item_id)

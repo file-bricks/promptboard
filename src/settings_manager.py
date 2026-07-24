@@ -97,6 +97,43 @@ class SettingsManager(QtCore.QObject):
         self.qs.setValue("imports/explorerpro_data", str(Path(path)))
         self.qs.sync()
 
+    # ---- Import-source availability (U3) --------------------------------
+    # An import menu entry is only shown when its source software is
+    # "configured": either explicitly enabled in settings, or auto-detected on
+    # first run by the presence of its ``prompts.json``.
+
+    def _detect_profiprompt(self) -> bool:
+        return (self.get_profiprompt_data_path() / "prompts.json").exists()
+
+    def _detect_explorerpro(self) -> bool:
+        return (self.get_explorerpro_data_path() / "prompts.json").exists()
+
+    def is_profiprompt_enabled(self) -> bool:
+        key = "imports/profiprompt_enabled"
+        if not self.qs.contains(key):
+            detected = self._detect_profiprompt()
+            self.qs.setValue(key, detected)
+            self.qs.sync()
+            return detected
+        return bool(self.qs.value(key, False, type=bool))
+
+    def set_profiprompt_enabled(self, value: bool) -> None:
+        self.qs.setValue("imports/profiprompt_enabled", bool(value))
+        self.qs.sync()
+
+    def is_explorerpro_enabled(self) -> bool:
+        key = "imports/explorerpro_enabled"
+        if not self.qs.contains(key):
+            detected = self._detect_explorerpro()
+            self.qs.setValue(key, detected)
+            self.qs.sync()
+            return detected
+        return bool(self.qs.value(key, False, type=bool))
+
+    def set_explorerpro_enabled(self, value: bool) -> None:
+        self.qs.setValue("imports/explorerpro_enabled", bool(value))
+        self.qs.sync()
+
     THEME_CHOICES = ("system", "light", "dark", "vibrant")
     DEFAULT_THEME = "system"
 
