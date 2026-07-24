@@ -526,6 +526,34 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
         "en": "Enter value for '{name}':",
         "es": "Introducir valor para '{name}':", "zh": "输入 '{name}' 的值:", "ja": "'{name}' の値を入力してください:", "ru": "Введите значение для '{name}':",
     },
+    "dialog.onboarding.title": {
+        "de": "Willkommen bei PromptBoard", "en": "Welcome to PromptBoard",
+        "es": "Bienvenido a PromptBoard", "zh": "欢迎使用 PromptBoard", "ja": "PromptBoard へようこそ", "ru": "Добро пожаловать в PromptBoard",
+    },
+    "dialog.onboarding.body": {
+        "de": (
+            "Kleiner Hinweis: PromptBoard speichert Änderungen automatisch. "
+            "Du musst Einträge nicht ausdrücklich „speichern und schließen“ — "
+            "sobald du weiterklickst, ist alles gesichert.\n\n"
+            "Rechtsklick auf das Tray-Symbol öffnet deine Einträge nach "
+            "Kategorie zum schnellen Kopieren."
+        ),
+        "en": (
+            "Quick note: PromptBoard saves changes automatically. You don't have "
+            "to explicitly \"save and close\" an entry — as soon as you move on, "
+            "everything is stored.\n\n"
+            "Right-click the tray icon to browse your entries by category for a "
+            "quick copy."
+        ),
+        "es": (
+            "Nota rápida: PromptBoard guarda los cambios automáticamente. No "
+            "necesitas «guardar y cerrar» una entrada.\n\n"
+            "Haz clic derecho en el icono de la bandeja para copiar por categoría."
+        ),
+        "zh": "提示：PromptBoard 会自动保存更改，无需显式“保存并关闭”。\n\n右键点击托盘图标可按分类快速复制条目。",
+        "ja": "ヒント: PromptBoard は変更を自動保存します。明示的な「保存して閉じる」は不要です。\n\nトレイアイコンを右クリックすると、カテゴリ別に項目をすばやくコピーできます。",
+        "ru": "Заметка: PromptBoard сохраняет изменения автоматически, явно «сохранять и закрывать» запись не нужно.\n\nЩёлкните правой кнопкой по значку в трее, чтобы копировать записи по категориям.",
+    },
     "dialog.import_failed.title": {
         "de": "Import fehlgeschlagen", "en": "Import failed",
         "es": "Error de importación", "zh": "导入失败", "ja": "インポート失敗", "ru": "Ошибка импорта",

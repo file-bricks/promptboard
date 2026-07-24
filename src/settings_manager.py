@@ -199,3 +199,10 @@ class SettingsManager(QtCore.QObject):
     def set_last_active_item_id(self, item_id: str) -> None:
         self.qs.setValue("session/last_active_item_id", str(item_id))
         self.qs.sync()
+
+    def is_onboarding_shown(self) -> bool:
+        return bool(self.qs.value("session/onboarding_shown", False, type=bool))
+
+    def set_onboarding_shown(self, value: bool = True) -> None:
+        self.qs.setValue("session/onboarding_shown", bool(value))
+        self.qs.sync()

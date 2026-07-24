@@ -928,6 +928,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.raise_()
         self.activateWindow()
 
+    def maybe_show_onboarding(self) -> bool:
+        """Show a one-time first-run hint about the autosave workflow (U6)."""
+        if self.settings.is_onboarding_shown():
+            return False
+        QtWidgets.QMessageBox.information(
+            self,
+            tr("dialog.onboarding.title"),
+            tr("dialog.onboarding.body"),
+        )
+        self.settings.set_onboarding_shown(True)
+        return True
+
     def toggle_visibility_from_hotkey(self) -> None:
         if self.isVisible() and not self.isMinimized():
             self.hide()
@@ -1063,6 +1075,7 @@ def main() -> int:
     if not storage.load_items():
         window.create_item()
     window.show()
+    window.maybe_show_onboarding()
     return app.exec()
 
 
