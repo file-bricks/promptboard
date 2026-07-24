@@ -117,3 +117,9 @@ python src\promptboard.py
 ```
 
 Unter Windows alternativ per Doppelklick auf `start.bat`.
+
+## Lizenz
+
+PromptBoard steht unter der [MIT](LICENSE)-Lizenz. Die Lizenzen der
+Laufzeit-Abhängigkeiten sind in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt)
+aufgeführt.

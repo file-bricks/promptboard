@@ -103,3 +103,8 @@ python src\promptboard.py
 ```
 
 Under Windows, you can alternatively start the app by double-clicking `start.bat`.
+
+## License
+
+PromptBoard is licensed under [MIT](LICENSE). Runtime dependency licenses are
+listed in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).

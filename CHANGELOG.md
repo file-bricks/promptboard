@@ -13,6 +13,19 @@ Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
 ## [Unreleased] - 2026-06-28
 
+### Sicherheit
+
+- Die optionale Dev-Testabhängigkeit `pytest` ist auf `>=9.0.3` angehoben,
+  weil OSV für die bisher erlaubte 8.x-Untergrenze `GHSA-6w46-j5rx-g56g`
+  meldet und `9.0.3` im Zielcheck keine Treffer hat.
+
+### Dokumentation
+
+- `THIRD_PARTY_LICENSES.txt` für die direkten Python-Runtime-Abhängigkeiten und
+  das transitive Qt-for-Python-Wheel-Set ergänzt (plus Regressionstest
+  `tests/test_third_party_licenses.py`, der das Inventar gegen Dependency-Drift
+  absichert).
+
 ### Fehlerbehebungen
 
 - **BUGSWEEP-41 – ExplorerPro-Export: Silent Data Loss bei ID-losen Einträgen**

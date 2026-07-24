@@ -1,0 +1,42 @@
+# Third-Party Licenses
+
+Project: PromptBoard
+Checked: 2026-07-02
+
+Project license:
+- PromptBoard is licensed under MIT according to `LICENSE`.
+
+Scope:
+- This inventory covers direct Python runtime dependencies declared in
+  `requirements.txt` and `pyproject.toml`, plus the Qt for Python wheel set
+  installed transitively by `PySide6`.
+- Optional development/build dependencies from `requirements-dev.txt` and
+  `[project.optional-dependencies].dev` are not runtime dependencies and are not
+  included here.
+- PyPI project metadata was checked on 2026-07-02 for package names, current
+  metadata versions, license expressions/classifiers and project URLs.
+- This file is not a frozen transitive SBOM. Before a binary or Store release,
+  regenerate a full transitive inventory from the exact resolved build
+  environment.
+
+## Direct Python Runtime Dependencies
+
+| Package | Requirement | Checked metadata version | License metadata | Source |
+|---|---|---:|---|---|
+| PySide6 | `PySide6>=6.6` | 6.11.1 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only | https://pypi.org/project/PySide6/ |
+
+## Qt for Python Runtime Wheels
+
+| Package | Requirement | Checked metadata version | License metadata | Source |
+|---|---|---:|---|---|
+| PySide6_Addons | transitive via `PySide6` | 6.11.1 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only | https://pypi.org/project/PySide6-Addons/ |
+| PySide6_Essentials | transitive via `PySide6` | 6.11.1 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only | https://pypi.org/project/PySide6-Essentials/ |
+| shiboken6 | transitive via `PySide6` | 6.11.1 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only | https://pypi.org/project/shiboken6/ |
+
+Release notes:
+
+- Preserve upstream license files and notices bundled inside installed wheels
+  and source distributions.
+- Keep the bundled Qt/PySide6 notices available in binary and Store builds.
+- Re-run this inventory when `requirements.txt`, `pyproject.toml`,
+  `requirements-dev.txt` or the frozen build environment changes.
