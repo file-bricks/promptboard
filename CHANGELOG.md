@@ -2,6 +2,32 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-07-24
+
+### Welle-1-Usertest (U1–U8)
+
+- **U8 – Single-Instance-Guard**: Ein Zweitstart erzeugt keine zweite Instanz und
+  kein zweites Tray-Icon mehr, sondern weckt die laufende Instanz und bringt ihr
+  Fenster in den Vordergrund (QLocalServer/QLocalSocket).
+- **U1 – Auto-Refresh nach Import**: Importierte Einträge erscheinen sofort; der
+  Einstellungsdialog schließt sich bei erfolgreichem Import, sodass das Board
+  direkt sichtbar wird.
+- **U3 – Konditionale Import-Menüs**: Import/Export unter „Datei" erscheinen nur,
+  wenn die Quell-Software konfiguriert bzw. automatisch erkannt ist; Toggles in
+  den Einstellungen.
+- **U2 – Materialisieren-Default**: Format `.md` oder `.txt` in den Einstellungen
+  wählbar (Default Markdown, unverändertes Bestandsverhalten).
+- **U5 – Tray-Navigation**: Rechtsklick → Kategorie → Eintrag kopiert in die
+  Zwischenablage (max. 20 Einträge pro Kategorie, Rest über „… mehr im Board").
+- **U4 – Skateboard-Icon**: Fenster- und Tray-Icon werden auch im Frozen-Build
+  korrekt aufgelöst (frozen-aware Ressourcenpfad statt generischem Fallback).
+- **U6 – Erststart-Hinweis**: Einmaliger Hinweis auf den Autosave-Workflow.
+- **U7 – Wide-Store-Logo**: `store_assets/Wide310x150Logo.png` wird
+  proportionsgetreu eingepasst statt in die Breite gestreckt.
+
+### Tests
+- Zentrale QSettings/Home-Isolation (`tests/conftest.py`); Testumfang 85 → 116.
+
 ## [Unreleased] - 2026-07-22
 
 ### Dokumentation & Marketing
