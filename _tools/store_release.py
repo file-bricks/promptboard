@@ -51,6 +51,9 @@ STORE_ASSET_FILENAMES = {
     "icon_310x310.png": "Square310x310Logo.png",
 }
 WACK_REPORT_DIRNAME = "test_reports"
+WIDE_LOGO_SIZE = (310, 150)
+WIDE_LOGO_PADDING = 8
+WIDE_LOGO_FILENAME = "Wide310x150Logo.png"
 
 
 def project_root() -> Path:
@@ -241,7 +244,58 @@ def refresh_store_icons(root: Path | None = None) -> Path:
     result = packager.generate_icons(str(source), output_dir=icons_dir)
     if result is False:
         raise RuntimeError(f"Store-Icon-Generierung fehlgeschlagen: {source}")
-    return ensure_store_assets(base, icons_dir=icons_dir)
+    assets_dir = ensure_store_assets(base, icons_dir=icons_dir)
+    # U7: the generic packager stretches the square motif onto the 310x150 wide
+    # tile. Rebuild it proportionally — best effort, so a missing PIL or an
+    # unreadable source never breaks the icon refresh.
+    try:
+        regenerate_wide_logo(base)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[!] Wide-Logo-Proportionsfix uebersprungen: {exc}")
+    return assets_dir
+
+
+def regenerate_wide_logo(
+    root: Path | None = None,
+    *,
+    source: Path | None = None,
+    target: Path | None = None,
+) -> Path:
+    """Rebuild the wide store logo, fitting the motif proportionally (U7).
+
+    The generic store packager scales the square app icon to 310x150, which
+    stretches the skateboard horizontally. Instead, contain-fit the motif
+    (preserving aspect ratio), centered on a transparent 310x150 canvas.
+    """
+    from PIL import Image  # dev-only dependency, imported lazily
+
+    base = root or project_root()
+    src = Path(source) if source else store_icon_source_path(base)
+    dst = Path(target) if target else (base / "store_assets" / WIDE_LOGO_FILENAME)
+    if not src.exists():
+        raise FileNotFoundError(f"Icon-Quelle nicht gefunden: {src}")
+
+    motif = Image.open(src).convert("RGBA")
+    # Trim fully transparent margins so padding is applied to the actual motif.
+    bbox = motif.getbbox()
+    if bbox:
+        motif = motif.crop(bbox)
+
+    canvas_w, canvas_h = WIDE_LOGO_SIZE
+    max_w = canvas_w - 2 * WIDE_LOGO_PADDING
+    max_h = canvas_h - 2 * WIDE_LOGO_PADDING
+    scale = min(max_w / motif.width, max_h / motif.height)
+    new_w = max(1, round(motif.width * scale))
+    new_h = max(1, round(motif.height * scale))
+    resized = motif.resize((new_w, new_h), Image.LANCZOS)
+
+    canvas = Image.new("RGBA", WIDE_LOGO_SIZE, (0, 0, 0, 0))
+    offset = ((canvas_w - new_w) // 2, (canvas_h - new_h) // 2)
+    canvas.paste(resized, offset, resized)
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(dst, format="PNG")
+    return dst
 
 
 def resolve_executable(root: Path | None = None, explicit: str | None = None) -> Path:
@@ -457,6 +511,10 @@ def main() -> None:
         "refresh-icons",
         help="Store-/MSIX-Logos aus PromptBoard.png neu erzeugen",
     )
+    subparsers.add_parser(
+        "refresh-wide-logo",
+        help="Nur Wide310x150Logo.png proportionsgetreu aus PromptBoard.png neu erzeugen",
+    )
 
     prepare_parser = subparsers.add_parser("prepare", help="Store-Paket-Staging erzeugen")
     prepare_parser.add_argument("--exe", help="Pfad zur PromptBoard-EXE")
@@ -500,6 +558,11 @@ def main() -> None:
         if args.command == "refresh-icons":
             assets_dir = refresh_store_icons()
             print(f"[+] Store-Icons aktualisiert: {assets_dir}")
+            return
+
+        if args.command == "refresh-wide-logo":
+            path = regenerate_wide_logo()
+            print(f"[+] Wide-Logo proportionsgetreu neu erzeugt: {path}")
             return
 
         if args.command == "prepare":
