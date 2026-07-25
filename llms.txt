@@ -1,4 +1,4 @@
-## Last-checked: 2026-07-22
+## Last-checked: 2026-07-25
 
 # PromptBoard
 
@@ -26,7 +26,7 @@ Primary commands:
 
 Verification:
 - python -m compileall -q src tests
-- python -m pytest (85/85 passed)
+- python -m pytest (116/116 passed)
 
 Public documentation:
 - README.md: English-first overview, key features, global hotkeys, installation, and quickstart

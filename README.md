@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/version-v1.1.1-blue" alt="Version v1.1.1">
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows">
   <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Built with Python and PySide6">
-  <img src="https://img.shields.io/badge/tests-85%2F85%20passing-success" alt="Tests: 85/85 passing">
+  <img src="https://img.shields.io/badge/tests-116%2F116%20passing-success" alt="Tests: 116/116 passing">
 </p>
 
 # PromptBoard
@@ -28,7 +28,7 @@ PromptBoard is a fast desktop utility and Windows tray application for reusable 
 ## Status
 
 **Phase:** public release (`v1.1.1`), store and platform hardening active in local development<br/>
-**Code:** PySide6 desktop application with 85/85 passing pytest tests<br/>
+**Code:** PySide6 desktop application with 116/116 passing pytest tests<br/>
 
 **CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) running Windows Pytest and macOS/Linux source smoke checks  
 **Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  

@@ -2,7 +2,12 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
-## [Unreleased] - 2026-07-24
+## [Unreleased] - 2026-07-25
+
+### Maintenance & Hygiene
+- **Dokumentations-Sync**: `llms.txt`, `README.md` und `README_de.md` auf 116/116 bestandene Pytest-Tests und `Last-checked: 2026-07-25` synchronisiert.
+
+## [1.1.1] - 2026-07-24
 
 ### Welle-1-Usertest (U1–U8)
 
