@@ -13,3 +13,15 @@
 1. **Interactive Demo GIF**: Record a short 10-second GIF showing the tray icon double-click, prompt search/filter, and right-click "Export to Desktop" `.md` materialization. Add it to the top of `README.md`.
 2. **Windows Store (MSIX) Partner Center Submission**: Proceed with the Store-P1 path by completing Partner Center submission using `releases/PromptBoard.msix`.
 3. **Awesome Lists & Directory Submissions**: Submit `file-bricks/promptboard` to `awesome-pyside`, `awesome-python-applications`, and LLM tool aggregators (Glama, LobeHub).
+
+## Date: 2026-07-26
+
+### Automated Improvements Executed
+1. **Badges & Visual Branding**: Added Shields.io Badges (`LLM-Ready`, `Ecosystem: file-bricks`, `Umbrella: open-bricks`) in `README.md` and `README_de.md`.
+2. **LLM Context & RAG**: Updated `llms.txt` `Last-checked: 2026-07-26` and verified 116/116 passing tests.
+3. **Changelog Update**: Documented Release 1.1.2 in `CHANGELOG.md`.
+
+### Manual / Next Steps Recommendations
+1. **Screencast / Animated Demo**: Create a 15-second animated GIF or MP4 preview of the tray workflow (Search -> Filter -> Materialize to Desktop `.md`) and embed it in `README.md`.
+2. **Windows Store (MSIX) Release**: Complete Partner Center packaging using `_tools/store_release.py msix-preflight`.
+3. **Community Showcase**: Post a launch announcement on Reddit (`r/LocalLLM`, `r/Python`, `r/PySide`) showcasing native offline local-first prompt materialization.

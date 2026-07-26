@@ -2,10 +2,12 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
-## [Unreleased] - 2026-07-25
+## [1.1.2] - 2026-07-26
 
-### Maintenance & Hygiene
-- **Dokumentations-Sync**: `llms.txt`, `README.md` und `README_de.md` auf 116/116 bestandene Pytest-Tests und `Last-checked: 2026-07-25` synchronisiert.
+### Discoverability & Marketing (Pfad B)
+- **Sichtbarkeit & LLM-Discovery**: `llms.txt` Header auf `Last-checked: 2026-07-26` synchronisiert und 116/116 bestandene Pytest-Tests verifiziert.
+- **Badges & Visual Branding**: Shields.io Badges (`LLM-Ready`, `Ecosystem: file-bricks`, `Umbrella: open-bricks`) in `README.md` und `README_de.md` ergänzt.
+- **Marketing-Empfehlungen**: Empfehlungen (Windows Store MSIX Readiness, ProductHunt Showcase, Screencast-GIF) in `MARKETING-LOG.txt` protokolliert.
 
 ## [1.1.1] - 2026-07-24
 

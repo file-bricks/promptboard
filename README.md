@@ -10,6 +10,9 @@
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows">
   <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Built with Python and PySide6">
   <img src="https://img.shields.io/badge/tests-116%2F116%20passing-success" alt="Tests: 116/116 passing">
+  <img src="https://img.shields.io/badge/LLM--Ready-llms.txt-purple" alt="LLM-Ready: llms.txt">
+  <img src="https://img.shields.io/badge/ecosystem-file--bricks-blue" alt="Ecosystem: file-bricks">
+  <img src="https://img.shields.io/badge/umbrella-open--bricks-orange" alt="Umbrella: open-bricks">
 </p>
 
 # PromptBoard
