@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [1.1.3] - 2026-07-27
+
+### Technische Hygiene & Wartung (Pfad A)
+- **Import-Fix in Testsuite**: Relativen Import in `tests/test_promptboard.py` korrigiert zu `from settings_dialog import SettingsDialog` für konsistente Modulauflösung (116/116 Pytest-Tests 100% grün).
+- **Metadaten-Synchronisation**: `llms.txt` Last-checked Datum auf `2026-07-27` aktualisiert.
+
 ## [1.1.2] - 2026-07-26
 
 ### Discoverability & Marketing (Pfad B)

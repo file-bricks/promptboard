@@ -656,7 +656,7 @@ def test_create_tray_skips_unavailable_system_tray(qapp_isolated, tmp_path, monk
 
 
 def test_settings_dialog_accessibility_and_live_relabeling(qapp_isolated, tmp_path):
-    from src.settings_dialog import SettingsDialog
+    from settings_dialog import SettingsDialog
     data_dir = tmp_path / "library"
     settings = SettingsManager()
     settings.qs.setValue("paths/data", str(data_dir))

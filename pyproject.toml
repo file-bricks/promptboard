@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "promptboard"
-version = "1.1.1"
+version = "1.1.3"
 description = "Local Windows tray app for reusable prompts, skills, workflows, roles and agents."
 readme = "README.md"
 requires-python = ">=3.10"
