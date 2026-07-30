@@ -1,4 +1,4 @@
-<img src="assets/banner.svg" width="100%" alt="PromptBoard">
+<img src="assets/banner.png" width="100%" alt="PromptBoard">
 
 <p>
   <a href="./README_de.md">🇩🇪 Deutsch</a> &nbsp;·&nbsp; <b>🇬🇧 English</b>
