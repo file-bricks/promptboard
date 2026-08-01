@@ -10,9 +10,9 @@
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows">
   <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Built with Python and PySide6">
   <img src="https://img.shields.io/badge/tests-116%2F116%20passing-success" alt="Tests: 116/116 passing">
-  <img src="https://img.shields.io/badge/LLM--Ready-llms.txt-purple" alt="LLM-Ready: llms.txt">
-  <img src="https://img.shields.io/badge/ecosystem-file--bricks-blue" alt="Ecosystem: file-bricks">
-  <img src="https://img.shields.io/badge/umbrella-open--bricks-orange" alt="Umbrella: open-bricks">
+  <img src="https://img.shields.io/badge/ecosystem-file--bricks-blue?logo=github" alt="Ecosystem: file-bricks">
+  <img src="https://img.shields.io/badge/umbrella-open--bricks-orange?logo=open-source-initiative" alt="Umbrella: open-bricks">
+  <img src="https://img.shields.io/badge/llms.txt-ready-22c55e?logo=markdown" alt="llms.txt: ready">
 </p>
 
 # PromptBoard
@@ -21,6 +21,9 @@
 
 > [!NOTE]
 > **Disambiguation:** `file-bricks/promptboard` is a native local-first Windows desktop tray application (Python & PySide6) designed for offline LLM prompt management and local Markdown materialization. It is not a cloud web service, SaaS platform, or browser extension.
+
+> [!TIP]
+> **LLM / Agent Integration:** See [`llms.txt`](./llms.txt) for machine-readable project context, API boundaries, CLI execution patterns, and architectural invariants.
 
 [Features](#key-features--goals) &nbsp;·&nbsp; [Architecture](#architecture--data-flow) &nbsp;·&nbsp; [Screenshots](#screenshots) &nbsp;·&nbsp; [Install & Run](#running-the-project) &nbsp;·&nbsp; [Docs](#onboarding)
 

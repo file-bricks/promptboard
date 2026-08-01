@@ -1,4 +1,4 @@
-<img src="assets/banner.svg" width="100%" alt="PromptBoard">
+<img src="assets/banner.png" width="100%" alt="PromptBoard">
 
 <p>
   <b>🇩🇪 Deutsch</b> &nbsp;·&nbsp; <a href="./README.md">🇬🇧 English</a>
@@ -10,9 +10,9 @@
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Plattform: Windows">
   <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Gebaut mit Python und PySide6">
   <img src="https://img.shields.io/badge/tests-116%2F116%20bestanden-success" alt="Tests: 116/116 bestanden">
-  <img src="https://img.shields.io/badge/LLM--Ready-llms.txt-purple" alt="LLM-Bereit: llms.txt">
-  <img src="https://img.shields.io/badge/ecosystem-file--bricks-blue" alt="Ökosystem: file-bricks">
-  <img src="https://img.shields.io/badge/umbrella-open--bricks-orange" alt="Dachorganisation: open-bricks">
+  <img src="https://img.shields.io/badge/ecosystem-file--bricks-blue?logo=github" alt="Ökosystem: file-bricks">
+  <img src="https://img.shields.io/badge/umbrella-open--bricks-orange?logo=open-source-initiative" alt="Dachorganisation: open-bricks">
+  <img src="https://img.shields.io/badge/llms.txt-ready-22c55e?logo=markdown" alt="llms.txt: bereit">
 </p>
 
 # PromptBoard
@@ -21,6 +21,9 @@
 
 > [!NOTE]
 > **Abgrenzung:** `file-bricks/promptboard` ist eine native, lokale Windows-Desktop-Tray-Anwendung (Python & PySide6) zur offline Verwaltung von LLM-Prompts und lokalen Markdown-Materialisierungen. Es ist kein Cloud-Webdienst, keine SaaS-Plattform und keine Browser-Erweiterung.
+
+> [!TIP]
+> **LLM- / Agenten-Integration:** Siehe [`llms.txt`](./llms.txt) für maschinenlesbaren Projektkontext, API-Grenzen, CLI-Muster und Architektur-Invarianten.
 
 [Features](#zielbild) &nbsp;·&nbsp; [Architektur](#architektur--datenfluss) &nbsp;·&nbsp; [Screenshots](#screenshots) &nbsp;·&nbsp; [Installation](#projekt-starten) &nbsp;·&nbsp; [Doku](#onboarding)
 

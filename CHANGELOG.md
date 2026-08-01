@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-08-01
+
+### Discoverability, README-Design & SEO Audit (Pfad B)
+- **Ökosystem- & Umbrella-Badges**: Shields.io-Badges für `file-bricks` (Ecosystem), `open-bricks` (Umbrella) und `llms.txt` in `README.md` und `README_de.md` mit SVG-Logos verfeinert.
+- **Banner-Synchronisation**: Grafische Einbindung (`assets/banner.png`) zwischen EN- und DE-README angeglichen.
+- **LLM-Agenten-Callout**: GFM-Callouts (`> [!TIP]`) mit direktem Link auf `llms.txt` für optimierte Discoverability von AI-Agenten hinzugefügt.
+- **Wartung & Hygiene**: `llms.txt` Header auf `Last-checked: 2026-08-01` und 116/116 bestandene Pytest-Tests verifiziert und synchronisiert.
+
 ## [1.1.3] - 2026-07-27
 
 ### Technische Hygiene & Wartung (Pfad A)

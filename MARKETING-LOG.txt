@@ -25,3 +25,16 @@
 1. **Screencast / Animated Demo**: Create a 15-second animated GIF or MP4 preview of the tray workflow (Search -> Filter -> Materialize to Desktop `.md`) and embed it in `README.md`.
 2. **Windows Store (MSIX) Release**: Complete Partner Center packaging using `_tools/store_release.py msix-preflight`.
 3. **Community Showcase**: Post a launch announcement on Reddit (`r/LocalLLM`, `r/Python`, `r/PySide`) showcasing native offline local-first prompt materialization.
+
+## Date: 2026-08-01
+
+### Automated Improvements Executed
+1. **Badges & Visual Alignment**: Enhanced Shields.io Badges in `README.md` and `README_de.md` with explicit SVG logos (`logo=github`, `logo=open-source-initiative`, `logo=markdown`).
+2. **Banner Uniformity**: Unified banner graphic reference (`assets/banner.png`) across English and German documentation.
+3. **LLM Crawler & Agent Callouts**: Integrated GFM `> [!TIP]` callout linking directly to [`llms.txt`](./llms.txt) for automated AI agent discoverability.
+4. **Metadata & Test Verification**: Updated `llms.txt` `Last-checked: 2026-08-01`, re-verified 116/116 passing Pytest test suite and updated `CHANGELOG.md`.
+
+### Manual / Next Steps Recommendations
+1. **Interactive Demo GIF**: Embed a short 10-second animated GIF showing global hotkey activation (`Win+Alt+P`) and tray menu prompt copy.
+2. **Microsoft Store MSIX Submission**: Finalize submission via Partner Center after running WACK (`_tools/run_wack.ps1`).
+
