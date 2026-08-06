@@ -55,6 +55,13 @@ def _load_json_array(path: Path) -> list[dict[str, Any]]:
     return [entry for entry in payload if isinstance(entry, dict)]
 
 
+def _str_val(value: Any, fallback: str = "") -> str:
+    if value is None:
+        return fallback
+    s = str(value).strip()
+    return s if s else fallback
+
+
 def _safe_key(value: Any, fallback: str) -> str:
     raw = str(value).strip() if value is not None else ""
     if not raw:
@@ -69,15 +76,15 @@ def _make_item_id(entry: dict[str, Any]) -> str:
 
 
 def _map_prompt_to_item(entry: dict[str, Any]) -> LibraryItem:
-    title = str(entry.get("title", "")).strip() or "IMPORTIERTER PROMPT"
-    content = str(entry.get("content", "")).strip()
-    category = str(entry.get("category", "")).strip() or "ExplorerPro Import"
-    tags_raw = entry.get("tags", [])
-    tags = parse_tags(tags_raw if isinstance(tags_raw, list) else [])
+    title = _str_val(entry.get("title"), "IMPORTIERTER PROMPT")
+    content = _str_val(entry.get("content"))
+    category = _str_val(entry.get("category"), "ExplorerPro Import")
+    tags_raw = entry.get("tags")
+    tags = parse_tags(tags_raw if isinstance(tags_raw, (list, str)) else [])
     if entry.get("favorite"):
         tags = parse_tags(tags + ["favorite"])
-    created = str(entry.get("created", "")).strip() or now_iso()
-    modified = str(entry.get("modified", "")).strip() or created
+    created = _str_val(entry.get("created"), now_iso())
+    modified = _str_val(entry.get("modified"), created)
     return LibraryItem(
         id=_make_item_id(entry),
         item_type=ItemType.PROMPT,

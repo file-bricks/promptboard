@@ -87,27 +87,34 @@ def _board_titles_by_prompt_id(boards: list[dict[str, Any]]) -> dict[str, list[s
     return titles_by_prompt_id
 
 
+def _str_val(value: Any, fallback: str = "") -> str:
+    if value is None:
+        return fallback
+    s = str(value).strip()
+    return s if s else fallback
+
+
 def _build_prompt_content(
     prompt: dict[str, Any],
     latest_version: Optional[dict[str, Any]],
     board_titles: list[str],
 ) -> str:
-    purpose = str(prompt.get("purpose", "")).strip()
+    purpose = _str_val(prompt.get("purpose"))
     prompt_text = ""
     version_label = ""
     version_result = ""
 
     if latest_version is not None:
-        prompt_text = str(latest_version.get("text", "")).strip()
+        prompt_text = _str_val(latest_version.get("text"))
         version_number = latest_version.get("version_number")
         if version_number not in (None, ""):
             version_label = f"v{version_number}"
-        version_result = str(latest_version.get("result", "")).strip()
+        version_result = _str_val(latest_version.get("result"))
 
     if not prompt_text:
-        prompt_text = str(prompt.get("text", "")).strip()
+        prompt_text = _str_val(prompt.get("text"))
     if not version_result:
-        version_result = str(prompt.get("last_result", "")).strip()
+        version_result = _str_val(prompt.get("last_result"))
 
     sections: list[str] = []
     if purpose:
@@ -132,12 +139,12 @@ def _map_prompt(
     prompt: dict[str, Any],
     board_titles: list[str],
 ) -> LibraryItem:
-    prompt_id = str(prompt.get("id", "")).strip()
-    title = str(prompt.get("title", "")).strip() or "IMPORTED PROMPT"
+    prompt_id = _str_val(prompt.get("id"))
+    title = _str_val(prompt.get("title"), "IMPORTED PROMPT")
     latest_version = _select_latest_version(prompt)
 
-    prompt_tags = parse_tags(prompt.get("tags", []))
-    version_tags = parse_tags(latest_version.get("tags", []) if latest_version else [])
+    prompt_tags = parse_tags(prompt.get("tags"))
+    version_tags = parse_tags(latest_version.get("tags") if latest_version else None)
     board_tags = [f"board:{title}" for title in board_titles]
 
     category = "ProfiPrompt Import"
@@ -146,11 +153,11 @@ def _map_prompt(
     elif len(board_titles) > 1:
         category = "ProfiPrompt Boards"
 
-    created_at = str(prompt.get("created_at", "")).strip()
-    updated_at = str(prompt.get("updated_at", "")).strip()
+    created_at = _str_val(prompt.get("created_at"))
+    updated_at = _str_val(prompt.get("updated_at"))
     if latest_version is not None:
-        created_at = created_at or str(latest_version.get("created_at", "")).strip()
-        updated_at = str(latest_version.get("updated_at", "")).strip() or updated_at
+        created_at = created_at or _str_val(latest_version.get("created_at"))
+        updated_at = _str_val(latest_version.get("updated_at")) or updated_at
 
     return LibraryItem(
         id=f"profiprompt:prompt:{_safe_key(prompt_id, title)}",

@@ -44,14 +44,20 @@ def normalize_name(name: str) -> str:
     return " ".join(name.split()).upper()
 
 
-def parse_tags(raw: str | Iterable[str]) -> List[str]:
+def parse_tags(raw: str | Iterable[str] | None) -> List[str]:
+    if raw is None:
+        return []
     if isinstance(raw, str):
         values = raw.split(",")
-    else:
+    elif isinstance(raw, Iterable):
         values = raw
+    else:
+        return []
     tags: List[str] = []
     seen: set[str] = set()
     for value in values:
+        if value is None:
+            continue
         tag = str(value).strip()
         if not tag:
             continue

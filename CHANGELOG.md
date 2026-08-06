@@ -2,7 +2,14 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
-## [Unreleased] - 2026-08-01
+## [Unreleased] - 2026-08-06
+
+### Bugsweep Iteration 1 (Null-Resilience in Adapters & Tag Parser)
+- **Null Field Guarding**: Null-Werte (`null` in JSON-Exporten für `purpose`, `title`, `text`, `content`, `category`, `created`, `modified`, `tags`) in `src/profiprompt_adapter.py` und `src/explorerpro_adapter.py` werden nun über `_str_val` defensiv behandelt, anstatt unschöne `"None"`-Strings in Titeln, Inhalten oder Zweckfeldern zu erzeugen.
+- **Robust Tag Parsing**: `parse_tags` in `src/models.py` gehärtet gegen `None`-Werte und ungültige Datentypen; verhindert `TypeError: 'NoneType' object is not iterable` beim Importieren von Datensätzen mit `"tags": null`.
+- **Testabdeckung**: 3 neue Unit-Tests in `tests/test_bugsweep_iteration1_null_resilience.py` hinzugefügt (119/119 Pytest-Tests 100% grün).
+
+## [1.1.4] - 2026-08-01
 
 ### Discoverability, README-Design & SEO Audit (Pfad B)
 - **Ökosystem- & Umbrella-Badges**: Shields.io-Badges für `file-bricks` (Ecosystem), `open-bricks` (Umbrella) und `llms.txt` in `README.md` und `README_de.md` mit SVG-Logos verfeinert.
