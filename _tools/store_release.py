@@ -61,6 +61,15 @@ def project_root() -> Path:
 
 
 def software_root(root: Path | None = None) -> Path:
+    """Wurzel der .SOFTWARE-Pipeline mit den zentralen Store-Werkzeugen.
+
+    Im Git-Klon liegt das Projekt nicht unterhalb von .SOFTWARE, der relative
+    Aufstieg greift dort also ins Leere. PROMPTBOARD_SOFTWARE_ROOT setzt den
+    Pfad direkt, damit der Store-Build auch im Klon laeuft.
+    """
+    override = os.environ.get("PROMPTBOARD_SOFTWARE_ROOT", "").strip()
+    if override:
+        return Path(override).expanduser()
     base = root or project_root()
     return base.parent.parent
 
