@@ -39,6 +39,18 @@ PromptBoard is a fast desktop utility and Windows tray application for reusable 
 **CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) running Windows Pytest and macOS/Linux source smoke checks  
 **Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
 
+### Verification readback — 2026-08-12
+
+- `python -X utf8 -m pytest -q`: **116 passed** (scope: the Python test suite).
+- `python -X utf8 tests/source_platform_smoke.py`: **OK** (source/offscreen smoke; it does not claim native macOS/Linux tray or hotkey parity).
+- `python -X utf8 -m compileall -q src _tools tests`: **OK**.
+- GitHub release `v1.1.1` is published; Store-P1 remains open because real
+  Partner-Center values, a local MSIX build with `makeappx.exe`, and an
+  elevated WACK readback are not yet available.
+- The published artifact line is `v1.1.1`. `pyproject.toml` still carries
+  unreleased development metadata `1.1.3`; this is recorded explicitly rather
+  than silently presenting it as a published v1.1.1 artifact.
+
 ## Architecture & Data Flow
 
 ```mermaid

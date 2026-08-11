@@ -2,7 +2,7 @@
 REM Build script for PromptBoard v1.1.1
 REM ===================================
 REM Builds a single-file Windows executable via PyInstaller,
-REM copies artefacts into releases\v1.1.1\, generates SHA256SUMS.txt.
+REM stages the complete release set and verifies SHA256SUMS.txt.
 
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
@@ -49,24 +49,17 @@ if errorlevel 1 (
 )
 
 echo.
-echo --- Stage release artefacts ---
-copy /Y "dist\PromptBoard-1.1.1-win64.exe" "%RELEASE_DIR%\" >nul
-
-echo --- Source archive ---
-python -c "import shutil; shutil.make_archive(r'%RELEASE_DIR%\PromptBoard-1.1.1-source', 'zip', '.', 'src')"
-
-echo --- CHANGELOG ---
-copy /Y "CHANGELOG.md" "%RELEASE_DIR%\CHANGELOG.txt" >nul
-
-echo --- SHA256SUMS ---
-pushd "%RELEASE_DIR%"
-if exist SHA256SUMS.txt del SHA256SUMS.txt
-for %%F in (*.exe *.zip) do (
-    for /f "delims=" %%H in ('certutil -hashfile "%%F" SHA256 ^| findstr /R "^[0-9a-f][0-9a-f]"') do (
-        echo %%H  %%F>> SHA256SUMS.txt
-    )
+echo --- Stage and certify release artefacts ---
+python scripts\certify_release.py stage --exe "dist\PromptBoard-1.1.1-win64.exe"
+if errorlevel 1 (
+    echo [FEHLER] Release-Staging fehlgeschlagen.
+    exit /b 1
 )
-popd
+python scripts\certify_release.py verify --require-msix
+if errorlevel 1 (
+    echo [FEHLER] Vollstaendige Zertifizierung fehlgeschlagen; MSIX/WACK-Gate bleibt offen.
+    exit /b 1
+)
 
 echo.
 echo === BUILD ERFOLGREICH ===

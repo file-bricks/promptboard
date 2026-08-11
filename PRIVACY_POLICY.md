@@ -1,6 +1,12 @@
 # Privacy Policy — PromptBoard
 
-Stand: 2026-05-20
+Stand: 2026-08-12
+
+## Readback / Geltungsstatus
+
+Diese Richtlinie beschreibt weiterhin die lokale, veröffentlichte PromptBoard-
+Linie `v1.1.1`. Sie ist kein Nachweis einer Windows-Store-Einreichung; reale
+Partner-Center-Werte, MSIX-Erzeugung und WACK-Abnahme bleiben Store-P1-Gates.
 
 ## English
 

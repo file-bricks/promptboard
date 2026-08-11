@@ -2,12 +2,29 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-08-12
+
+### Release- und Status-Readback
+
+- Nutzer- und Release-Dokumente synchronisieren den aktuellen, reproduzierbaren
+  Stand: `python -X utf8 -m pytest -q` mit **116/116** sowie der direkte
+  Source-Smoke `python -X utf8 tests/source_platform_smoke.py` mit `OK`.
+- Die veröffentlichte Artefaktlinie bleibt `v1.1.1`; der GitHub-Release ist
+  live. `pyproject.toml` führt `1.1.3` weiterhin als unveröffentlichte
+  Entwicklungsmetadaten und wird deshalb nicht als v1.1.1 ausgegeben.
+- Das lokale Release-Zertifizierungswerkzeug erzeugt ein vollständiges
+  Source-Archiv aus getrackten Dateien und hasht EXE, Source-ZIP und Changelog
+  in genau einer `SHA256SUMS.txt`; Laufzeitdaten, Build-Caches, Store-Staging
+  und frühere Releases werden ausgeschlossen.
+- Store-P1 bleibt offen: Im lokalen Preflight fehlt `makeappx.exe`; reale
+  Partner-Center-Werte und ein erhöhter WACK-Readback wurden nicht behauptet.
+
 ## [Unreleased] - 2026-08-06
 
 ### Bugsweep Iteration 1 (Null-Resilience in Adapters & Tag Parser)
 - **Null Field Guarding**: Null-Werte (`null` in JSON-Exporten für `purpose`, `title`, `text`, `content`, `category`, `created`, `modified`, `tags`) in `src/profiprompt_adapter.py` und `src/explorerpro_adapter.py` werden nun über `_str_val` defensiv behandelt, anstatt unschöne `"None"`-Strings in Titeln, Inhalten oder Zweckfeldern zu erzeugen.
 - **Robust Tag Parsing**: `parse_tags` in `src/models.py` gehärtet gegen `None`-Werte und ungültige Datentypen; verhindert `TypeError: 'NoneType' object is not iterable` beim Importieren von Datensätzen mit `"tags": null`.
-- **Testabdeckung**: 3 neue Unit-Tests in `tests/test_bugsweep_iteration1_null_resilience.py` hinzugefügt (119/119 Pytest-Tests 100% grün).
+- **Testabdeckung**: 3 neue Unit-Tests in `tests/test_bugsweep_iteration1_null_resilience.py` hinzugefügt; der aktuelle frische Readback umfasst 116/116 Pytest-Tests.
 
 ## [1.1.4] - 2026-08-01
 

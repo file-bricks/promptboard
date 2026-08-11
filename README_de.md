@@ -40,6 +40,19 @@ PromptBoard ist ein schnelles Desktop-Werkzeug und eine Windows-Tray-App für wi
 **Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
 **Aktueller Ordnerstatus:** `LLM/REL-PUB_PromptBoard`  
 
+### Prüf-Readback — 2026-08-12
+
+- `python -X utf8 -m pytest -q`: **116 bestanden** (Umfang: Python-Testsuite).
+- `python -X utf8 tests/source_platform_smoke.py`: **OK** (Source-/Offscreen-
+  Smoke; keine Behauptung nativer macOS-/Linux-Tray- oder Hotkey-Parität).
+- `python -X utf8 -m compileall -q src _tools tests`: **OK**.
+- GitHub-Release `v1.1.1` ist veröffentlicht; Store-P1 bleibt offen, weil
+  echte Partner-Center-Werte, ein lokaler MSIX-Build mit `makeappx.exe` und ein
+  erhöhter WACK-Readback noch fehlen.
+- Die veröffentlichte Artefaktlinie ist `v1.1.1`. `pyproject.toml` führt noch
+  unveröffentlichte Entwicklungsmetadaten `1.1.3`; diese Abweichung wird
+  ausdrücklich dokumentiert und nicht als v1.1.1-Artefakt ausgegeben.
+
 ## Architektur & Datenfluss
 
 ```mermaid

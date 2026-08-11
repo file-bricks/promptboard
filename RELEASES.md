@@ -8,12 +8,18 @@
 **Plattform:** Windows x64
 **Repo:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)
 
+**Readback 2026-08-12:** Der GitHub-Release ist live (nicht Draft, nicht
+Pre-release). Der lokale Plan-D-Klon erzeugt und prüft EXE, Source-ZIP,
+`CHANGELOG.txt` und eine einzige `SHA256SUMS.txt`. Ein MSIX konnte wegen des
+fehlenden Windows-SDK-Werkzeugs `makeappx.exe` nicht zertifiziert werden;
+Partner-Center und erhöhter WACK bleiben Store-P1-Gates.
+
 ### Artefakte (`releases/v1.1.1/`)
 
 | Datei | Inhalt |
 |---|---|
 | `PromptBoard-1.1.1-win64.exe` | Single-File Windows-Executable (PyInstaller, windowed) |
-| `PromptBoard-1.1.1-source.zip` | Quellcode-Archiv (`src/`) |
+| `PromptBoard-1.1.1-source.zip` | Getracktes Quell-/Dokumentationsarchiv; Runtime-Daten, Build-Caches, Store-Staging und frühere Releases ausgeschlossen |
 | `CHANGELOG.txt` | Changelog dieser Version |
 | `SHA256SUMS.txt` | SHA-256 Prüfsummen |
 
@@ -22,7 +28,8 @@
 - **Hotfix für Import-Crash** nach ProfiPrompt-/ExplorerPro-Import
 - `reload_list()` schützt den Listen-Rebuild mit `blockSignals(True/False)`
 - `Storage.upsert_many()` reduziert Batch-Imports auf einen Read- und einen Write-Pfad
-- 30/30 pytest-Tests grün
+- Historischer v1.1.1-Stand: 30/30 pytest-Tests grün; aktueller Readback:
+  `python -X utf8 -m pytest -q` mit 116/116.
 
 ### Store-Vorbereitung
 

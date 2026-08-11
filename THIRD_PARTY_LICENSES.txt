@@ -40,3 +40,13 @@ Release notes:
 - Keep the bundled Qt/PySide6 notices available in binary and Store builds.
 - Re-run this inventory when `requirements.txt`, `pyproject.toml`,
   `requirements-dev.txt` or the frozen build environment changes.
+
+## v1.1.1 release readback — 2026-08-12
+
+The active runtime was read back from the build environment before release
+staging: `PySide6`, `PySide6_Addons`, `PySide6_Essentials` and `shiboken6` are
+all version `6.11.1` and report the LGPL/GPL expression listed above. The
+release source archive includes this inventory and excludes runtime data,
+build caches, Store staging and the stopped historical `flutter_port/` line.
+The inventory is therefore linked to the certified EXE/source set without
+claiming a frozen transitive SBOM.

@@ -2,10 +2,10 @@
 name: promptboard-state
 type: state-snapshot
 version: 1.1.1
-updated: 2026-06-17
+updated: 2026-08-12
 updated_by: GPT
 current_phase: REL-PUB v1.1.1 stabilisiert; Icon-Assets vereinheitlicht, Store-P1 bleibt offen
-last_verified: 2026-06-17
+last_verified: 2026-08-12
 description: |
   PromptBoard ist als öffentliches Desktop-Tool veröffentlicht. Die aktuelle
   Linie steht bei v1.1.1 inklusive Hotfix für den Import-Crash,
@@ -22,6 +22,21 @@ description: |
 **Next review:** nach dem ersten erhöhten WACK-Lauf über `_tools\run_wack.ps1`
 oder nach einer Entscheidung, ob `PromptBase Team Server` als eigenes Projekt
 angelegt wird.
+
+## Readback 2026-08-12
+
+- **Tests:** `python -X utf8 -m pytest -q` läuft im frischen Plan-D-Klon mit
+  **116/116**; `python -X utf8 tests/source_platform_smoke.py` und
+  `python -X utf8 -m compileall -q src _tools tests` sind ebenfalls grün.
+- **Release:** GitHub `v1.1.1` ist live (nicht Draft, nicht Pre-release) mit
+  EXE, Source-ZIP, `CHANGELOG.txt` und `SHA256SUMS.txt`.
+- **Store-P1:** nicht geschlossen. Die zentrale Store-Pipeline meldet im
+  lokalen Preflight `makeappx.exe nicht gefunden`; Partner-Center-Werte und ein
+  erhöhter WACK-Lauf bleiben externe Gates.
+- **Versionsgrenze:** Release-Dokumente und Paketartefakte beziehen sich auf
+  `v1.1.1`; `pyproject.toml` enthält weiterhin `1.1.3` als unveröffentlichte
+  Entwicklungsmetadaten. Diese Differenz ist offen und wird nicht durch Text
+  kaschiert.
 
 ## Current Phase
 
