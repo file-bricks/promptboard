@@ -235,7 +235,8 @@ def test_refresh_store_icons_uses_promptboard_png_and_updates_store_assets(tmp_p
 
 
 def test_latest_wack_report_uses_newest_xml(tmp_path):
-    import os, time
+    import os
+    import time
     module = load_module()
     report_dir = tmp_path / "reports"
     report_dir.mkdir()

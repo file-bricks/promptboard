@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [1.1.5] - 2026-08-14
+
+### Discoverability, README-Design & Code-Hygiene (Pfad B)
+
+- **Code-Hygiene & Linting**: Unbenutzten Import `gen_id` in `src/profiprompt_adapter.py` bereinigt, unbenutzte `app`-Zuweisungen in `tests/test_hotkeys.py` nachgezogen und `tests/test_store_release.py` Mehrfachimports aufgeteilt; `[tool.ruff]` Konfiguration in `pyproject.toml` verankert (`ruff check` 100% sauber).
+- **Zweisprachige Dokumentation & Verifikations-Readback**: `README.md`, `README_de.md` und `llms.txt` auf Stand `2026-08-14` aktualisiert (116/116 Pytest-Tests, Source-Platform Smoke OK, compileall OK, ruff check OK).
+- **Entwicklungsmetadaten**: Unveröffentlichte Entwicklungsmetadaten `1.1.3` in `pyproject.toml` weiterhin transparent dokumentiert.
+
 ## [Unreleased] - 2026-08-12
 
 ### Release- und Status-Readback

@@ -34,7 +34,15 @@
 3. **LLM Crawler & Agent Callouts**: Integrated GFM `> [!TIP]` callout linking directly to [`llms.txt`](./llms.txt) for automated AI agent discoverability.
 4. **Metadata & Test Verification**: Updated `llms.txt` `Last-checked: 2026-08-01`, re-verified 116/116 passing Pytest test suite and updated `CHANGELOG.md`.
 
+## Date: 2026-08-14
+
+### Automated Improvements Executed
+1. **Code-Hygiene & Linting**: Cleaned unused import `gen_id` in `profiprompt_adapter.py`, fixed unused `app` references in `test_hotkeys.py`, and split multiple imports in `test_store_release.py`. Added `[tool.ruff]` section in `pyproject.toml` (`ruff check` 100% clean).
+2. **Bilingual Verification Readback**: Synchronized verification readbacks in `README.md`, `README_de.md`, and `llms.txt` to `2026-08-14` (116/116 Pytest tests passing, Source Platform Smoke OK, compileall OK, ruff check OK).
+3. **Changelog & Documentation**: Updated `CHANGELOG.md` with release entry `[1.1.5] - 2026-08-14`.
+
 ### Manual / Next Steps Recommendations
-1. **Interactive Demo GIF**: Embed a short 10-second animated GIF showing global hotkey activation (`Win+Alt+P`) and tray menu prompt copy.
-2. **Microsoft Store MSIX Submission**: Finalize submission via Partner Center after running WACK (`_tools/run_wack.ps1`).
+1. **Interactive Demo GIF**: Record a short 10-second GIF demonstrating tray quick-filter and Markdown materialization to Desktop (`.md`) to place below the hero banner in `README.md`.
+2. **Microsoft Store Partner Center Packaging**: Fill Partner Center credentials and generate final signed `.msix` package via `_tools/store_release.py`.
+3. **Community Showcase**: Share PromptBoard in `r/Python`, `r/LocalLLM`, and PySide Discord channels for desktop prompt engineering workflows.
 

@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
-from models import ItemType, LibraryItem, gen_id, normalize_name, now_iso, parse_tags
+from models import ItemType, LibraryItem, normalize_name, now_iso, parse_tags
 
 logger = logging.getLogger(__name__)
 

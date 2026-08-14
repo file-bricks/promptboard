@@ -45,7 +45,7 @@ class FakeApp:
 
 
 def test_hotkeys_register_and_dispatch_callbacks():
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    _app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     backend = FakeBackend()
     calls = []
     manager = PromptBoardHotkeys(
@@ -68,7 +68,7 @@ def test_hotkeys_register_and_dispatch_callbacks():
 
 
 def test_hotkeys_can_be_started_twice_without_crashing():
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    _app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     backend = FakeBackend()
     manager = PromptBoardHotkeys(
         on_toggle_visibility=lambda: None,
