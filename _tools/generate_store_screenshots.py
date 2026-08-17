@@ -37,6 +37,51 @@ SCREENSHOT_NAMES = {
 THEME = "dark"
 
 
+def _force_native_platform() -> None:
+    """Entfernt eine geerbte offscreen-Plattform VOR der QApplication-Erzeugung.
+
+    Unter QT_QPA_PLATFORM=offscreen rendert Qt auf Windows keine echten
+    Glyphen -- jede Glyphe wird als .notdef-Kaestchen (Tofu) gerastert; ein
+    Screenshot per grab() sieht dann gueltig aus, ist aber unbrauchbar (Fund
+    aus der Store-Welle 1, behoben u.a. in SoftwareCenter/ProfiPrompt/
+    CleanMarkdown/LitZen). Dieses Skript setzt die Variable selbst nicht,
+    kann sie aber aus der aufrufenden Umgebung/Session geerbt haben.
+    """
+    if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+        del os.environ["QT_QPA_PLATFORM"]
+
+
+def _render_probe_char(app: QtWidgets.QApplication, ch: str) -> bytes:
+    pm = QtGui.QPixmap(48, 48)
+    pm.fill(QtCore.Qt.GlobalColor.white)
+    p = QtGui.QPainter(pm)
+    p.setFont(app.font())
+    p.drawText(pm.rect(), QtCore.Qt.AlignCenter, ch)
+    p.end()
+    return bytes(pm.toImage().constBits())
+
+
+def _assert_font_rendering(app: QtWidgets.QApplication) -> None:
+    """Bricht ab statt still ein Tofu-Screenshot-Set zu erzeugen."""
+    platform = QtWidgets.QApplication.platformName()
+    if platform == "offscreen":
+        raise RuntimeError(
+            "Qt laeuft unter 'offscreen' -- Screenshots waeren Tofu (Kaestchen "
+            "statt Text). QT_QPA_PLATFORM=offscreen nicht setzen."
+        )
+    probes = ["A", "B", "g", "8", "M"]
+    renders = [_render_probe_char(app, ch) for ch in probes]
+    blank = _render_probe_char(app, " ")
+    distinct = len(set(renders))
+    non_blank = sum(1 for r in renders if r != blank)
+    if not (distinct >= 3 and non_blank >= len(probes) - 1):
+        raise RuntimeError(
+            f"Font-Rendering-Selbsttest fehlgeschlagen (Plattform '{platform}'): "
+            "gerenderte Glyphen sind nicht unterscheidbar (Tofu-Verdacht). "
+            "Abbruch, um kein defektes Screenshot-Set zu erzeugen."
+        )
+
+
 def apply_screenshot_font(app: QtWidgets.QApplication) -> None:
     families = {family.casefold(): family for family in QtGui.QFontDatabase.families()}
     for preferred in ("Segoe UI", "Arial", "Noto Sans", "Liberation Sans", "Sans Serif"):
@@ -197,10 +242,12 @@ def generate_store_screenshots(output_dir: Path) -> list[Path]:
         temp_root = Path(temp_dir)
         configure_qsettings(temp_root)
 
+        _force_native_platform()
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
         app.setApplicationName("PromptBoard Screenshot Generator")
         apply_screenshot_font(app)
         apply_theme(app, THEME)
+        _assert_font_rendering(app)
 
         settings = SettingsManager()
         data_dir = temp_root / "data"
@@ -271,10 +318,12 @@ def generate_main_screenshot(main_path: Path) -> Path:
         temp_root = Path(temp_dir)
         configure_qsettings(temp_root)
 
+        _force_native_platform()
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
         app.setApplicationName("PromptBoard Screenshot Generator")
         apply_screenshot_font(app)
         apply_theme(app, THEME)
+        _assert_font_rendering(app)
 
         settings = SettingsManager()
         data_dir = temp_root / "data"
