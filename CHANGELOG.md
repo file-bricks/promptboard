@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-09-10
+
+### Store-Screenshot Test-Härtung, Gitignore-Fix & Testsuite-Harmonisierung
+
+- **Store-Screenshot Headless Guard**: `real_gui_available()` in `_tools/generate_store_screenshots.py` bereitgestellt und in `tests/test_store_screenshots.py` eingebunden (`pytest.skip` bei Headless/Offscreen-Ausführung), wodurch vermieden wird, dass Vorab-Tests mit `QT_QPA_PLATFORM=offscreen` den Screenshot-Generierungs-Selbsttest (`_assert_font_rendering`) mit `RuntimeError` abbrechen.
+- **Gitignore-Anker für Bugsweep-Artefakte**: `/*_BUGSWEEP_*.py` auf Root geankert, damit reguläre Testdateien unter `tests/` (z. B. `tests/test_bugsweep_iteration1_null_resilience.py`) auf Windows-Dateisystemen nicht mehr fälschlicherweise ignoriert werden.
+- **Lint-Hygiene**: Unbenutzte Imports und Leerzeilen-Whitespace in `tests/test_bugsweep_iteration1_null_resilience.py` bereinigt (`ruff check` 100% sauber).
+- **Teststand synchronisiert**: Vollständige Pytest-Suite umfasst nun 119 Tests (118 passed, 1 skipped in Headless-/Offscreen-Umgebungen; 119 passed bei nativer GUI-Ausführung).
+
 ## [1.1.5] - 2026-08-14
 
 ### Discoverability, README-Design & Code-Hygiene (Pfad B)

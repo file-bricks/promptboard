@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
@@ -13,10 +12,19 @@ for entry in (str(SRC_DIR), str(TOOLS_DIR)):
     if entry not in sys.path:
         sys.path.insert(0, entry)
 
-from generate_store_screenshots import SCREENSHOT_NAMES, generate_store_screenshots
+from generate_store_screenshots import (
+    SCREENSHOT_NAMES,
+    generate_store_screenshots,
+    real_gui_available,
+)
 
 
-def test_generate_store_screenshots_writes_all_targets(tmp_path):
+def test_generate_store_screenshots_writes_all_targets(tmp_path: Path) -> None:
+    if not real_gui_available():
+        pytest.skip(
+            "Store-Screenshots brauchen eine echte GUI-Session; headless (offscreen) "
+            "entstehen unlesbare Tofu-Kaestchen statt Text."
+        )
     targets = generate_store_screenshots(tmp_path)
 
     assert {target.name for target in targets} == set(SCREENSHOT_NAMES.values())

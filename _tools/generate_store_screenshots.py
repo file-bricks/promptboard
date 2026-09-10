@@ -37,6 +37,27 @@ SCREENSHOT_NAMES = {
 THEME = "dark"
 
 
+HEADLESS_PLATFORMS = {"offscreen", "minimal"}
+
+
+def real_gui_available() -> bool:
+    """Kann dieser Prozess ein echtes Fenster zeichnen?
+
+    Laeuft bereits eine QApplication (z. B. unter pytest mit
+    ``QT_QPA_PLATFORM=offscreen``), entscheidet deren Plattform-Plugin -- ein
+    zweites laesst sich nicht daneben starten.
+    """
+    app = QtWidgets.QApplication.instance()
+    if app is not None:
+        return app.platformName() not in HEADLESS_PLATFORMS
+    forced = os.environ.get("QT_QPA_PLATFORM", "")
+    if forced in HEADLESS_PLATFORMS:
+        forced = ""
+    if sys.platform.startswith("win") or sys.platform == "darwin":
+        return True
+    return bool(forced or os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+
 def _force_native_platform() -> None:
     """Entfernt eine geerbte offscreen-Plattform VOR der QApplication-Erzeugung.
 

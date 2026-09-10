@@ -2,10 +2,10 @@
 name: promptboard-state
 type: state-snapshot
 version: 1.1.1
-updated: 2026-08-12
-updated_by: GPT
+updated: 2026-09-10
+updated_by: Gemini (Antigravity)
 current_phase: REL-PUB v1.1.1 stabilisiert; Icon-Assets vereinheitlicht, Store-P1 bleibt offen
-last_verified: 2026-08-12
+last_verified: 2026-09-10
 description: |
   PromptBoard ist als öffentliches Desktop-Tool veröffentlicht. Die aktuelle
   Linie steht bei v1.1.1 inklusive Hotfix für den Import-Crash,
@@ -23,11 +23,13 @@ description: |
 oder nach einer Entscheidung, ob `PromptBase Team Server` als eigenes Projekt
 angelegt wird.
 
-## Readback 2026-08-12
+## Readback 2026-09-10
 
-- **Tests:** `python -X utf8 -m pytest -q` läuft im frischen Plan-D-Klon mit
-  **116/116**; `python -X utf8 tests/source_platform_smoke.py` und
-  `python -X utf8 -m compileall -q src _tools tests` sind ebenfalls grün.
+- **Tests:** `python -X utf8 -m pytest -q` läuft im Plan-D-Klon mit
+  **118/118 bestanden (1 übersprungen, 119 gesamt)**; Store-Screenshots
+  überspringen headless sauber. `python -X utf8 tests/source_platform_smoke.py`,
+  `ruff check` und `python -X utf8 -m compileall -q src _tools tests` sind
+  ebenfalls 100% grün.
 - **Release:** GitHub `v1.1.1` ist live (nicht Draft, nicht Pre-release) mit
   EXE, Source-ZIP, `CHANGELOG.txt` und `SHA256SUMS.txt`.
 - **Store-P1:** nicht geschlossen. Die zentrale Store-Pipeline meldet im

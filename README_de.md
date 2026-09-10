@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/version-v1.1.1-blue" alt="Version v1.1.1">
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Plattform: Windows">
   <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Gebaut mit Python und PySide6">
-  <img src="https://img.shields.io/badge/tests-116%2F116%20bestanden-success" alt="Tests: 116/116 bestanden">
+  <img src="https://img.shields.io/badge/tests-119%2F119%20bestanden-success" alt="Tests: 119/119 bestanden">
   <img src="https://img.shields.io/badge/ecosystem-file--bricks-blue?logo=github" alt="Ökosystem: file-bricks">
   <img src="https://img.shields.io/badge/umbrella-open--bricks-orange?logo=open-source-initiative" alt="Dachorganisation: open-bricks">
   <img src="https://img.shields.io/badge/llms.txt-ready-22c55e?logo=markdown" alt="llms.txt: bereit">
@@ -34,15 +34,15 @@ PromptBoard ist ein schnelles Desktop-Werkzeug und eine Windows-Tray-App für wi
 ## Status
 
 **Phase:** öffentlich released (`v1.1.1`), Store- und Plattformhärtung im lokalen Entwicklungsstand aktiv<br/>
-**Code:** PySide6-Desktop-App mit 116/116 pytest-Tests<br/>
+**Code:** PySide6-Desktop-App mit 119/119 pytest-Tests<br/>
 
 **CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) mit Windows-Pytest sowie macOS-/Linux-Source-Smoke  
 **Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
 **Aktueller Ordnerstatus:** `LLM/REL-PUB_PromptBoard`  
 
-### Prüf-Readback — 2026-08-14
+### Prüf-Readback — 2026-09-10
 
-- `python -X utf8 -m pytest -q`: **116 bestanden** (Umfang: Python-Testsuite).
+- `python -X utf8 -m pytest -q`: **118 bestanden, 1 übersprungen (119 gesamt)** (Umfang: Python-Testsuite; Screenshot-Test überspringt sauber unter Headless/Offscreen).
 - `python -X utf8 tests/source_platform_smoke.py`: **OK** (Source-/Offscreen-
   Smoke; keine Behauptung nativer macOS-/Linux-Tray- oder Hotkey-Parität).
 - `python -X utf8 -m compileall -q src _tools tests scripts`: **OK**.
