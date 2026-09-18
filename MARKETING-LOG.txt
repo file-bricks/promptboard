@@ -46,3 +46,11 @@
 2. **Microsoft Store Partner Center Packaging**: Fill Partner Center credentials and generate final signed `.msix` package via `_tools/store_release.py`.
 3. **Community Showcase**: Share PromptBoard in `r/Python`, `r/LocalLLM`, and PySide Discord channels for desktop prompt engineering workflows.
 
+## Date: 2026-09-18
+
+### Automated Improvements Executed (Pfad A Hygiene)
+1. **CI-Workflow- & Matrix-Härtung**: Workflows `tests.yml`, `stale.yml`, und `welcome.yml` auf Standard gehärtet mit `concurrency` (`cancel-in-progress: true`), `timeout-minutes: 15`, validierten Actions (`checkout@v4`, `setup-python@v5`), und Job-Permissions (`contents: read`).
+2. **PEP 621 Standardisierung**: `pyproject.toml` um `license-files`, `classifiers`, `keywords`, standardisierte `[project.urls]` (11 kanonische Endpunkte) und `[tool.pytest.ini_options]` (`norecursedirs`, `addopts = "-ra -q"`) erweitert.
+3. **Multi-Host Cloud-Sync & Lock-Schutz**: `.gitignore` gehärtet gegen Multi-Host Konfliktkopien (*-ASUS*, *-WORKSTATION*, *-Mac Studio*), Lock-Dateien (`LOCK*`, `LOCK.permissions.json`) und temporäre Test-/Cache-Dateien.
+4. **Code-Hygiene & Lint-Bereinigung**: Ambivalente Schleifenvariable `l` in `translator.py` zu `lang_code` bereinigt (`ruff check` 100% sauber).
+5. **Rechtliche Absicherung & Verträge**: Gesetzlicher Hinweis nach § 521 BGB Gefälligkeitsrecht in `README_de.md` verankert; `tests/test_metadata.py` als automatisierte Vertragstest-Suite für Metadaten, CI-Härtung, Gitignore und Dokumentationsparität integriert.

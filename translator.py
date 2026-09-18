@@ -181,12 +181,12 @@ class TranslationSystem:
         if lang and lang in SUPPORTED_LANGUAGES:
             return {lang: [k for k, v in self.translations.items() if not v.get(lang)]}
         missing = {}
-        for l in SUPPORTED_LANGUAGES:
-            if l == 'de':
+        for lang_code in SUPPORTED_LANGUAGES:
+            if lang_code == 'de':
                 continue
-            m = [k for k, v in self.translations.items() if not v.get(l)]
+            m = [k for k, v in self.translations.items() if not v.get(lang_code)]
             if m:
-                missing[l] = m
+                missing[lang_code] = m
         return missing
 
 

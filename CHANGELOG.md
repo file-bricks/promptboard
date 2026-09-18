@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
+## [Unreleased] - 2026-09-18
+
+### Technische Repository-Hygiene, CI-Matrix-Härtung & PEP 621 Metadaten (Pfad A)
+
+- **CI-Matrix & Workflow-Härtung**: `tests.yml` mit `concurrency` (`cancel-in-progress: true`), `timeout-minutes: 15` und validierten GitHub Actions (`checkout@v4`, `setup-python@v5`) sowie Ruff-Prüfschritt gehärtet; Flotten-Workflows `stale.yml` (automatisches Stale-Labeling nach 30 Tagen) und `welcome.yml` (Begrüßung für Erstbeitragende) integriert.
+- **PEP 621 Metadaten-Standardisierung**: `pyproject.toml` um `license-files = ["LICENSE", "THIRD_PARTY_LICENSES.txt"]`, `classifiers`, `keywords` sowie vollständige `[project.urls]` (Homepage, Docs, Issues, Changelog, Security, Third-Party Licenses, Marketing Log, LLM Ready) und `[tool.pytest.ini_options]` (`norecursedirs`, `minversion = "7.0"`, `addopts = "-ra -q"`) erweitert.
+- **Multi-Host Cloud-Sync & Lock-Schutz**: `.gitignore` gehärtet gegen Multi-Host Konfliktdateien (`*conflicted copy*`, `*-ASUS-GEI*`, `*-WORKSTATION-LG*`, `*-Mac Studio*`), systemweite Locks (`LOCK*`, `LOCK.permissions.json`) und temporäre SQLite-/Tool-Caches (`*.db-wal`, `uv.lock`, `.hypothesis/`, `.turbo/`, `.ruff_cache/`).
+- **Code-Hygiene & Linter**: Ambivalente Schleifenvariable `l` in `translator.py` zu `lang_code` refaktorisiert (`ruff check` 100% sauber ohne Warnungen).
+- **Rechtlicher Hinweis & Doku-Härtung**: Gesetzlichen Hinweis nach § 521 BGB Gefälligkeitsrecht in `README_de.md` ergänzt; Verifikations-Readbacks in `README.md`, `README_de.md` und `llms.txt` synchronisiert.
+- **Vertragstest-Suite**: `tests/test_metadata.py` mit 8 Vertragstests für PEP 621 Metadaten, CI Concurrency/Timeouts/Permissions, Gitignore-Muster, Invarianten und Dokumentations-Parität implementiert.
+
 ## [Unreleased] - 2026-09-10
 
 ### Store-Screenshot Test-Härtung, Gitignore-Fix & Testsuite-Harmonisierung

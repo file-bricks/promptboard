@@ -34,15 +34,15 @@ PromptBoard ist ein schnelles Desktop-Werkzeug und eine Windows-Tray-App für wi
 ## Status
 
 **Phase:** öffentlich released (`v1.1.1`), Store- und Plattformhärtung im lokalen Entwicklungsstand aktiv<br/>
-**Code:** PySide6-Desktop-App mit 119/119 pytest-Tests<br/>
+**Code:** PySide6-Desktop-App mit 126/126 pytest-Tests<br/>
 
 **CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) mit Windows-Pytest sowie macOS-/Linux-Source-Smoke  
 **Repository:** [file-bricks/promptboard](https://github.com/file-bricks/promptboard)  
 **Aktueller Ordnerstatus:** `LLM/REL-PUB_PromptBoard`  
 
-### Prüf-Readback — 2026-09-10
+### Prüf-Readback — 2026-09-18
 
-- `python -X utf8 -m pytest -q`: **118 bestanden, 1 übersprungen (119 gesamt)** (Umfang: Python-Testsuite; Screenshot-Test überspringt sauber unter Headless/Offscreen).
+- `python -X utf8 -m pytest -q`: **125 bestanden, 1 übersprungen (126 gesamt)** (Umfang: Python-Testsuite; Screenshot-Test überspringt sauber unter Headless/Offscreen).
 - `python -X utf8 tests/source_platform_smoke.py`: **OK** (Source-/Offscreen-
   Smoke; keine Behauptung nativer macOS-/Linux-Tray- oder Hotkey-Parität).
 - `python -X utf8 -m compileall -q src _tools tests scripts`: **OK**.
@@ -143,3 +143,7 @@ Unter Windows alternativ per Doppelklick auf `start.bat`.
 PromptBoard steht unter der [MIT](LICENSE)-Lizenz. Die Lizenzen der
 Laufzeit-Abhängigkeiten sind in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt)
 aufgeführt.
+
+## Rechtlicher Hinweis (§ 521 BGB Gefälligkeitsrecht)
+
+PromptBoard wird als unentgeltliches Open-Source-Werkzeug zur Verfügung gestellt. Gemäß § 521 BGB haftet der Entwickler bei unentgeltlicher Überlassung ausschließlich für Vorsatz und grobe Fahrlässigkeit. Die Nutzung erfolgt auf eigenes Risiko im Rahmen der MIT-Lizenz.

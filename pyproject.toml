@@ -11,16 +11,60 @@ description = "Local Windows tray app for reusable prompts, skills, workflows, r
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_LICENSES.txt"]
 authors = [{ name = "Lukas Geiger" }]
+keywords = [
+  "promptboard",
+  "prompts",
+  "prompt-management",
+  "tray-application",
+  "pyside6",
+  "desktop-app",
+  "offline-first",
+  "windows",
+  "llm",
+  "local-first",
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Win32 (MS Windows)",
+  "Intended Audience :: Developers",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: Microsoft :: Windows :: Windows 10",
+  "Operating System :: Microsoft :: Windows :: Windows 11",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Desktop Environment",
+  "Topic :: Utilities",
+]
 dependencies = [
   "PySide6>=6.6",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=9.0.3",
+  "pytest>=7.0.0",
   "pyinstaller>=6.0",
+  "ruff>=0.4.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/file-bricks/promptboard"
+Documentation = "https://github.com/file-bricks/promptboard#readme"
+Repository = "https://github.com/file-bricks/promptboard.git"
+Issues = "https://github.com/file-bricks/promptboard/issues"
+Changelog = "https://github.com/file-bricks/promptboard/blob/main/CHANGELOG.md"
+Security = "https://github.com/file-bricks/promptboard/blob/main/SECURITY.md"
+"Third-Party Licenses" = "https://github.com/file-bricks/promptboard/blob/main/THIRD_PARTY_LICENSES.txt"
+"Parent Organization" = "https://github.com/file-bricks"
+"Umbrella Ecosystem" = "https://github.com/open-bricks"
+"Marketing Log" = "https://github.com/file-bricks/promptboard/blob/main/MARKETING-LOG.txt"
+"LLM Ready" = "https://github.com/file-bricks/promptboard/blob/main/llms.txt"
 
 [project.scripts]
 promptboard = "promptboard:main"
@@ -50,8 +94,23 @@ py-modules = [
 "" = "src"
 
 [tool.pytest.ini_options]
+minversion = "7.0"
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = "-ra -q"
+norecursedirs = [
+  ".git",
+  ".pytest_cache",
+  "__pycache__",
+  "build",
+  "dist",
+  ".ruff_cache",
+  "output",
+  "materialized",
+  "_WARTUNG",
+  "store_package",
+  "releases",
+]
 
 [tool.ruff]
 line-length = 100

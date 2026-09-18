@@ -57,3 +57,42 @@ _tmp_accessibility_check/
 
 # Bugsweep artefacts
 /*_BUGSWEEP_*.py
+
+# Multi-Host Cloud Sync & Conflict Copies
+*conflicted copy*
+* (Kopie)*
+* (Copy)*
+*-ASUS*
+*-ASUS-GEI*
+*-LAPTOP*
+*-WORKSTATION*
+*-WORKSTATION-LG*
+*-Mac Studio*
+*-MacBook*
+
+# Lock files & permissions
+LOCK
+LOCK.*
+LOCK*.txt
+LOCK.permissions.json
+LOCK.user.*
+LOCK.until.*
+LOCK.condition.*
+
+# Tool caches, coverage & package locks
+uv.lock
+!package-lock.json
+.hypothesis/
+.turbo/
+.nyc_output/
+.coverage
+.coverage.*
+coverage.xml
+*.orig
+*.rej
+.ruff_cache/
+
+# Local database & journal files
+*.db
+*.db-shm
+*.db-wal

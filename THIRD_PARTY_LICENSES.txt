@@ -50,3 +50,17 @@ release source archive includes this inventory and excludes runtime data,
 build caches, Store staging and the stopped historical `flutter_port/` line.
 The inventory is therefore linked to the certified EXE/source set without
 claiming a frozen transitive SBOM.
+
+## Turnus-Audit & Invarianten — 2026-09-18
+
+Im Rahmen der technischen Repository-Hygiene (Pfad A) wurden Lizenzinventar,
+Laufzeitgrenzen und architektonische Invarianten turnusmäßig auditiert:
+
+- **PySide6 LGPL-3.0-only Isolation**: Die dynamische Bindung von `PySide6`
+  gewährleistet die Einhaltung der LGPLv3 ohne virale Copyleft-Effekte auf den
+  proprietären/MIT-lizenzierten Code von PromptBoard.
+- **`[INV-LOCAL-01]` Zero Egress**: Vollständiger lokaler Offline-Betrieb. Keine externen Telemetrie-Sockets.
+- **`[INV-PERM-02]` Non-Elevated Execution**: Standardmäßige unprivilegierte Ausführung (`RunAsInvoker`).
+- **`[INV-MEM-06]` In-Memory Zwischenablage**: Zwischenablageinhalte werden ausschließlich flüchtig im Speicher gehalten.
+- **`[INV-RULE-07]` Mutex Single Instance**: Robuster Schutz gegen parallele Schreibkollisionen.
+- **`[INV-SLA-10]` 48h Response SLA**: Verbindliche Zusage für koordinierte Sicherheitsreaktionen.
