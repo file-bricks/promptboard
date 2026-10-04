@@ -2,7 +2,27 @@
 
 Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
-## [Unreleased] - 2026-09-18
+## [Unreleased]
+
+## [1.1.3] - 2026-10-04
+
+Sammelrelease seit `v1.1.1`. Die Eintraege `[1.1.2]` bis `[1.1.5]` weiter unten sowie die datierten `[Unreleased]`-Bloecke wurden nie einzeln veroeffentlicht; alle zugehoerigen Aenderungen sind in diesem Release enthalten.
+
+### Hinzugefuegt / Geaendert
+
+- Import-UX: Auto-Refresh nach Import, konditionale Menuepunkte; Materialisieren-Default als `.txt` oder Markdown waehlbar.
+- Tray-Navigation Kategorie -> Eintrag -> Kopieren; Single-Instance-Guard weckt die laufende Instanz statt einen zweiten Tray zu starten; einmaliger Erststart-Hinweis zum Autosave-Workflow.
+- Icon-Fixes (Fenster/Tray auch im Frozen-Build, Wide310x150Logo proportionsgetreu), Barrierefreiheit (Screenreader-Namen fuer Bibliothek und Einstellungen).
+- Zusaetzliche README-Fassungen: Spanisch, Chinesisch (vereinfacht), Japanisch, Russisch.
+
+### Behoben / Fixed
+
+- Robustheit: Null-Felder in ProfiPrompt-/ExplorerPro-Adaptern und Tag-Parser, Bibliothek-Load, Hotkey-Callback, Settings-Pfad, Erhalt ID-loser Eintraege beim Export.
+- Packaging: OSI-Lizenz-Classifier entfernt, der mit `license=` (PEP 639) kollidierte; CI-Fallback auf `tomli` fuer Python 3.10.
+- Store-Screenshot-Generator und Tests gegen Offscreen-Rendering gehaertet; Store-Build auch ausserhalb der .SOFTWARE-Pipeline moeglich.
+- Versionstraeger (`pyproject.toml`, Build-Skripte, Store-Konfiguration, READMEs) einheitlich auf `1.1.3`.
+
+## Details 2026-09-18 (Pfad A)
 
 ### Technische Repository-Hygiene, CI-Matrix-Härtung & PEP 621 Metadaten (Pfad A)
 

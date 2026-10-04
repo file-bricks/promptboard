@@ -8,7 +8,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
-  <img src="https://img.shields.io/badge/version-v1.1.1-blue" alt="Version v1.1.1">
+  <img src="https://img.shields.io/badge/version-v1.1.3-blue" alt="Version v1.1.3">
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows">
   <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Built with Python and PySide6">
   <img src="https://img.shields.io/badge/tests-126%2F126%20passing-success" alt="Tests: 126/126 passing">
@@ -35,7 +35,7 @@ PromptBoard は、再利用可能な LLM の構成要素(プロンプト、ス�
 
 ## Status
 
-**フェーズ:** 公開リリース(`v1.1.1`)、ストアおよびプラットフォーム向けの堅牢化はローカル開発で進行中<br/>
+**フェーズ:** 公開リリース(`v1.1.3`)、ストアおよびプラットフォーム向けの堅牢化はローカル開発で進行中<br/>
 **コード:** pytest テスト 126/126 件合格の PySide6 デスクトップアプリケーション<br/>
 
 **CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) — Windows での Pytest と macOS/Linux でのソースのスモークチェックを実行  
@@ -47,13 +47,9 @@ PromptBoard は、再利用可能な LLM の構成要素(プロンプト、ス�
 - `python -X utf8 tests/source_platform_smoke.py`: **OK**(ソース/オフスクリーンのスモークテストであり、ネイティブな macOS/Linux のトレイやホットキーの同等性を主張するものではありません)。
 - `python -X utf8 -m compileall -q src _tools tests scripts`: **OK**。
 - `ruff check src _tools tests scripts`: **OK**(すべてのチェックに合格)。
-- GitHub リリース `v1.1.1` は公開済みです。Store-P1 は未完了のままです。実際の
+- GitHub リリース `v1.1.3` は公開済みです。Store-P1 は未完了のままです。実際の
   Partner-Center の値、`makeappx.exe` によるローカル MSIX ビルド、および
   管理者権限での WACK の読み戻しがまだ揃っていないためです。
-- 公開済みのアーティファクトは `v1.1.1` の系列です。`pyproject.toml` には
-  未リリースの開発用メタデータ `1.1.3` が残っています。これを公開済みの
-  v1.1.1 アーティファクトであるかのように黙って見せかけるのではなく、
-  ここに明示的に記録しています。
 
 ## Architecture & Data Flow
 

@@ -2,7 +2,7 @@
 name: promptboard
 type: project-docs
 profile: FULL
-version: 1.1.1
+version: 1.1.3
 created: 2026-05-10
 updated: 2026-05-12
 last_verified: 2026-05-12

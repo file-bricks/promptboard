@@ -1,7 +1,7 @@
 ---
 name: promptboard-state
 type: state-snapshot
-version: 1.1.1
+version: 1.1.3
 updated: 2026-09-10
 updated_by: Gemini (Antigravity)
 current_phase: REL-PUB v1.1.1 stabilisiert; Icon-Assets vereinheitlicht, Store-P1 bleibt offen
@@ -35,10 +35,7 @@ angelegt wird.
 - **Store-P1:** nicht geschlossen. Die zentrale Store-Pipeline meldet im
   lokalen Preflight `makeappx.exe nicht gefunden`; Partner-Center-Werte und ein
   erhöhter WACK-Lauf bleiben externe Gates.
-- **Versionsgrenze:** Release-Dokumente und Paketartefakte beziehen sich auf
-  `v1.1.1`; `pyproject.toml` enthält weiterhin `1.1.3` als unveröffentlichte
-  Entwicklungsmetadaten. Diese Differenz ist offen und wird nicht durch Text
-  kaschiert.
+- **Versionsgrenze:** Release-Dokumente, Paketartefakte und `pyproject.toml` stehen ab 2026-10-04 einheitlich auf `1.1.3` (Release v1.1.3; v1.1.1 bleibt die historische Vorversion).
 
 ## Current Phase
 

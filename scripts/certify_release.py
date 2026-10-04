@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage and verify the PromptBoard v1.1.1 release set.
+"""Stage and verify the PromptBoard v1.1.3 release set.
 
 The release directory is deliberately treated as a generated, local-only
 surface.  The source archive is assembled from tracked files so runtime data,
@@ -18,7 +18,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 
-APP_VERSION = "1.1.1"
+APP_VERSION = "1.1.3"
 APP_NAME = "PromptBoard"
 EXE_NAME = f"{APP_NAME}-{APP_VERSION}-win64.exe"
 SOURCE_NAME = f"{APP_NAME}-{APP_VERSION}-source.zip"

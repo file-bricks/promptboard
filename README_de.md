@@ -6,7 +6,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="Lizenz: MIT">
-  <img src="https://img.shields.io/badge/version-v1.1.1-blue" alt="Version v1.1.1">
+  <img src="https://img.shields.io/badge/version-v1.1.3-blue" alt="Version v1.1.3">
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Plattform: Windows">
   <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Gebaut mit Python und PySide6">
   <img src="https://img.shields.io/badge/tests-119%2F119%20bestanden-success" alt="Tests: 119/119 bestanden">
@@ -33,7 +33,7 @@ PromptBoard ist ein schnelles Desktop-Werkzeug und eine Windows-Tray-App für wi
 
 ## Status
 
-**Phase:** öffentlich released (`v1.1.1`), Store- und Plattformhärtung im lokalen Entwicklungsstand aktiv<br/>
+**Phase:** öffentlich released (`v1.1.3`), Store- und Plattformhärtung im lokalen Entwicklungsstand aktiv<br/>
 **Code:** PySide6-Desktop-App mit 126/126 pytest-Tests<br/>
 
 **CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) mit Windows-Pytest sowie macOS-/Linux-Source-Smoke  
@@ -47,12 +47,9 @@ PromptBoard ist ein schnelles Desktop-Werkzeug und eine Windows-Tray-App für wi
   Smoke; keine Behauptung nativer macOS-/Linux-Tray- oder Hotkey-Parität).
 - `python -X utf8 -m compileall -q src _tools tests scripts`: **OK**.
 - `ruff check src _tools tests scripts`: **OK** (alle Prüfungen bestanden).
-- GitHub-Release `v1.1.1` ist veröffentlicht; Store-P1 bleibt offen, weil
+- GitHub-Release `v1.1.3` ist veröffentlicht; Store-P1 bleibt offen, weil
   echte Partner-Center-Werte, ein lokaler MSIX-Build mit `makeappx.exe` und ein
   erhöhter WACK-Readback noch fehlen.
-- Die veröffentlichte Artefaktlinie ist `v1.1.1`. `pyproject.toml` führt noch
-  unveröffentlichte Entwicklungsmetadaten `1.1.3`; diese Abweichung wird
-  ausdrücklich dokumentiert und nicht als v1.1.1-Artefakt ausgegeben.
 
 ## Architektur & Datenfluss
 

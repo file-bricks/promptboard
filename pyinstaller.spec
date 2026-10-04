@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec for PromptBoard v1.1.1.
+"""PyInstaller spec for PromptBoard v1.1.3.
 
 Build with:
     python -m PyInstaller pyinstaller.spec --noconfirm
@@ -50,7 +50,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='PromptBoard-1.1.1-win64',
+    name='PromptBoard-1.1.3-win64',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

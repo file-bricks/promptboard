@@ -191,4 +191,5 @@ def test_documentation_and_marketing_log_parity():
     assert "Pfad A Hygiene" in mktg
 
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "[Unreleased] - 2026-09-18" in changelog
+    assert "## [1.1.3] - 2026-10-04" in changelog
+    assert "Details 2026-09-18 (Pfad A)" in changelog

@@ -4,7 +4,7 @@ Stand: 2026-08-12
 
 ## Einreichungsstatus
 
-Die Listing-Texte sind für die veröffentlichte Produktlinie `v1.1.1`
+Die Listing-Texte sind für die veröffentlichte Produktlinie `v1.1.3`
 aktualisiert und lokal geprüft. Eine Store-Einreichung wird nicht behauptet:
 `store_package.json` enthält weiterhin Platzhalter für Publisher/Identity,
 und der lokale MSIX-Preflight ist wegen fehlendem `makeappx.exe` offen.

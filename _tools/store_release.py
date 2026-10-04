@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any, Mapping
 
 APP_NAME = "PromptBoard"
-APP_VERSION = "1.1.1"
-STORE_VERSION = "1.1.1.0"
+APP_VERSION = "1.1.3"
+STORE_VERSION = "1.1.3.0"
 APP_EXECUTABLE = f"{APP_NAME}-{APP_VERSION}-win64.exe"
 STORE_CONFIG_NAME = "store_package.json"
 LOCAL_STORE_CONFIG_NAME = "store_package.local.json"

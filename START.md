@@ -1,7 +1,7 @@
 ---
 name: promptboard-start
 type: session-bootstrap
-version: 1.1.1
+version: 1.1.3
 updated: 2026-05-12
 last_verified: 2026-05-12
 description: |

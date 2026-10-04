@@ -8,7 +8,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
-  <img src="https://img.shields.io/badge/version-v1.1.1-blue" alt="Version v1.1.1">
+  <img src="https://img.shields.io/badge/version-v1.1.3-blue" alt="Version v1.1.3">
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows">
   <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Built with Python and PySide6">
   <img src="https://img.shields.io/badge/tests-126%2F126%20passing-success" alt="Tests: 126/126 passing">
@@ -35,7 +35,7 @@ PromptBoard es una utilidad de escritorio rápida y una aplicación de bandeja d
 
 ## Estado
 
-**Fase:** versión pública (`v1.1.1`), con el refuerzo para tienda y plataformas activo en el desarrollo local<br/>
+**Fase:** versión pública (`v1.1.3`), con el refuerzo para tienda y plataformas activo en el desarrollo local<br/>
 **Código:** aplicación de escritorio PySide6 con 126/126 pruebas de pytest superadas<br/>
 
 **CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) ejecutando Pytest en Windows y comprobaciones rápidas del código fuente en macOS/Linux  
@@ -47,12 +47,9 @@ PromptBoard es una utilidad de escritorio rápida y una aplicación de bandeja d
 - `python -X utf8 tests/source_platform_smoke.py`: **OK** (prueba rápida del código fuente/offscreen; no afirma paridad nativa de la bandeja ni de los atajos de teclado en macOS/Linux).
 - `python -X utf8 -m compileall -q src _tools tests scripts`: **OK**.
 - `ruff check src _tools tests scripts`: **OK** (todas las comprobaciones superadas).
-- La versión `v1.1.1` de GitHub está publicada; Store-P1 sigue abierto porque aún no
+- La versión `v1.1.3` de GitHub está publicada; Store-P1 sigue abierto porque aún no
   están disponibles los valores reales de Partner Center, una compilación local de MSIX con
   `makeappx.exe` ni una lectura de WACK con privilegios elevados.
-- La línea de artefactos publicada es `v1.1.1`. `pyproject.toml` aún contiene los
-  metadatos de desarrollo no publicados `1.1.3`; esto se registra de forma explícita en lugar de
-  presentarlo en silencio como un artefacto publicado de v1.1.1.
 
 ## Arquitectura y flujo de datos
 

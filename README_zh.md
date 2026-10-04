@@ -8,7 +8,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
-  <img src="https://img.shields.io/badge/version-v1.1.1-blue" alt="Version v1.1.1">
+  <img src="https://img.shields.io/badge/version-v1.1.3-blue" alt="Version v1.1.3">
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows">
   <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Built with Python and PySide6">
   <img src="https://img.shields.io/badge/tests-126%2F126%20passing-success" alt="Tests: 126/126 passing">
@@ -35,7 +35,7 @@ PromptBoard 是一款快速的桌面工具和 Windows 托盘应用,用于管理�
 
 ## 状态
 
-**阶段:** 公开发布(`v1.1.1`),商店与平台加固正在本地开发中<br/>
+**阶段:** 公开发布(`v1.1.3`),商店与平台加固正在本地开发中<br/>
 **代码:** PySide6 桌面应用,126/126 个 pytest 测试通过<br/>
 
 **CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) 运行 Windows Pytest 以及 macOS/Linux 源码冒烟检查  
@@ -47,12 +47,9 @@ PromptBoard 是一款快速的桌面工具和 Windows 托盘应用,用于管理�
 - `python -X utf8 tests/source_platform_smoke.py`:**OK**(源码/offscreen 冒烟测试;不声称 macOS/Linux 原生托盘或热键已达到同等支持)。
 - `python -X utf8 -m compileall -q src _tools tests scripts`:**OK**。
 - `ruff check src _tools tests scripts`:**OK**(所有检查均通过)。
-- GitHub 发布版 `v1.1.1` 已发布;Store-P1 仍未完成,因为尚缺真实的
+- GitHub 发布版 `v1.1.3` 已发布;Store-P1 仍未完成,因为尚缺真实的
   Partner-Center 值、使用 `makeappx.exe` 的本地 MSIX 构建,以及
   提升权限的 WACK 回读。
-- 已发布的产物版本线为 `v1.1.1`。`pyproject.toml` 仍带有
-  未发布的开发元数据 `1.1.3`;此处明确记录这一点,而不是
-  悄悄将其呈现为已发布的 v1.1.1 产物。
 
 ## Architecture & Data Flow
 

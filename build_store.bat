@@ -2,8 +2,8 @@
 setlocal
 cd /d "%~dp0"
 
-set EXE_PATH=dist\PromptBoard-1.1.1-win64.exe
-if not exist "%EXE_PATH%" set EXE_PATH=releases\v1.1.1\PromptBoard-1.1.1-win64.exe
+set EXE_PATH=dist\PromptBoard-1.1.3-win64.exe
+if not exist "%EXE_PATH%" set EXE_PATH=releases\v1.1.3\PromptBoard-1.1.3-win64.exe
 
 python --version >nul 2>&1
 if errorlevel 1 (
@@ -13,7 +13,7 @@ if errorlevel 1 (
 
 if not exist "%EXE_PATH%" (
     echo [FEHLER] Keine PromptBoard-EXE gefunden.
-    echo Erwartet: dist\PromptBoard-1.1.1-win64.exe oder releases\v1.1.1\PromptBoard-1.1.1-win64.exe
+    echo Erwartet: dist\PromptBoard-1.1.3-win64.exe oder releases\v1.1.3\PromptBoard-1.1.3-win64.exe
     exit /b 1
 )
 

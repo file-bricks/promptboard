@@ -22,8 +22,8 @@ def test_build_store_config_has_store_defaults():
     config = module.build_store_config()
 
     assert config["app_name"] == "PromptBoard"
-    assert config["version"] == "1.1.1.0"
-    assert config["executable"] == "PromptBoard-1.1.1-win64.exe"
+    assert config["version"] == "1.1.3.0"
+    assert config["executable"] == "PromptBoard-1.1.3-win64.exe"
     assert config["capabilities"] == "runFullTrust"
     assert config["privacy_url"].endswith("/PRIVACY_POLICY.md")
 
@@ -132,7 +132,7 @@ def test_prepare_store_package_uses_effective_store_values(tmp_path):
         ),
         encoding="utf-8",
     )
-    exe_path = tmp_path / "PromptBoard-1.1.1-win64.exe"
+    exe_path = tmp_path / "PromptBoard-1.1.3-win64.exe"
     exe_path.write_bytes(b"stub")
     icon_path = tmp_path / "PromptBoard.png"
     icon_path.write_bytes(b"png")

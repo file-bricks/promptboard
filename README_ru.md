@@ -8,7 +8,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
-  <img src="https://img.shields.io/badge/version-v1.1.1-blue" alt="Version v1.1.1">
+  <img src="https://img.shields.io/badge/version-v1.1.3-blue" alt="Version v1.1.3">
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows">
   <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Built with Python and PySide6">
   <img src="https://img.shields.io/badge/tests-126%2F126%20passing-success" alt="Tests: 126/126 passing">
@@ -35,7 +35,7 @@ PromptBoard — это быстрая настольная утилита и п�
 
 ## Статус
 
-**Этап:** публичный релиз (`v1.1.1`), в локальной разработке ведётся усиление под магазины и платформы<br/>
+**Этап:** публичный релиз (`v1.1.3`), в локальной разработке ведётся усиление под магазины и платформы<br/>
 **Код:** настольное приложение на PySide6, 126/126 успешно проходящих тестов pytest<br/>
 
 **CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) — запуск Windows Pytest и smoke-проверок исходников для macOS/Linux  
@@ -47,12 +47,9 @@ PromptBoard — это быстрая настольная утилита и п�
 - `python -X utf8 tests/source_platform_smoke.py`: **OK** (smoke-проверка исходников/offscreen; она не утверждает паритет нативного трея или горячих клавиш на macOS/Linux).
 - `python -X utf8 -m compileall -q src _tools tests scripts`: **OK**.
 - `ruff check src _tools tests scripts`: **OK** (все проверки пройдены).
-- Релиз GitHub `v1.1.1` опубликован; Store-P1 остаётся открытым, поскольку реальные
+- Релиз GitHub `v1.1.3` опубликован; Store-P1 остаётся открытым, поскольку реальные
   значения Partner-Center, локальная сборка MSIX с помощью `makeappx.exe` и
   проверка WACK с повышенными правами пока недоступны.
-- Опубликованная линия артефактов — `v1.1.1`. В `pyproject.toml` по-прежнему указаны
-  неопубликованные метаданные разработки `1.1.3`; это зафиксировано явно, а не
-  выдаётся молча за опубликованный артефакт v1.1.1.
 
 ## Architecture & Data Flow
 

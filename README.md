@@ -6,7 +6,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
-  <img src="https://img.shields.io/badge/version-v1.1.1-blue" alt="Version v1.1.1">
+  <img src="https://img.shields.io/badge/version-v1.1.3-blue" alt="Version v1.1.3">
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Platform: Windows">
   <img src="https://img.shields.io/badge/built%20with-Python%20%26%20PySide6-3776AB?logo=python&logoColor=white" alt="Built with Python and PySide6">
   <img src="https://img.shields.io/badge/tests-126%2F126%20passing-success" alt="Tests: 126/126 passing">
@@ -33,7 +33,7 @@ PromptBoard is a fast desktop utility and Windows tray application for reusable 
 
 ## Status
 
-**Phase:** public release (`v1.1.1`), store and platform hardening active in local development<br/>
+**Phase:** public release (`v1.1.3`), store and platform hardening active in local development<br/>
 **Code:** PySide6 desktop application with 126/126 passing pytest tests<br/>
 
 **CI:** [PromptBoard tests](https://github.com/file-bricks/promptboard/actions/workflows/tests.yml) running Windows Pytest and macOS/Linux source smoke checks  
@@ -45,12 +45,9 @@ PromptBoard is a fast desktop utility and Windows tray application for reusable 
 - `python -X utf8 tests/source_platform_smoke.py`: **OK** (source/offscreen smoke; it does not claim native macOS/Linux tray or hotkey parity).
 - `python -X utf8 -m compileall -q src _tools tests scripts`: **OK**.
 - `ruff check src _tools tests scripts`: **OK** (all checks passed).
-- GitHub release `v1.1.1` is published; Store-P1 remains open because real
+- GitHub release `v1.1.3` is published; Store-P1 remains open because real
   Partner-Center values, a local MSIX build with `makeappx.exe`, and an
   elevated WACK readback are not yet available.
-- The published artifact line is `v1.1.1`. `pyproject.toml` still carries
-  unreleased development metadata `1.1.3`; this is recorded explicitly rather
-  than silently presenting it as a published v1.1.1 artifact.
 
 ## Architecture & Data Flow
 

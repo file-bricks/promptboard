@@ -1,5 +1,5 @@
 @echo off
-REM Build script for PromptBoard v1.1.1
+REM Build script for PromptBoard v1.1.3
 REM ===================================
 REM Builds a single-file Windows executable via PyInstaller,
 REM stages the complete release set and verifies SHA256SUMS.txt.
@@ -7,7 +7,7 @@ REM stages the complete release set and verifies SHA256SUMS.txt.
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
-set VERSION=1.1.1
+set VERSION=1.1.3
 set RELEASE_DIR=releases\v%VERSION%
 
 echo.
@@ -50,7 +50,7 @@ if errorlevel 1 (
 
 echo.
 echo --- Stage and certify release artefacts ---
-python scripts\certify_release.py stage --exe "dist\PromptBoard-1.1.1-win64.exe"
+python scripts\certify_release.py stage --exe "dist\PromptBoard-1.1.3-win64.exe"
 if errorlevel 1 (
     echo [FEHLER] Release-Staging fehlgeschlagen.
     exit /b 1
