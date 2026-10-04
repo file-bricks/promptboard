@@ -96,3 +96,10 @@ coverage.xml
 *.db
 *.db-shm
 *.db-wal
+
+# ---- Interne Arbeits-/Statusdateien (after-care 2026-10-04) ----
+TASKPLAN_STATUS_*.md
+TEAM_SERVER_KONZEPT.md
+docs/con1_ANFORDERUNGSANALYSE_*.md
+docs/consense_diff_*.md
+_after-care/
