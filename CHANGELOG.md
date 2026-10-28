@@ -4,6 +4,8 @@ Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
 ## [Unreleased]
 
+- Hindi-README ergänzt; Sprachmenüs und llms.txt-Index aktualisiert. Die App-UI bleibt bei DE/EN/ES/ZH/JA/RU.
+
 ## [1.1.3] - 2026-10-04
 
 Sammelrelease seit `v1.1.1`. Die Eintraege `[1.1.2]` bis `[1.1.5]` weiter unten sowie die datierten `[Unreleased]`-Bloecke wurden nie einzeln veroeffentlicht; alle zugehoerigen Aenderungen sind in diesem Release enthalten.
