@@ -5,6 +5,7 @@ Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 ## [Unreleased]
 
 - Hindi-README ergänzt; Sprachmenüs und llms.txt-Index aktualisiert. Die App-UI bleibt bei DE/EN/ES/ZH/JA/RU.
+- Arabische README ergänzt; Sprachmenüs und llms.txt-Sprachindex aktualisiert. Die App-UI bleibt bei DE/EN/ES/ZH/JA/RU.
 
 ## [1.1.3] - 2026-10-04
 
