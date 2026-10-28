@@ -37,6 +37,7 @@ Release boundary (readback 2026-09-18):
 Public documentation:
 - README.md: English-first overview, key features, global hotkeys, installation, and quickstart
 - README_de.md: German translation of the project overview
+- README_fr.md: French translation of the English project overview (README.md remains authoritative)
 - ARCHITECTURE.md: module structure, PySide6 components, and adapter design
 
 ## Audience

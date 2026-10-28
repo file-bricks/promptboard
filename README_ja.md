@@ -1,7 +1,7 @@
 <img src="assets/banner.png" width="100%" alt="PromptBoard">
 
 <p>
-  <a href="./README_de.md">🇩🇪 Deutsch</a> &nbsp;·&nbsp; <a href="./README.md">🇬🇧 English</a> &nbsp;·&nbsp; <a href="./README_es.md">🇪🇸 Español</a> &nbsp;·&nbsp; <a href="./README_zh.md">🇨🇳 简体中文</a> &nbsp;·&nbsp; <b>🇯🇵 日本語</b> &nbsp;·&nbsp; <a href="./README_ru.md">🇷🇺 Русский</a>
+  <a href="./README_de.md">🇩🇪 Deutsch</a> &nbsp;·&nbsp; <a href="./README.md">🇬🇧 English</a> &nbsp;·&nbsp; <a href="./README_fr.md">🇫🇷 Français</a> &nbsp;·&nbsp; <a href="./README_es.md">🇪🇸 Español</a> &nbsp;·&nbsp; <a href="./README_zh.md">🇨🇳 简体中文</a> &nbsp;·&nbsp; <b>🇯🇵 日本語</b> &nbsp;·&nbsp; <a href="./README_ru.md">🇷🇺 Русский</a>
 </p>
 
 > 本書は機械支援翻訳です。英語版([README.md](README.md))が正本です。
