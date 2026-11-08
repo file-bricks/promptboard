@@ -4,6 +4,16 @@ Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
 ## [Unreleased]
 
+### Barrierefreiheit, Tastaturnavigation & Screenreader-Ergonomie (WCAG 2.1 AA / BITV 2.0)
+
+- **Tastatur-Kurzbefehle im Hauptmenü**: Standard-Shortcuts für `Datei > Neu` (`Ctrl+N`), `Datei > Beenden` (`Ctrl+Q`) und `Einstellungen` (`Ctrl+,`) verankert.
+- **Schnellsuche per Tastatur (`Ctrl+F`)**: Tastaturkürzel zur sofortigen Fokussierung und Textauswahl des Bibliotheks-Suchfelds implementiert (`focus_search()`).
+- **Suchfeld-Tastaturbedienung**: `Escape` leert den eingegebenen Suchtext bzw. bewegt den Tastaturfokus zur Eintragsliste; `Pfeil nach unten` und `Enter` übergeben den Fokus direkt an die gefilterte Liste zur sofortigen Pfeiltasten-Navigation.
+- **Listenbedienung & Kopier-Parität per Tastatur**: `Enter` / `Return` auf einem ausgewählten Bibliothekseintrag kopiert dessen Inhalt sofort in die Zwischenablage (vollständige Tastatur-Parität zum Doppelklick); `Entf` (`Delete`) löscht den ausgewählten Eintrag nach Bestätigung.
+- **Detaillierte Eintrags-Tooltips**: `reload_list()` und `_update_list_item_text()` statten jedes Listenelement mit einem mehrzeiligen Tooltip (Name, Typ, Kategorie, Tags und Inhaltsvorschau) für Screenreader und Maus-Hover aus.
+- **Formular-Label-Verknüpfung (`setBuddy`)**: Alle Eingabefelder im Bearbeitungsformular (`type_combo`, `name_edit`, `category_edit`, `tags_edit`, `source_edit`) wurden explizit mit ihren beschreibenden `QLabel`-Beschriftungen verknüpft, wodurch Screenreader und Barrierefreiheitswerkzeuge Eingabezwecke barrierefrei auflösen.
+- **Automatisierte Vertragstests**: Neue Testsuite `tests/test_ui_accessibility.py` mit 8 Vertragstests für Menü-Shortcuts, Suchfokus, Escape-/Enter-Navigation, Listenbedienung, Tooltips und Label-Buddies implementiert (Gesamtsuite: 133 passed, 1 skipped).
+
 ## [1.1.3] - 2026-10-04
 
 Sammelrelease seit `v1.1.1`. Die Eintraege `[1.1.2]` bis `[1.1.5]` weiter unten sowie die datierten `[Unreleased]`-Bloecke wurden nie einzeln veroeffentlicht; alle zugehoerigen Aenderungen sind in diesem Release enthalten.
