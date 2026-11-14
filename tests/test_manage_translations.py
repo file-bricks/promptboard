@@ -75,6 +75,25 @@ def test_scan_and_atomic_write_leave_no_temp_files(tmp_path):
     assert leftovers == []
 
 
+def test_scan_never_overwrites_unreadable_translations_file(tmp_path):
+    (tmp_path / "sample.py").write_text('button.setText("Datei öffnen")\n', encoding="utf-8")
+    locales = tmp_path / "locales"
+    locales.mkdir()
+    trans_file = locales / "translations.json"
+
+    # Kaputtes JSON (z. B. Merge-Konfliktmarker): Scan muss abbrechen statt zu leeren.
+    broken = '<<<<<<< HEAD\n{"hello": {"de": "Hallo", "en": "Hello"}}\n'
+    trans_file.write_text(broken, encoding="utf-8")
+    assert mt.main(["--scan", "--dir", str(tmp_path)]) == 1
+    assert trans_file.read_text(encoding="utf-8") == broken
+
+    # Gültiges JSON, aber kein Objekt: ebenfalls unverändert lassen.
+    trans_file.write_text("[]\n", encoding="utf-8")
+    assert mt.main(["--dir", str(tmp_path)]) == 1
+    assert trans_file.read_text(encoding="utf-8") == "[]\n"
+    assert list(locales.glob("*.tmp.*")) == []
+
+
 def test_translator_system_atomic_save_and_umlaut_detection(tmp_path):
     ts = TranslationSystem("ja", app_dir=tmp_path)
     ts.add_translation("save_btn", de="Speichern", en="Save", ja="保存")
