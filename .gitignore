@@ -18,7 +18,27 @@ dist/
 
 # Release artefacts (large binaries go to GitHub Releases, not git)
 releases/
+!releases/
+releases/*
+!releases/windowsstore/
+releases/windowsstore/*
+!releases/windowsstore/BUILD.md
+!releases/windowsstore/WACK_PROTOCOL.md
+!releases/windowsstore/store_listing_de.md
+!releases/windowsstore/store_listing_en.md
+!releases/windowsstore/store_listing_es.md
+!releases/windowsstore/store_listing_zh.md
+!releases/windowsstore/store_listing_ja.md
+!releases/windowsstore/store_listing_ru.md
+!releases/windowsstore/store_settings.json
+!releases/windowsstore/StoreLogo.png
 store_package/
+!store_package/
+store_package/*
+!store_package/PromptBoard/
+store_package/PromptBoard/*
+!store_package/PromptBoard/AppxManifest.xml
+!store_package/PromptBoard/icons/
 store_package.local.json
 _WARTUNG/
 *.msix

@@ -8,6 +8,7 @@ Canonical repository: https://github.com/file-bricks/promptboard
 Default branch: main
 Package name: promptboard
 CLI script: promptboard (via `src\promptboard.py`)
+Supported languages (Tier-2 6-language parity): `de` (Deutsch), `en` (English), `es` (Español), `zh` (简体中文), `ja` (日本語), `ru` (Русский)
 
 Important boundaries:
 - Purely local, runs offline on Windows (via PySide6 tray app).
@@ -20,24 +21,33 @@ Important boundaries:
 Primary commands:
 - python src\promptboard.py (run the desktop app)
 - python -m pip install -e ".[dev]" (install developer dependencies)
+- python manage_translations.py --check --stats (verify 158-key Tier-2 6-language parity)
+- python scripts\check_store_readiness.py (verify Windows Store & Tier-2 listing readiness)
 - python _tools\generate_store_screenshots.py (regenerate tray/store screenshots)
 - python _tools\store_release.py msix-preflight --use-test-identity (run local MSIX preflight build)
 - powershell -ExecutionPolicy Bypass -File "_tools\run_wack.ps1" (run Microsoft WACK validations)
 
 Verification:
 - python -X utf8 -m compileall -q src _tools tests scripts (OK)
-- ruff check src _tools tests scripts (OK; all checks passed)
-- python -X utf8 -m pytest -q (125 passed, 1 skipped (126 total))
+- python -X utf8 -m ruff check . (OK; all checks passed)
+- python -X utf8 manage_translations.py --check (OK; 158/158 keys x 6 languages)
+- python -X utf8 scripts\check_store_readiness.py (OK; 0 findings)
+- python -X utf8 -m pytest -q (125 passed, 1 skipped baseline + a11y/store/i18n contract suites)
 - python -X utf8 tests/source_platform_smoke.py (OK; source/offscreen scope)
 
 Release boundary (readback 2026-09-18):
 - Published GitHub artifact line: v1.1.3 (matches pyproject.toml metadata 1.1.3).
-- Store-P1 is open: Partner-Center values, makeappx.exe/MSIX and elevated WACK
-  evidence are not available in this local run.
+- Store identity harmonized on `Geiger.PromptBoard` / `CN=52596601-BAB4-4F3F-B182-E8F3F273B202` (`1.1.3.0`); elevated WACK / `makeappx.exe` signoff remains a local admin SDK step.
+
 Public documentation:
 - README.md: English-first overview, key features, global hotkeys, installation, and quickstart
 - README_de.md: German translation of the project overview
+- README_es.md: Spanish translation of the project overview
+- README_zh.md: Simplified Chinese translation of the project overview
+- README_ja.md: Japanese translation of the project overview
+- README_ru.md: Russian translation of the project overview
 - ARCHITECTURE.md: module structure, PySide6 components, and adapter design
+- STORE_LISTING.md: 6-language Windows Store metadata and Policy 10.1.3 keywords
 
 ## Audience
 
@@ -53,4 +63,5 @@ reusable prompts skills workflows agents desktop
 local-first prompt management tool
 native windows tray prompt clipboard manager
 offline LLM prompt library markdown export
+multilingual prompt organizer de en es zh ja ru
 ```

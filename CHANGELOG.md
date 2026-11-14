@@ -4,6 +4,14 @@ Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
 ## [Unreleased]
 
+### Tier-2 6-Sprachen Store-Readiness, i18n-Gate & Vertragstests (TW-PB-01..06)
+
+- **Store-Packaging & Manifest (`TW-PB-01`)**: `store_package.json` und `store_package/PromptBoard/AppxManifest.xml` auf die kanonische Partner-Center-Identität (`Geiger.PromptBoard`, `CN=52596601-BAB4-4F3F-B182-E8F3F273B202`, `1.1.3.0`) sowie alle 6 Tier-2-Sprachen (`de-DE`, `en-US`, `es-ES`, `zh-CN`, `ja-JP`, `ru-RU`), Kurzbeschreibungen (`<= 100` Zeichen) und exakt 7 richtlinienkonforme Keywords je Sprache gemäß Microsoft Partner Center Policy 10.1.3 harmonisiert.
+- **Store-Listing & Staging (`TW-PB-02`)**: `STORE_LISTING.md` auf alle 6 Sprachen ausgebaut (englische Kurzbeschreibung korrigiert) sowie `releases/windowsstore/` (`BUILD.md`, `WACK_PROTOCOL.md`, `store_settings.json`, `StoreLogo.png` 50×50, 6 `store_listing_<lang>.md`) angelegt und in `.gitignore` sauber freigegeben; `_tools/store_release.py` bewahrt Listenfelder und baut ein 6-sprachiges Listing.
+- **Automatisierter Store-Readiness-Linter (`TW-PB-03`)**: `scripts/check_store_readiness.py` prüft XML-Wohlgeformtheit, Manifest-Ressourcen, `store_package.json`, Kurzbeschreibungen, Keywords/Markenfreiheit, Staging-Konsistenz und Store-Assets/Screenshots (0 Findings).
+- **Translation CLI-Gate & Atomare Persistenz (`TW-PB-04`)**: `locales/translations.json` auf alle 158 Schlüssel aus `src/i18n.py` synchronisiert (100 % Abdeckung über `de`, `en`, `es`, `zh`, `ja`, `ru`); `manage_translations.py` um `argparse`-Subflags (`--check`, `--stats`, `--scan`, `--dir`), UTF-8-Stream-Schutz (`reconfigure`) und atomares Same-Directory-Staging (`flush` + `fsync` + `os.replace`) in `manage_translations.py` sowie `translator.py` erweitert.
+- **Dokumentations-Parität & CI-Vertragstests (`TW-PB-05`, `TW-PB-06`)**: `llms.txt` und `llm.txt` mit den 6 `README*.md`-Fassungen synchronisiert; `tests/test_store_materials.py` und `tests/test_manage_translations.py` ergänzt, `tests/source_platform_smoke.py` um die 6-Sprachen-Paritätsprüfung erweitert und `.github/workflows/tests.yml` um die Gates erweitert.
+
 ### Barrierefreiheit, Tastaturnavigation & Screenreader-Ergonomie (WCAG 2.1 AA / BITV 2.0)
 
 - **Tastatur-Kurzbefehle im Hauptmenü**: Standard-Shortcuts für `Datei > Neu` (`Ctrl+N`), `Datei > Beenden` (`Ctrl+Q`) und `Einstellungen` (`Ctrl+,`) verankert.

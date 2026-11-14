@@ -40,10 +40,15 @@ jobs:
           python -m pip install -e ".[dev]"
 
       - name: Compile sources
-        run: python -m compileall -q src tests
+        run: python -m compileall -q src tests scripts
 
       - name: Lint with Ruff
         run: python -m ruff check .
+
+      - name: Check Tier-2 translations and store readiness
+        run: |
+          python manage_translations.py --check
+          python scripts/check_store_readiness.py
 
       - name: Run tests
         env:
