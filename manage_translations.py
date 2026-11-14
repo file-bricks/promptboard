@@ -249,18 +249,21 @@ def check_translations(source_dir: str | None = None) -> int:
     return 0
 
 
-def manage_translations(source_dir: str | None = None) -> None:
+def manage_translations(source_dir: str | None = None) -> int:
     _ensure_utf8_streams()
     if not source_dir:
         source_dir = str(APP_DIR)
     trans_file = os.path.join(source_dir, TRANSLATION_FILE)
 
     if os.path.exists(trans_file):
-        try:
-            with open(trans_file, "r", encoding="utf-8") as f:
-                translations = json.load(f)
-        except (json.JSONDecodeError, OSError):
-            translations = {}
+        # Eine vorhandene, aber nicht lesbare/parsbare Datei darf nie durch einen
+        # leeren Stand ersetzt werden -- sonst gehen alle Übersetzungen verloren.
+        loaded, err = _load_translations_dict(source_dir)
+        if err or loaded is None:
+            print(f"[FAIL] {err}")
+            print("[FAIL] Scan abgebrochen; die bestehende Datei wurde nicht verändert.")
+            return 1
+        translations = loaded
     else:
         translations = {}
 
@@ -311,6 +314,7 @@ def manage_translations(source_dir: str | None = None) -> None:
     total_keys = len([k for k in translations if not k.startswith("_")])
     print(f"\n[i] Gesamt: {total_keys} Schlüssel in {trans_file}")
     print(f"[i] Sprachen: {', '.join(SUPPORTED_LANGUAGES)}")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -348,8 +352,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.stats:
         return print_stats(args.dir)
     # --scan oder Standardverhalten ohne Flag
-    manage_translations(args.dir)
-    return 0
+    return manage_translations(args.dir)
 
 
 if __name__ == "__main__":
