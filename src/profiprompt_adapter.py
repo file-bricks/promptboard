@@ -10,6 +10,49 @@ from models import ItemType, LibraryItem, normalize_name, now_iso, parse_tags
 
 logger = logging.getLogger(__name__)
 
+ADAPTER_NAME = "ProfiPrompt"
+IS_READ_ONLY = True
+SUPPORTED_FILES = ("prompts.json", "boards.json")
+
+
+def validate_profiprompt_contract(data_dir: Path) -> dict[str, Any]:
+    """
+    Evaluates and validates the ProfiPrompt storage directory against the adapter contract.
+    Returns status metadata including availability, prompt count, board count, read-only state,
+    and schema health.
+    """
+    path = Path(data_dir)
+    prompts_file = path / "prompts.json"
+    boards_file = path / "boards.json"
+
+    prompts_exist = prompts_file.exists()
+    boards_exist = boards_file.exists()
+
+    prompts_payload = _load_json_object(prompts_file) if prompts_exist else {}
+    boards_payload = _load_json_object(boards_file) if boards_exist else {}
+
+    prompts_list = prompts_payload.get("prompts", []) if isinstance(prompts_payload, dict) else []
+    boards_list = boards_payload.get("boards", []) if isinstance(boards_payload, dict) else []
+
+    valid_prompts = [p for p in prompts_list if isinstance(p, dict)] if isinstance(prompts_list, list) else []
+    valid_boards = [b for b in boards_list if isinstance(b, dict)] if isinstance(boards_list, list) else []
+
+    is_valid = prompts_exist and isinstance(prompts_payload, dict) and "prompts" in prompts_payload
+
+    return {
+        "adapter": ADAPTER_NAME,
+        "is_read_only": IS_READ_ONLY,
+        "is_valid": is_valid,
+        "prompts_exist": prompts_exist,
+        "boards_exist": boards_exist,
+        "prompt_count": len(valid_prompts),
+        "board_count": len(valid_boards),
+        "supported_files": list(SUPPORTED_FILES),
+        "write_back_supported": False,
+        "reason_read_only": "ProfiPrompt stores relational boards and version histories; write-back is disabled to prevent schema corruption.",
+    }
+
+
 
 def _load_json_object(path: Path) -> dict[str, Any]:
     if not path.exists():

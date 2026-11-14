@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
 ## [Unreleased]
 
+### Inline-Variablen mit Leerzeichen und ProfiPrompt-Vertrag (gerettet aus OneDrive-only-Stand)
+
+- **Inline-Variablen:** `{{ name }}` mit Leerzeichen sowie Namen mit Punkt oder Bindestrich (`{{user.name}}`, `{{first-name}}`) werden beim Kopieren abgefragt und ersetzt; bisher landeten sie wörtlich in der Zwischenablage.
+- **ProfiPrompt-Adapter:** `validate_profiprompt_contract()` beschreibt Verfügbarkeit, Anzahl gültiger Prompts/Boards und den Nur-Lese-Vertrag des Adapters; die spätere Null-Feld-Härtung des Adapters bleibt erhalten.
+- Beide Änderungen samt Tests lagen seit Juli/August 2026 nur im OneDrive-Ordner und wurden nie committet.
+
 ### Tier-2 6-Sprachen Store-Readiness, i18n-Gate & Vertragstests (TW-PB-01..06)
 
 - **Store-Packaging & Manifest (`TW-PB-01`)**: `store_package.json` und `store_package/PromptBoard/AppxManifest.xml` auf die kanonische Partner-Center-Identität (`Geiger.PromptBoard`, `CN=52596601-BAB4-4F3F-B182-E8F3F273B202`, `1.1.3.0`) sowie alle 6 Tier-2-Sprachen (`de-DE`, `en-US`, `es-ES`, `zh-CN`, `ja-JP`, `ru-RU`), Kurzbeschreibungen (`<= 100` Zeichen) und exakt 7 richtlinienkonforme Keywords je Sprache gemäß Microsoft Partner Center Policy 10.1.3 harmonisiert.
