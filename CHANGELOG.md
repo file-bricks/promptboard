@@ -4,6 +4,9 @@ Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
 ## [Unreleased]
 
+- Bengalische und portugiesische README ergänzt; alle elf Dokumentationssprachen reziprok verlinkt und im llms.txt-Index aufgeführt. Die App-UI bleibt bei DE/EN/ES/ZH/JA/RU (2026-11-03).
+- Französische, Hindi- und arabische README ergänzt, in allen vorhandenen README-Sprachwahlen verlinkt und im Dokumentationsindex `llms.txt` eingetragen. Die Laufzeitsprachen bleiben unverändert (2026-11-02).
+
 ### Inline-Variablen mit Leerzeichen und ProfiPrompt-Vertrag (gerettet aus OneDrive-only-Stand)
 
 - **Inline-Variablen:** `{{ name }}` mit Leerzeichen sowie Namen mit Punkt oder Bindestrich (`{{user.name}}`, `{{first-name}}`) werden beim Kopieren abgefragt und ersetzt; bisher landeten sie wörtlich in der Zwischenablage.
@@ -16,7 +19,7 @@ Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 - **Store-Listing & Staging (`TW-PB-02`)**: `STORE_LISTING.md` auf alle 6 Sprachen ausgebaut (englische Kurzbeschreibung korrigiert) sowie `releases/windowsstore/` (`BUILD.md`, `WACK_PROTOCOL.md`, `store_settings.json`, `StoreLogo.png` 50×50, 6 `store_listing_<lang>.md`) angelegt und in `.gitignore` sauber freigegeben; `_tools/store_release.py` bewahrt Listenfelder und baut ein 6-sprachiges Listing.
 - **Automatisierter Store-Readiness-Linter (`TW-PB-03`)**: `scripts/check_store_readiness.py` prüft XML-Wohlgeformtheit, Manifest-Ressourcen, `store_package.json`, Kurzbeschreibungen, Keywords/Markenfreiheit, Staging-Konsistenz und Store-Assets/Screenshots (0 Findings).
 - **Translation CLI-Gate & Atomare Persistenz (`TW-PB-04`)**: `locales/translations.json` auf alle 158 Schlüssel aus `src/i18n.py` synchronisiert (100 % Abdeckung über `de`, `en`, `es`, `zh`, `ja`, `ru`); `manage_translations.py` um `argparse`-Subflags (`--check`, `--stats`, `--scan`, `--dir`), UTF-8-Stream-Schutz (`reconfigure`) und atomares Same-Directory-Staging (`flush` + `fsync` + `os.replace`) in `manage_translations.py` sowie `translator.py` erweitert.
-- **Dokumentations-Parität & CI-Vertragstests (`TW-PB-05`, `TW-PB-06`)**: `llms.txt` und `llm.txt` mit den 6 `README*.md`-Fassungen synchronisiert; `tests/test_store_materials.py` und `tests/test_manage_translations.py` ergänzt, `tests/source_platform_smoke.py` um die 6-Sprachen-Paritätsprüfung erweitert und `.github/workflows/tests.yml` um die Gates erweitert.
+- **Dokumentations-Parität & CI-Vertragstests (`TW-PB-05`, `TW-PB-06`)**: `llms.txt` und `llm.txt` mit den `README*.md`-Fassungen synchronisiert; `tests/test_store_materials.py` und `tests/test_manage_translations.py` ergänzt, `tests/source_platform_smoke.py` um die 6-Sprachen-Paritätsprüfung erweitert und `.github/workflows/tests.yml` um die Gates erweitert.
 
 ### Barrierefreiheit, Tastaturnavigation & Screenreader-Ergonomie (WCAG 2.1 AA / BITV 2.0)
 
