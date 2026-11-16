@@ -1,14 +1,83 @@
 {
   "app_name": "PromptBoard",
-  "publisher": "CN=YourPublisher",
+  "publisher": "CN=52596601-BAB4-4F3F-B182-E8F3F273B202",
   "publisher_display": "Lukas Geiger",
-  "identity_name": "YourPublisher.PromptBoard",
+  "identity_name": "Geiger.PromptBoard",
   "version": "1.1.3.0",
   "description": "Lokales Tray-Tool für Prompts, Skills, Workflows, Rollen und Agenten.",
   "executable": "PromptBoard-1.1.3-win64.exe",
   "capabilities": "runFullTrust",
   "category": "Productivity",
   "age_rating": "3+",
+  "license": "MIT",
   "privacy_url": "https://github.com/file-bricks/promptboard/blob/main/PRIVACY_POLICY.md",
-  "support_url": "https://github.com/file-bricks/promptboard/issues"
+  "support_url": "https://github.com/file-bricks/promptboard/issues",
+  "languages": [
+    "de-DE",
+    "en-US",
+    "es-ES",
+    "zh-CN",
+    "ja-JP",
+    "ru-RU"
+  ],
+  "description_de": "Lokales Tray-Tool für Prompts, Skills, Workflows, Rollen und Agenten.",
+  "description_en": "Local tray tool for prompts, skills, workflows, roles, and agents.",
+  "description_es": "Herramienta local en bandeja para prompts, skills, flujos, roles y agentes.",
+  "description_zh": "本地托盘工具，用于管理提示词、技能、工作流、角色与智能体。",
+  "description_ja": "プロンプト・スキル・ワークフロー・ロール・エージェント向けのローカル常駐ツール。",
+  "description_ru": "Локальная утилита в трее для промптов, навыков, процессов, ролей и агентов.",
+  "keywords_de": [
+    "prompts",
+    "prompt-manager",
+    "skills",
+    "workflows",
+    "markdown",
+    "zwischenablage",
+    "offline-tool"
+  ],
+  "keywords_en": [
+    "prompts",
+    "prompt manager",
+    "skills",
+    "workflows",
+    "markdown",
+    "clipboard",
+    "offline tray"
+  ],
+  "keywords_es": [
+    "prompts",
+    "gestor prompts",
+    "habilidades",
+    "flujos",
+    "markdown",
+    "portapapeles",
+    "sin conexion"
+  ],
+  "keywords_zh": [
+    "提示词",
+    "提示词管理",
+    "技能",
+    "工作流",
+    "markdown",
+    "剪贴板",
+    "本地离线"
+  ],
+  "keywords_ja": [
+    "プロンプト",
+    "プロンプト管理",
+    "スキル",
+    "ワークフロー",
+    "markdown",
+    "クリップボード",
+    "オフライン"
+  ],
+  "keywords_ru": [
+    "промпты",
+    "менеджер промптов",
+    "навыки",
+    "процессы",
+    "markdown",
+    "буфер обмена",
+    "офлайн"
+  ]
 }

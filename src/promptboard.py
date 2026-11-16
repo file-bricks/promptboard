@@ -104,6 +104,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.file_menu = menubar.addMenu(tr("menu.file"))
         self.action_new = self.file_menu.addAction(tr("menu.file.new"))
+        self.action_new.setShortcut(QtGui.QKeySequence.StandardKey.New)
         self.action_new.triggered.connect(self.create_item)
 
         # Import/export entries appear only when the source software is
@@ -132,10 +133,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.file_menu.addSeparator()
         self.action_quit = self.file_menu.addAction(tr("menu.file.quit"))
+        self.action_quit.setShortcut(QtGui.QKeySequence.StandardKey.Quit)
         self.action_quit.triggered.connect(QtWidgets.QApplication.instance().quit)
 
         self.settings_menu = menubar.addMenu(tr("menu.settings"))
         self.action_open_settings = self.settings_menu.addAction(tr("menu.settings.open"))
+        self.action_open_settings.setShortcut(QtGui.QKeySequence.StandardKey.Preferences)
         self.action_open_settings.triggered.connect(self.open_settings_dialog)
 
     def _build_library_widget(self) -> QtWidgets.QWidget:
@@ -206,11 +209,25 @@ class MainWindow(QtWidgets.QMainWindow):
         self.source_edit = QtWidgets.QLineEdit()
         self.source_edit.setPlaceholderText(tr("form.source_placeholder"))
         self.form_layout = form  # gespeichert für Re-Labeling bei Sprachwechsel
-        form.addRow(tr("form.type"), self.type_combo)
-        form.addRow(tr("form.name"), self.name_edit)
-        form.addRow(tr("form.category"), self.category_edit)
-        form.addRow(tr("form.tags"), self.tags_edit)
-        form.addRow(tr("form.source"), self.source_edit)
+        self.type_label = QtWidgets.QLabel(tr("form.type"))
+        self.type_label.setBuddy(self.type_combo)
+        form.addRow(self.type_label, self.type_combo)
+
+        self.name_label = QtWidgets.QLabel(tr("form.name"))
+        self.name_label.setBuddy(self.name_edit)
+        form.addRow(self.name_label, self.name_edit)
+
+        self.category_label = QtWidgets.QLabel(tr("form.category"))
+        self.category_label.setBuddy(self.category_edit)
+        form.addRow(self.category_label, self.category_edit)
+
+        self.tags_label = QtWidgets.QLabel(tr("form.tags"))
+        self.tags_label.setBuddy(self.tags_edit)
+        form.addRow(self.tags_label, self.tags_edit)
+
+        self.source_label = QtWidgets.QLabel(tr("form.source"))
+        self.source_label.setBuddy(self.source_edit)
+        form.addRow(self.source_label, self.source_edit)
 
         self.content_edit = QtWidgets.QPlainTextEdit()
         self.content_edit.setPlaceholderText(tr("form.content_placeholder"))
@@ -248,6 +265,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tags_edit.textChanged.connect(self.schedule_save)
         self.source_edit.textChanged.connect(self.schedule_save)
         self.content_edit.textChanged.connect(self.schedule_save)
+
+        # Tastatur- und Barrierefreiheits-Shortcuts & Event-Filter
+        self.search_shortcut = QtGui.QShortcut(QtGui.QKeySequence.StandardKey.Find, self)
+        self.search_shortcut.activated.connect(self.focus_search)
+
+        self.search_edit.installEventFilter(self)
+        self.item_list.installEventFilter(self)
 
     # ------------------------------------------------------------ language
 
@@ -359,6 +383,53 @@ class MainWindow(QtWidgets.QMainWindow):
         self.status_label.setAccessibleDescription(tr("status.label_description"))
         self.status_label.setToolTip(tr("status.label_description"))
 
+    def focus_search(self) -> None:
+        """Fokussiert das Suchfeld und markiert den aktuellen Suchtext."""
+        self.search_edit.setFocus()
+        self.search_edit.selectAll()
+
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        """Tastatursteuerung für Suchfeld (Escape/Pfeiltaste/Enter) und Bibliotheksliste (Enter/Delete)."""
+        if event.type() == QtCore.QEvent.Type.KeyPress and isinstance(event, QtGui.QKeyEvent):
+            key = event.key()
+            if watched is self.search_edit:
+                if key == QtCore.Qt.Key.Key_Escape:
+                    if self.search_edit.text():
+                        self.search_edit.clear()
+                    else:
+                        self.item_list.setFocus()
+                    return True
+                if key in (QtCore.Qt.Key.Key_Down, QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter):
+                    self.item_list.setFocus()
+                    if self.item_list.count() > 0 and self.item_list.currentRow() < 0:
+                        self.item_list.setCurrentRow(0)
+                    return True
+            elif watched is self.item_list:
+                if key in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter):
+                    self.copy_current_item()
+                    return True
+                if key == QtCore.Qt.Key.Key_Delete:
+                    self.delete_current_item()
+                    return True
+                if key == QtCore.Qt.Key.Key_F and bool(event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier):
+                    self.focus_search()
+                    return True
+        return super().eventFilter(watched, event)
+
+    @staticmethod
+    def _apply_item_tooltip(widget_item: QtWidgets.QListWidgetItem, item: LibraryItem) -> None:
+        """Erzeugt einen detaillierten Tooltip für Screenreader und Maus-Hover."""
+        tooltip_lines = [f"{item.name} ({item.item_type.value})"]
+        if item.category:
+            tooltip_lines.append(f"{tr('form.category')}: {item.category}")
+        if item.tags:
+            tooltip_lines.append(f"{tr('form.tags')}: {', '.join(item.tags)}")
+        preview_lines = [line.strip() for line in item.content.strip().splitlines() if line.strip()]
+        if preview_lines:
+            preview = preview_lines[0][:80] + ("..." if len(preview_lines[0]) > 80 or len(preview_lines) > 1 else "")
+            tooltip_lines.append(f"\n{preview}")
+        widget_item.setToolTip("\n".join(tooltip_lines))
+
     def all_items(self) -> List[LibraryItem]:
         try:
             return self.storage.load_items()
@@ -391,6 +462,7 @@ class MainWindow(QtWidgets.QMainWindow):
             for item in self.filtered_items():
                 widget_item = QtWidgets.QListWidgetItem(self._item_display_text(item))
                 widget_item.setData(QtCore.Qt.UserRole, item.id)
+                self._apply_item_tooltip(widget_item, item)
                 self.item_list.addItem(widget_item)
         finally:
             self.item_list.blockSignals(False)
@@ -499,7 +571,9 @@ class MainWindow(QtWidgets.QMainWindow):
     def _update_list_item_text(self, item: LibraryItem) -> None:
         row = self._find_list_row_by_id(item.id)
         if row >= 0:
-            self.item_list.item(row).setText(self._item_display_text(item))
+            widget_item = self.item_list.item(row)
+            widget_item.setText(self._item_display_text(item))
+            self._apply_item_tooltip(widget_item, item)
 
     def _suggest_new_item_type(self) -> ItemType:
         filter_value = self.type_filter.currentText().strip()

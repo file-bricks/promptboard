@@ -97,13 +97,19 @@ def store_icon_source_path(root: Path | None = None) -> Path:
     return base / STORE_ICON_SOURCE_NAME
 
 
-def read_json_file(path: Path) -> dict[str, str]:
+def read_json_file(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError(f"Ungültige Store-Konfiguration in {path}: Objekt erwartet.")
-    return {str(key): str(value) for key, value in data.items()}
+    parsed: dict[str, Any] = {}
+    for key, value in data.items():
+        if isinstance(value, list):
+            parsed[str(key)] = [str(item) for item in value]
+        else:
+            parsed[str(key)] = str(value)
+    return parsed
 
 
 def normalize_capabilities(value: str) -> str:
@@ -113,9 +119,14 @@ def normalize_capabilities(value: str) -> str:
     return ",".join(dict.fromkeys(capabilities))
 
 
-def normalize_store_config(config: Mapping[str, str]) -> dict[str, str]:
-    normalized = {str(key): str(value) for key, value in config.items()}
-    normalized["capabilities"] = normalize_capabilities(normalized.get("capabilities", ""))
+def normalize_store_config(config: Mapping[str, Any]) -> dict[str, Any]:
+    normalized: dict[str, Any] = {}
+    for key, value in config.items():
+        if isinstance(value, list):
+            normalized[str(key)] = [str(item) for item in value]
+        else:
+            normalized[str(key)] = str(value)
+    normalized["capabilities"] = normalize_capabilities(str(normalized.get("capabilities", "")))
     return normalized
 
 
@@ -168,41 +179,93 @@ def assert_store_ready(config: Mapping[str, str]) -> None:
         )
 
 
-def build_store_listing(config: Mapping[str, str]) -> str:
-    description_de = (
-        "PromptBoard ist ein leichtgewichtiges, offline-first Desktop-Werkzeug für wiederverwendbare "
-        "LLM-Bausteine. Die App verwaltet Prompts, Skills, Workflows, Rollen und "
-        "Agenten lokal, bietet schnellen Tray-Zugriff, globale Hotkeys, DE/EN-Live-Wechsel "
-        "und Markdown-Materialisierung ohne Cloud-Zwang."
+def build_store_listing(config: Mapping[str, Any]) -> str:
+    short_de = str(config.get("description_de") or config["description"])
+    short_en = str(
+        config.get("description_en")
+        or "Local tray tool for prompts, skills, workflows, roles, and agents."
     )
-    description_en = (
-        "PromptBoard is a lightweight, offline-first desktop utility for reusable LLM building blocks. "
-        "It keeps prompts, skills, workflows, roles, and agents local, adds quick tray "
-        "access, global hotkeys, live DE/EN switching, and Markdown materialization "
-        "without mandatory cloud sync."
+    short_es = str(
+        config.get("description_es")
+        or "Herramienta local en bandeja para prompts, skills, flujos, roles y agentes."
     )
+    short_zh = str(
+        config.get("description_zh")
+        or "本地托盘工具，用于管理提示词、技能、工作流、角色与智能体。"
+    )
+    short_ja = str(
+        config.get("description_ja")
+        or "プロンプト・スキル・ワークフロー・ロール・エージェント向けのローカル常駐ツール。"
+    )
+    short_ru = str(
+        config.get("description_ru")
+        or "Локальная утилита в трее для промптов, навыков, процессов, ролей и агентов."
+    )
+    kw_de = ", ".join(config.get("keywords_de") or ["prompts", "prompt-manager", "skills", "workflows", "markdown", "zwischenablage", "offline-tool"])
+    kw_en = ", ".join(config.get("keywords_en") or ["prompts", "prompt manager", "skills", "workflows", "markdown", "clipboard", "offline tray"])
+    kw_es = ", ".join(config.get("keywords_es") or ["prompts", "gestor prompts", "habilidades", "flujos", "markdown", "portapapeles", "sin conexion"])
+    kw_zh = ", ".join(config.get("keywords_zh") or ["提示词", "提示词管理", "技能", "工作流", "markdown", "剪贴板", "本地离线"])
+    kw_ja = ", ".join(config.get("keywords_ja") or ["プロンプト", "プロンプト管理", "スキル", "ワークフロー", "markdown", "クリップボード", "オフライン"])
+    kw_ru = ", ".join(config.get("keywords_ru") or ["промпты", "менеджер промптов", "навыки", "процессы", "markdown", "буфер обмена", "офлайн"])
+
     return (
         f"# Store Listing - {config['app_name']}\n\n"
-        "Stand: 2026-05-24\n\n"
+        "Stand: 2026-11-14 (Tier-2 6-Sprachen-Ausbau)\n\n"
         "## Deutsch\n\n"
-        f"**Name:** {config['app_name']}  \n"
-        f"**Kurzbeschreibung:** {config['description']}  \n"
-        f"**Kategorie:** {config['category']}  \n"
+        f"**Name:** {config['app_name']}\n"
+        f"**Kurzbeschreibung:** {short_de}\n"
+        f"**Kategorie:** {config['category']}\n"
         f"**Altersfreigabe:** {config['age_rating']}\n\n"
         "### Beschreibung\n\n"
-        f"{description_de}\n\n"
+        "PromptBoard ist ein leichtgewichtiges, offline-first Desktop-Werkzeug für wiederverwendbare "
+        "LLM-Bausteine. Die App verwaltet Prompts, Skills, Workflows, Rollen und Agenten lokal, bietet "
+        "schnellen Tray-Zugriff, globale Hotkeys, 6-Sprachen-Wechsel und Markdown-Materialisierung ohne Cloud-Zwang.\n\n"
         "### Keywords\n\n"
-        "Prompt, LLM, AI, Tray, Productivity, Markdown, Clipboard, Workflow, Skills, Agenten\n\n"
+        f"{kw_de}\n\n"
         "---\n\n"
         "## English\n\n"
-        f"**Name:** {config['app_name']}  \n"
-        f"**Short Description:** {config['description']}  \n"
-        f"**Category:** {config['category']}  \n"
+        f"**Name:** {config['app_name']}\n"
+        f"**Short Description:** {short_en}\n"
+        f"**Category:** {config['category']}\n"
         f"**Age Rating:** {config['age_rating']}\n\n"
         "### Description\n\n"
-        f"{description_en}\n\n"
+        "PromptBoard is a lightweight, offline-first desktop utility for reusable LLM building blocks. "
+        "It keeps prompts, skills, workflows, roles, and agents local, adds quick tray access, global hotkeys, "
+        "live 6-language switching, and Markdown materialization without mandatory cloud sync.\n\n"
         "### Keywords\n\n"
-        "Prompt, LLM, AI, tray, productivity, Markdown, clipboard, workflow, skills, agents\n"
+        f"{kw_en}\n\n"
+        "---\n\n"
+        "## Español (es-ES)\n\n"
+        f"**Nombre:** {config['app_name']}\n"
+        f"**Descripción corta:** {short_es}\n"
+        f"**Categoría:** {config['category']}\n"
+        f"**Clasificación de edad:** {config['age_rating']}\n\n"
+        "### Keywords\n\n"
+        f"{kw_es}\n\n"
+        "---\n\n"
+        "## 简体中文 (zh-CN)\n\n"
+        f"**名称:** {config['app_name']}\n"
+        f"**简短描述:** {short_zh}\n"
+        f"**类别:** {config['category']}\n"
+        f"**年龄分级:** {config['age_rating']}\n\n"
+        "### Keywords\n\n"
+        f"{kw_zh}\n\n"
+        "---\n\n"
+        "## 日本語 (ja-JP)\n\n"
+        f"**名前:** {config['app_name']}\n"
+        f"**短い説明:** {short_ja}\n"
+        f"**カテゴリ:** {config['category']}\n"
+        f"**年齢区分:** {config['age_rating']}\n\n"
+        "### Keywords\n\n"
+        f"{kw_ja}\n\n"
+        "---\n\n"
+        "## Русский (ru-RU)\n\n"
+        f"**Название:** {config['app_name']}\n"
+        f"**Краткое описание:** {short_ru}\n"
+        f"**Категория:** {config['category']}\n"
+        f"**Возрастной рейтинг:** {config['age_rating']}\n\n"
+        "### Keywords\n\n"
+        f"{kw_ru}\n"
     )
 
 

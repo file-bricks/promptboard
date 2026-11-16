@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
@@ -12,14 +13,14 @@ SRC_ROOT = PROJECT_ROOT / "src"
 
 sys.path.insert(0, str(SRC_ROOT))
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtWidgets  # noqa: E402
 
-from i18n import set_language as set_global_language
-from models import ItemType, LibraryItem
-from promptboard import MainWindow, PromptBoardHotkeys, create_tray
-from settings_manager import SettingsManager
-from storage import Storage
-from theme import apply_theme
+from i18n import _TRANSLATIONS, VALID_LANGUAGES, set_language as set_global_language  # noqa: E402
+from models import ItemType, LibraryItem  # noqa: E402
+from promptboard import MainWindow, PromptBoardHotkeys, create_tray  # noqa: E402
+from settings_manager import SettingsManager  # noqa: E402
+from storage import Storage  # noqa: E402
+from theme import apply_theme  # noqa: E402
 
 
 class SmokeFailure(RuntimeError):
@@ -121,6 +122,19 @@ def main() -> None:
             markdown = materialized.read_text(encoding="utf-8")
             _assert("Überprüfung für Ölwechsel" in markdown, "Materialisierte Datei enthält den Editorinhalt nicht.")
             _assert("Prüfung" in markdown, "Materialisierte Datei enthält die Kategorie nicht.")
+
+            # Tier-2 6-Sprachen Translation Parity Check
+            translations_path = PROJECT_ROOT / "locales" / "translations.json"
+            _assert(translations_path.is_file(), "locales/translations.json fehlt.")
+            translations = json.loads(translations_path.read_text(encoding="utf-8"))
+            translation_keys = {k for k in translations if not k.startswith("_")}
+            _assert(
+                translation_keys == set(_TRANSLATIONS.keys()),
+                "locales/translations.json Schlüssel weichen von src/i18n.py ab.",
+            )
+            for lang in VALID_LANGUAGES:
+                missing = [k for k in translation_keys if not str(translations[k].get(lang, "")).strip()]
+                _assert(not missing, f"Fehlende Übersetzungen für Sprache '{lang}': {len(missing)}")
         finally:
             hotkeys.stop()
             if tray is not None:

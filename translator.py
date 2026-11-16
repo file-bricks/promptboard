@@ -15,13 +15,26 @@ translator.set_language('en')
 """
 
 import json
+import os
 import re
+import stat
+import sys
 from pathlib import Path
 from typing import Dict, List, Set
 
 SUPPORTED_LANGUAGES = ['de', 'en', 'es', 'zh', 'ja', 'ru']
 DEFAULT_LANGUAGE = 'de'
 FALLBACK_CHAIN = ['en', 'de']
+
+
+def _ensure_utf8_streams() -> None:
+    """Sichert UTF-8-Konsolen-Encoding unter Windows für stdout und stderr."""
+    for stream in (sys.stdout, sys.stderr):
+        if stream and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (OSError, ValueError, AttributeError):
+                pass
 
 
 class TranslationSystem:
@@ -74,9 +87,30 @@ class TranslationSystem:
             self.translations = {}
 
     def _save_translations(self):
+        """Speichert translations.json atomar über Same-Directory-Staging."""
         self.translations_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.translations_file, 'w', encoding='utf-8') as f:
-            json.dump(self.translations, f, indent=2, ensure_ascii=False)
+        temp_path = self.translations_file.with_name(
+            f"{self.translations_file.name}.tmp.{os.getpid()}"
+        )
+        try:
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(self.translations, f, indent=2, ensure_ascii=False)
+                f.write('\n')
+                f.flush()
+                os.fsync(f.fileno())
+            if self.translations_file.exists():
+                try:
+                    os.chmod(self.translations_file, stat.S_IWRITE | stat.S_IREAD)
+                except (OSError, PermissionError):
+                    pass
+            os.replace(temp_path, self.translations_file)
+        except Exception:
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except OSError:
+                    pass
+            raise
 
     def t(self, key: str) -> str:
         """
@@ -144,6 +178,8 @@ class TranslationSystem:
 
         missing = {lang: [] for lang in SUPPORTED_LANGUAGES if lang != 'de'}
         for k, v in self.translations.items():
+            if k.startswith("_") or not isinstance(v, dict):
+                continue
             for lang in SUPPORTED_LANGUAGES:
                 if lang != 'de' and not v.get(lang):
                     missing[lang].append(k)
@@ -152,7 +188,7 @@ class TranslationSystem:
 
     def _find_german_strings(self, directory: Path) -> Set[str]:
         german_strings = set()
-        skip_dirs = {'build', 'dist', 'venv', '.venv', '__pycache__', 'releases'}
+        skip_dirs = {'build', 'dist', 'venv', '.venv', '__pycache__', 'releases', '.git', 'tests', 'scripts', '_tools'}
 
         for py_file in directory.rglob("*.py"):
             if any(folder in py_file.parts for folder in skip_dirs):
@@ -171,26 +207,28 @@ class TranslationSystem:
         return german_strings
 
     def _is_german(self, text: str) -> bool:
-        if any(ch in text for ch in "aeoeueAeOeUess"):
+        if any(ch in text for ch in "\u00e4\u00f6\u00fc\u00c4\u00d6\u00dc\u00df"):
             return True
         text_lower = text.lower()
         return any(hint in text_lower for hint in self.german_hints)
 
     def get_missing_translations(self, lang: str = None) -> Dict[str, List[str]]:
         """Gibt fehlende Übersetzungen zurück. Ohne Argument: alle Sprachen."""
+        entries = {k: v for k, v in self.translations.items() if not k.startswith("_") and isinstance(v, dict)}
         if lang and lang in SUPPORTED_LANGUAGES:
-            return {lang: [k for k, v in self.translations.items() if not v.get(lang)]}
+            return {lang: [k for k, v in entries.items() if not v.get(lang)]}
         missing = {}
         for lang_code in SUPPORTED_LANGUAGES:
             if lang_code == 'de':
                 continue
-            m = [k for k, v in self.translations.items() if not v.get(lang_code)]
+            m = [k for k, v in entries.items() if not v.get(lang_code)]
             if m:
                 missing[lang_code] = m
         return missing
 
 
 if __name__ == "__main__":
+    _ensure_utf8_streams()
     tr = TranslationSystem('de')
     print(f"Sprache: {tr.get_language()}")
     print(f"Unterstützt: {', '.join(SUPPORTED_LANGUAGES)}")
