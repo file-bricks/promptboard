@@ -4,13 +4,28 @@ from pathlib import Path
 from typing import Iterable
 
 from models import LibraryItem
+from storage import atomic_write_text
+
+
+def _escape_marker_attr(value: object) -> str:
+    raw = "" if value is None else str(value)
+    cleaned = raw.replace("\r", " ").replace("\n", " ")
+    cleaned = (
+        cleaned.replace("&", "&amp;")
+        .replace('"', "&quot;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    while "--" in cleaned:
+        cleaned = cleaned.replace("--", "&#45;&#45;")
+    return cleaned
 
 
 def _origin_marker(item: LibraryItem) -> str:
     return (
-        f'<!-- promptboard:item id="{item.id}" '
-        f'type="{item.item_type.value}" '
-        f'updated_at="{item.updated_at}" -->'
+        f'<!-- promptboard:item id="{_escape_marker_attr(item.id)}" '
+        f'type="{_escape_marker_attr(item.item_type.value)}" '
+        f'updated_at="{_escape_marker_attr(item.updated_at)}" -->'
     )
 
 
@@ -86,14 +101,44 @@ def render_item(item: LibraryItem, fmt: str = FORMAT_MARKDOWN) -> str:
     return renderer(item)
 
 
+def resolve_batch_targets(
+    items: Iterable[LibraryItem],
+    target_dir: Path,
+    fmt: str = FORMAT_MARKDOWN,
+) -> list[tuple[LibraryItem, Path]]:
+    """Resolve target file paths for a batch, disambiguating intra-batch stem collisions."""
+    target_dir = Path(target_dir)
+    ext = materialize_extension(fmt)
+    used_keys: set[str] = set()
+    resolved: list[tuple[LibraryItem, Path]] = []
+
+    for item in items:
+        stem = item.filename_stem()
+        candidate_name = f"{stem}{ext}"
+        if candidate_name.casefold() in used_keys:
+            idx = 2
+            while True:
+                suffix = f" ({idx})"
+                max_base = max(1, 120 - len(suffix))
+                trimmed_stem = stem[:max_base].rstrip(". ") or stem[:max_base]
+                candidate_name = f"{trimmed_stem}{suffix}{ext}"
+                if candidate_name.casefold() not in used_keys:
+                    break
+                idx += 1
+        used_keys.add(candidate_name.casefold())
+        resolved.append((item, target_dir / candidate_name))
+
+    return resolved
+
+
 def materialize_item(
     item: LibraryItem,
     target_dir: Path,
     fmt: str = FORMAT_MARKDOWN,
 ) -> Path:
-    target_dir.mkdir(parents=True, exist_ok=True)
+    target_dir = Path(target_dir)
     target_path = target_dir / f"{item.filename_stem()}{materialize_extension(fmt)}"
-    target_path.write_text(render_item(item, fmt), encoding="utf-8")
+    atomic_write_text(target_path, render_item(item, fmt), encoding="utf-8")
     return target_path
 
 
@@ -102,5 +147,10 @@ def materialize_items(
     target_dir: Path,
     fmt: str = FORMAT_MARKDOWN,
 ) -> list[Path]:
-    """Materialize several items into the same target directory."""
-    return [materialize_item(item, target_dir, fmt) for item in items]
+    """Materialize several items into the same target directory without intra-batch clobbering."""
+    pairs = resolve_batch_targets(items, target_dir, fmt)
+    written: list[Path] = []
+    for item, target_path in pairs:
+        atomic_write_text(target_path, render_item(item, fmt), encoding="utf-8")
+        written.append(target_path)
+    return written

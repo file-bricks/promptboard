@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
 import json
 import logging
 import re
 from pathlib import Path
 from typing import Any, Optional
 
+from library_query import parse_iso_datetime
 from models import ItemType, LibraryItem, normalize_name, now_iso, parse_tags
 
 logger = logging.getLogger(__name__)
@@ -77,16 +79,20 @@ def _parse_timestamp(value: Any) -> str:
     return str(value).strip() if value is not None else ""
 
 
-def _version_sort_key(version: dict[str, Any]) -> tuple[int, str, str, str]:
+def _version_sort_key(version: dict[str, Any]) -> tuple[int, datetime, datetime, str, str, str]:
     raw_number = version.get("version_number", 0)
     try:
         version_number = int(raw_number)
     except (TypeError, ValueError):
         version_number = 0
+    updated_raw = _parse_timestamp(version.get("updated_at", ""))
+    created_raw = _parse_timestamp(version.get("created_at", ""))
     return (
         version_number,
-        _parse_timestamp(version.get("updated_at", "")),
-        _parse_timestamp(version.get("created_at", "")),
+        parse_iso_datetime(updated_raw),
+        parse_iso_datetime(created_raw),
+        updated_raw,
+        created_raw,
         str(version.get("id", "")),
     )
 
@@ -240,7 +246,16 @@ def load_profiprompt_items(data_dir: Path) -> list[LibraryItem]:
         board_titles = board_titles_by_prompt_id.get(prompt_id, [])
         items.append(_map_prompt(prompt, board_titles))
 
-    items.sort(key=lambda item: (item.updated_at, item.created_at, item.name), reverse=True)
+    items.sort(
+        key=lambda item: (
+            parse_iso_datetime(item.updated_at),
+            parse_iso_datetime(item.created_at),
+            item.updated_at,
+            item.created_at,
+            item.name,
+        ),
+        reverse=True,
+    )
     return items
 
 
@@ -248,4 +263,13 @@ def load_latest_profiprompt_item(data_dir: Path) -> Optional[LibraryItem]:
     prompt_items = [item for item in load_profiprompt_items(data_dir) if item.item_type == ItemType.PROMPT]
     if not prompt_items:
         return None
-    return max(prompt_items, key=lambda item: (item.updated_at, item.created_at, item.name))
+    return max(
+        prompt_items,
+        key=lambda item: (
+            parse_iso_datetime(item.updated_at),
+            parse_iso_datetime(item.created_at),
+            item.updated_at,
+            item.created_at,
+            item.name,
+        ),
+    )

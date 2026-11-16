@@ -32,6 +32,7 @@ import re
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
+from library_query import parse_iso_datetime
 from models import ItemType, LibraryItem, normalize_name, now_iso, parse_tags
 from storage import atomic_write_json
 
@@ -105,7 +106,13 @@ def load_explorerpro_items(data_dir: Path) -> list[LibraryItem]:
     entries = _load_json_array(prompts_file)
     items = [_map_prompt_to_item(entry) for entry in entries]
     items.sort(
-        key=lambda item: (item.updated_at, item.created_at, item.name),
+        key=lambda item: (
+            parse_iso_datetime(item.updated_at),
+            parse_iso_datetime(item.created_at),
+            item.updated_at,
+            item.created_at,
+            item.name,
+        ),
         reverse=True,
     )
     return items

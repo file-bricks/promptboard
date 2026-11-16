@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import getpass
 import logging
+import re
 from typing import Callable, Optional
 
 from PySide6 import QtCore, QtNetwork
@@ -23,6 +24,15 @@ logger = logging.getLogger(__name__)
 
 _PING = b"activate"
 _TIMEOUT_MS = 300
+_MAX_USER_TOKEN_LEN = 48
+
+
+def _sanitize_server_token(raw: object) -> str:
+    text = "" if raw is None else str(raw).strip()
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", text).strip("._-")
+    if len(cleaned) > _MAX_USER_TOKEN_LEN:
+        cleaned = cleaned[:_MAX_USER_TOKEN_LEN].rstrip("._-")
+    return cleaned or "default"
 
 
 def _default_server_name() -> str:
@@ -30,7 +40,7 @@ def _default_server_name() -> str:
         user = getpass.getuser()
     except Exception:  # noqa: BLE001
         user = "default"
-    return f"PromptBoard-singleton-{user}"
+    return f"PromptBoard-singleton-{_sanitize_server_token(user)}"
 
 
 class SingleInstance(QtCore.QObject):
@@ -69,6 +79,8 @@ class SingleInstance(QtCore.QObject):
 
     def start_server(self, on_activate: Callable[[], None]) -> bool:
         """Listen as the primary instance. Returns True on success."""
+        if self._server is not None:
+            self.stop()
         self._on_activate = on_activate
         server = QtNetwork.QLocalServer(self)
         if not server.listen(self._server_name):
@@ -82,6 +94,7 @@ class SingleInstance(QtCore.QObject):
             logger.warning(
                 "Single-Instance-Server konnte nicht starten: %s", server.errorString()
             )
+            server.deleteLater()
             return False
         server.newConnection.connect(self._handle_new_connection)
         self._server = server
@@ -90,22 +103,27 @@ class SingleInstance(QtCore.QObject):
     def _handle_new_connection(self) -> None:
         if self._server is None:
             return
-        connection = self._server.nextPendingConnection()
-        if connection is None:
-            return
-        # Any connection means "a second start happened" — payload is advisory.
-        if connection.waitForReadyRead(_TIMEOUT_MS):
-            connection.readAll()
-        if self._on_activate is not None:
+        accepted_any = False
+        while self._server is not None and self._server.hasPendingConnections():
+            connection = self._server.nextPendingConnection()
+            if connection is None:
+                break
+            accepted_any = True
+            # Any connection means "a second start happened" — payload is advisory.
+            if connection.waitForReadyRead(_TIMEOUT_MS):
+                connection.readAll()
+            connection.disconnectFromServer()
+            connection.deleteLater()
+
+        if accepted_any and self._on_activate is not None:
             try:
                 self._on_activate()
             except Exception:  # noqa: BLE001
                 logger.exception("Single-Instance-Aktivierungs-Callback fehlgeschlagen")
-        connection.disconnectFromServer()
-        connection.deleteLater()
 
     def stop(self) -> None:
         if self._server is not None:
             self._server.close()
             QtNetwork.QLocalServer.removeServer(self._server_name)
+            self._server.deleteLater()
             self._server = None

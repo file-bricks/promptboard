@@ -13,15 +13,15 @@ from hotkeys import PromptBoardHotkeys
 from i18n import set_language as set_global_language
 from i18n import tr
 from item_templates import build_default_name, get_item_template
-from library_query import SORT_MODE_LABELS, query_items
+from library_query import SORT_MODE_LABELS, parse_iso_datetime, query_items
 from logging_setup import configure_logging
-from materializer import materialize_extension, materialize_items
+from materializer import render_item, resolve_batch_targets
 from models import ItemType, LibraryItem, gen_id, normalize_name, now_iso, parse_tags
 from profiprompt_adapter import load_profiprompt_items
 from settings_dialog import SettingsDialog
 from settings_manager import SettingsManager
 from single_instance import SingleInstance
-from storage import Storage
+from storage import Storage, atomic_write_text
 from theme import apply_theme
 
 logger = logging.getLogger(__name__)
@@ -776,10 +776,9 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         target_dir = self.settings.get_materialize_path()
         fmt = self.settings.get_materialize_format()
-        extension = materialize_extension(fmt)
-        items_to_write: list[LibraryItem] = []
-        for item in items:
-            target_path = target_dir / f"{item.filename_stem()}{extension}"
+        planned_pairs = resolve_batch_targets(items, target_dir, fmt)
+        approved_pairs: list[tuple[LibraryItem, Path]] = []
+        for item, target_path in planned_pairs:
             if self.settings.get_confirm_overwrite() and target_path.exists():
                 answer = QtWidgets.QMessageBox.question(
                     self,
@@ -790,14 +789,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
                 if answer != QtWidgets.QMessageBox.StandardButton.Yes:
                     continue
-            items_to_write.append(item)
+            approved_pairs.append((item, target_path))
 
-        if not items_to_write:
+        if not approved_pairs:
             self.status_label.setText(tr("status.materialize_cancelled"))
             return
 
         try:
-            targets = materialize_items(items_to_write, target_dir, fmt)
+            targets: list[Path] = []
+            for item, target_path in approved_pairs:
+                atomic_write_text(target_path, render_item(item, fmt), encoding="utf-8")
+                targets.append(target_path)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Materialisierung fehlgeschlagen")
             self._show_error(tr("error.materialize_failed"), exc)
@@ -885,7 +887,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         latest_item = max(
             (item for item in imported_items if item.item_type == ItemType.PROMPT),
-            key=lambda item: (item.updated_at, item.created_at, item.name),
+            key=lambda item: (
+                parse_iso_datetime(item.updated_at),
+                parse_iso_datetime(item.created_at),
+                item.updated_at,
+                item.created_at,
+                item.name,
+            ),
             default=None,
         )
         if latest_item is None:
@@ -1105,6 +1113,22 @@ def create_tray(window: MainWindow) -> Optional[QtWidgets.QSystemTrayIcon]:
     return tray
 
 
+def _seed_initial_item_if_empty(storage: Storage, window: MainWindow) -> bool:
+    """Create a starter item only when the library loads cleanly and is empty."""
+    try:
+        items = storage.load_items()
+    except (OSError, ValueError) as exc:
+        logger.warning(
+            "Start-Eintrag wird übersprungen, da library.json nicht fehlerfrei lesbar ist: %s",
+            exc,
+        )
+        return False
+    if not items:
+        window.create_item()
+        return True
+    return False
+
+
 def main() -> int:
     configure_logging()
     logger.info("PromptBoard startet")
@@ -1146,8 +1170,7 @@ def main() -> int:
     else:
         window.status_label.setText(tr("status.hotkeys_unavailable"))
     app.aboutToQuit.connect(hotkeys.stop)
-    if not storage.load_items():
-        window.create_item()
+    _seed_initial_item_if_empty(storage, window)
     window.show()
     window.maybe_show_onboarding()
     return app.exec()

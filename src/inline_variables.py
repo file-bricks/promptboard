@@ -9,6 +9,8 @@ VariableValueProvider = Callable[[str], tuple[str, bool]]
 
 
 def extract_inline_variables(text: str) -> list[str]:
+    if not isinstance(text, str) or not text:
+        return []
     seen: set[str] = set()
     variables: list[str] = []
     for match in INLINE_VARIABLE_PATTERN.finditer(text):
@@ -23,6 +25,8 @@ def resolve_inline_variables(
     text: str,
     value_provider: VariableValueProvider,
 ) -> str | None:
+    if not isinstance(text, str):
+        return ""
     variables = extract_inline_variables(text)
     if not variables:
         return text
@@ -39,4 +43,3 @@ def resolve_inline_variables(
         return values.get(name, match.group(0))
 
     return INLINE_VARIABLE_PATTERN.sub(_replace, text)
-

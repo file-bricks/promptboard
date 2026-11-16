@@ -7,6 +7,20 @@ from enum import Enum
 from typing import Any, Dict, Iterable, List
 import uuid
 
+_MAX_FILENAME_STEM_LEN = 120
+_SUPERSCRIPT_DIGITS = str.maketrans({"\u00b9": "1", "\u00b2": "2", "\u00b3": "3"})
+_WINDOWS_RESERVED_STEMS = frozenset(
+    {
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        "CLOCK$",
+        *(f"COM{i}" for i in range(1, 10)),
+        *(f"LPT{i}" for i in range(1, 10)),
+    }
+)
+
 
 class ItemType(str, Enum):
     PROMPT = "PROMPT"
@@ -41,7 +55,8 @@ def gen_id() -> str:
 
 
 def normalize_name(name: str) -> str:
-    return " ".join(name.split()).upper()
+    raw = "" if name is None else str(name)
+    return " ".join(raw.split()).upper()
 
 
 def parse_tags(raw: str | Iterable[str] | None) -> List[str]:
@@ -70,8 +85,18 @@ def parse_tags(raw: str | Iterable[str] | None) -> List[str]:
 
 
 def sanitize_filename(name: str) -> str:
-    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", name.strip())
+    raw = "" if name is None else str(name)
+    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", raw.strip())
     cleaned = cleaned.rstrip(". ")
+    if len(cleaned) > _MAX_FILENAME_STEM_LEN:
+        cleaned = cleaned[:_MAX_FILENAME_STEM_LEN].rstrip(". ")
+    if not cleaned:
+        return "PROMPTBOARD_EINTRAG"
+    stem_head = cleaned.split(".", 1)[0].rstrip(" ").translate(_SUPERSCRIPT_DIGITS).upper()
+    if stem_head in _WINDOWS_RESERVED_STEMS:
+        cleaned = f"_{cleaned}"
+        if len(cleaned) > _MAX_FILENAME_STEM_LEN:
+            cleaned = cleaned[:_MAX_FILENAME_STEM_LEN].rstrip(". ")
     return cleaned or "PROMPTBOARD_EINTRAG"
 
 

@@ -24,17 +24,29 @@ def coerce_sort_mode(raw: str | None) -> str:
     return DEFAULT_SORT_MODE
 
 
-def _parse_iso_datetime(raw: str) -> datetime:
+def parse_iso_datetime(raw: str | None) -> datetime:
+    if not isinstance(raw, str):
+        return datetime.min.replace(tzinfo=timezone.utc)
+    cleaned = raw.strip()
+    if not cleaned:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    if cleaned.endswith(("Z", "z")):
+        cleaned = f"{cleaned[:-1]}+00:00"
     try:
-        parsed = datetime.fromisoformat(raw)
-    except ValueError:
+        parsed = datetime.fromisoformat(cleaned)
+    except (ValueError, OverflowError):
         return datetime.min.replace(tzinfo=timezone.utc)
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
-    return parsed
+    return parsed.astimezone(timezone.utc)
+
+
+_parse_iso_datetime = parse_iso_datetime
 
 
 def _search_terms(search_text: str) -> List[str]:
+    if not isinstance(search_text, str):
+        return []
     return [term.casefold() for term in search_text.split() if term.strip()]
 
 
@@ -75,8 +87,8 @@ def sort_items(items: Iterable[LibraryItem], sort_mode: str | None) -> List[Libr
     return sorted(
         items,
         key=lambda item: (
-            _parse_iso_datetime(item.updated_at),
-            _parse_iso_datetime(item.created_at),
+            parse_iso_datetime(item.updated_at),
+            parse_iso_datetime(item.created_at),
             item.name.casefold(),
             item.id,
         ),
