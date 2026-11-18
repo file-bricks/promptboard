@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import sys
+import uuid
 from pathlib import Path
 
 from PySide6 import QtCore
@@ -8,6 +10,39 @@ from PySide6 import QtCore
 from library_query import DEFAULT_SORT_MODE, coerce_sort_mode
 
 logger = logging.getLogger(__name__)
+
+_FOLDERID_DESKTOP_BYTES = uuid.UUID("{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}").bytes_le
+
+
+def _known_desktop_folder() -> Path:
+    """Resolve the active OS Desktop directory (supports OneDrive Known Folder Move).
+
+    Falls back to ``Path.home() / "Desktop"`` on non-Windows platforms or if
+    ``SHGetKnownFolderPath`` is unavailable or returns an empty/unusable path.
+    """
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            shell32 = ctypes.windll.shell32
+            ole32 = ctypes.windll.ole32
+            p_path = wintypes.LPWSTR()
+            hr = shell32.SHGetKnownFolderPath(
+                ctypes.create_string_buffer(_FOLDERID_DESKTOP_BYTES, 16),
+                0,
+                None,
+                ctypes.byref(p_path),
+            )
+            if hr == 0 and p_path.value:
+                resolved = Path(p_path.value)
+                ole32.CoTaskMemFree(p_path)
+                return resolved
+            if p_path:
+                ole32.CoTaskMemFree(p_path)
+        except Exception:  # noqa: BLE001 — headless/sandboxed hosts fall back safely
+            pass
+    return Path.home() / "Desktop"
 
 
 def _ensure_dir(path: Path, fallback: Path) -> Path:
@@ -47,13 +82,13 @@ class SettingsManager(QtCore.QObject):
 
     def get_materialize_path(self) -> Path:
         raw = self.qs.value("paths/materialize", "", type=str)
+        desktop_default = _known_desktop_folder()
         if not raw:
-            default = Path.home() / "Desktop"
-            self.qs.setValue("paths/materialize", str(default))
+            self.qs.setValue("paths/materialize", str(desktop_default))
             self.qs.sync()
-            raw = str(default)
+            raw = str(desktop_default)
         path = Path(raw)
-        return _ensure_dir(path, Path.home() / "Desktop")
+        return _ensure_dir(path, desktop_default)
 
     def set_materialize_path(self, path: Path) -> None:
         self.qs.setValue("paths/materialize", str(Path(path)))
