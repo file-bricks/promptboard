@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
+import http.client
 import inspect
 import ipaddress
 import json
@@ -19,6 +20,8 @@ import logging
 import os
 from pathlib import Path
 import re
+import socket
+import ssl
 import stat
 import threading
 import time
@@ -44,6 +47,7 @@ DEFAULT_NAMESPACE = "promptboard"
 DEFAULT_SCHEMA_VERSION = "promptboard-library-v1"
 DEFAULT_KIND = "item"
 DEFAULT_HTTP_TIMEOUT = 10.0
+DEFAULT_SHUTDOWN_HTTP_TIMEOUT = 0.8
 
 NAMESPACE_RE = re.compile(r"\A[a-z0-9_-]{1,32}\Z")
 KIND_RE = re.compile(r"\A[a-z0-9_-]{1,32}\Z")
@@ -583,9 +587,245 @@ class _NoRedirectHandler(urllib_request.HTTPRedirectHandler):
         return None
 
 
-def _read_stream_with_deadline(stream: Any, deadline: float, chunk_size: int = 65536) -> bytes:
+def _force_close_socket(sock: Any) -> None:
+    """Forcefully shut down and close a live socket across threads, bypassing _io_refs."""
+    if sock is None:
+        return
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        pass
+    try:
+        real_close = getattr(sock, "_real_close", None)
+        if callable(real_close):
+            real_close()
+        else:
+            sock.close()
+    except OSError:
+        pass
+    try:
+        sock.close()
+    except OSError:
+        pass
+
+
+class _RequestAbortController:
+    """Tracks in-flight HTTP sockets by epoch so shutdown can abort active network I/O."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._epoch: int = 0
+        self._sockets: Dict[int, Tuple[int, Any]] = {}
+
+    def current_epoch(self) -> int:
+        with self._lock:
+            return self._epoch
+
+    def is_epoch_aborted(self, request_epoch: int) -> bool:
+        with self._lock:
+            return request_epoch < self._epoch
+
+    def register_socket(self, sock: Any, request_epoch: int) -> None:
+        if sock is None:
+            return
+        abort_now = False
+        with self._lock:
+            if request_epoch < self._epoch:
+                abort_now = True
+            else:
+                self._sockets[id(sock)] = (request_epoch, sock)
+        if abort_now:
+            _force_close_socket(sock)
+            raise OSError("HTTP request aborted during shutdown.")
+
+    def unregister_socket(self, sock: Any) -> None:
+        if sock is None:
+            return
+        with self._lock:
+            self._sockets.pop(id(sock), None)
+
+    def abort_all(self) -> int:
+        with self._lock:
+            self._epoch += 1
+            sockets = [sock for _ep, sock in self._sockets.values()]
+            self._sockets.clear()
+            epoch = self._epoch
+        for sock in sockets:
+            _force_close_socket(sock)
+        return epoch
+
+
+def _open_tracked_tcp_socket(
+    address: Tuple[str, int],
+    timeout: Any = socket._GLOBAL_DEFAULT_TIMEOUT,
+    source_address: Optional[Tuple[str, int]] = None,
+    *,
+    abort_controller: Optional[_RequestAbortController] = None,
+    request_epoch: int = 0,
+    tracked_sockets: Optional[List[Any]] = None,
+) -> socket.socket:
+    host, port = address
+    if abort_controller is not None and abort_controller.is_epoch_aborted(request_epoch):
+        raise OSError("HTTP request aborted during shutdown.")
+    err: Optional[OSError] = None
+    infos = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+    if not infos:
+        raise OSError("getaddrinfo returns an empty list")
+    for af, socktype, proto, _canonname, sa in infos:
+        sock: Optional[socket.socket] = None
+        try:
+            if abort_controller is not None and abort_controller.is_epoch_aborted(request_epoch):
+                raise OSError("HTTP request aborted during shutdown.")
+            sock = socket.socket(af, socktype, proto)
+            if tracked_sockets is not None:
+                tracked_sockets.append(sock)
+            if abort_controller is not None:
+                abort_controller.register_socket(sock, request_epoch)
+            if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
+                sock.settimeout(timeout)
+            if source_address:
+                sock.bind(source_address)
+            sock.connect(sa)
+            return sock
+        except OSError as exc:
+            err = exc
+            if sock is not None:
+                if abort_controller is not None:
+                    abort_controller.unregister_socket(sock)
+                _force_close_socket(sock)
+    if err is not None:
+        raise err
+    raise OSError("Failed to establish TCP connection.")
+
+
+class _AbortableHTTPConnection(http.client.HTTPConnection):
+    def __init__(
+        self,
+        *args: Any,
+        abort_controller: Optional[_RequestAbortController] = None,
+        request_epoch: int = 0,
+        tracked_sockets: Optional[List[Any]] = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self._abort_controller = abort_controller
+        self._request_epoch = request_epoch
+        self._tracked_sockets = tracked_sockets
+        self._create_connection = self._create_tracked_connection
+
+    def _create_tracked_connection(
+        self,
+        address: Tuple[str, int],
+        timeout: Any = socket._GLOBAL_DEFAULT_TIMEOUT,
+        source_address: Optional[Tuple[str, int]] = None,
+    ) -> socket.socket:
+        return _open_tracked_tcp_socket(
+            address,
+            timeout,
+            source_address,
+            abort_controller=self._abort_controller,
+            request_epoch=self._request_epoch,
+            tracked_sockets=self._tracked_sockets,
+        )
+
+
+class _AbortableHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(
+        self,
+        *args: Any,
+        abort_controller: Optional[_RequestAbortController] = None,
+        request_epoch: int = 0,
+        tracked_sockets: Optional[List[Any]] = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self._abort_controller = abort_controller
+        self._request_epoch = request_epoch
+        self._tracked_sockets = tracked_sockets
+        self._create_connection = self._create_tracked_connection
+
+    def _create_tracked_connection(
+        self,
+        address: Tuple[str, int],
+        timeout: Any = socket._GLOBAL_DEFAULT_TIMEOUT,
+        source_address: Optional[Tuple[str, int]] = None,
+    ) -> socket.socket:
+        return _open_tracked_tcp_socket(
+            address,
+            timeout,
+            source_address,
+            abort_controller=self._abort_controller,
+            request_epoch=self._request_epoch,
+            tracked_sockets=self._tracked_sockets,
+        )
+
+    def connect(self) -> None:
+        super().connect()
+        if self.sock is not None:
+            if self._tracked_sockets is not None:
+                self._tracked_sockets.append(self.sock)
+            if self._abort_controller is not None:
+                self._abort_controller.register_socket(self.sock, self._request_epoch)
+
+
+class _AbortableHTTPHandler(urllib_request.HTTPHandler):
+    def __init__(
+        self,
+        abort_controller: Optional[_RequestAbortController],
+        request_epoch: int,
+        tracked_sockets: List[Any],
+    ) -> None:
+        super().__init__()
+        self._abort_controller = abort_controller
+        self._request_epoch = request_epoch
+        self._tracked_sockets = tracked_sockets
+
+    def http_open(self, req: urllib_request.Request) -> Any:
+        return self.do_open(
+            _AbortableHTTPConnection,
+            req,
+            abort_controller=self._abort_controller,
+            request_epoch=self._request_epoch,
+            tracked_sockets=self._tracked_sockets,
+        )
+
+
+class _AbortableHTTPSHandler(urllib_request.HTTPSHandler):
+    def __init__(
+        self,
+        abort_controller: Optional[_RequestAbortController],
+        request_epoch: int,
+        tracked_sockets: List[Any],
+        context: Optional[ssl.SSLContext] = None,
+    ) -> None:
+        super().__init__(context=context)
+        self._abort_controller = abort_controller
+        self._request_epoch = request_epoch
+        self._tracked_sockets = tracked_sockets
+
+    def https_open(self, req: urllib_request.Request) -> Any:
+        return self.do_open(
+            _AbortableHTTPSConnection,
+            req,
+            context=self._context,
+            abort_controller=self._abort_controller,
+            request_epoch=self._request_epoch,
+            tracked_sockets=self._tracked_sockets,
+        )
+
+
+def _read_stream_with_deadline(
+    stream: Any,
+    deadline: float,
+    chunk_size: int = 65536,
+    *,
+    abort_controller: Optional[_RequestAbortController] = None,
+    request_epoch: int = 0,
+) -> bytes:
     chunks: List[bytes] = []
     while True:
+        if abort_controller is not None and abort_controller.is_epoch_aborted(request_epoch):
+            raise OSError("HTTP response read aborted during shutdown.")
         if time.monotonic() > deadline:
             raise TimeoutError("HTTP response read exceeded deadline.")
         piece = stream.read(chunk_size)
@@ -601,17 +841,33 @@ def default_http_requester(
     headers: Dict[str, str],
     body: Optional[bytes],
     timeout: float,
+    *,
+    abort_controller: Optional[_RequestAbortController] = None,
 ) -> Tuple[int, Dict[str, str], bytes]:
-    """Stdlib ``urllib.request`` transport. Disables redirects and enforces bounded reads."""
+    """Stdlib ``urllib.request`` transport. Disables redirects and supports socket abort."""
+    request_epoch = abort_controller.current_epoch() if abort_controller is not None else 0
+    if abort_controller is not None and abort_controller.is_epoch_aborted(request_epoch):
+        raise urllib_error.URLError("HTTP request aborted during shutdown.")
+
+    tracked_sockets: List[Any] = []
+    http_handler = _AbortableHTTPHandler(abort_controller, request_epoch, tracked_sockets)
+    https_handler = _AbortableHTTPSHandler(abort_controller, request_epoch, tracked_sockets)
+
     parsed = urllib_parse.urlparse(url)
     host = parsed.hostname or ""
     if is_loopback_host(host) or is_tailscale_host(host):
         opener = urllib_request.build_opener(
             urllib_request.ProxyHandler({}),
             _NoRedirectHandler(),
+            http_handler,
+            https_handler,
         )
     else:
-        opener = urllib_request.build_opener(_NoRedirectHandler())
+        opener = urllib_request.build_opener(
+            _NoRedirectHandler(),
+            http_handler,
+            https_handler,
+        )
 
     req_headers = dict(headers)
     if body is not None:
@@ -624,17 +880,37 @@ def default_http_requester(
         with opener.open(req, timeout=bounded_timeout) as resp:
             status = int(getattr(resp, "status", resp.getcode()))
             resp_headers = {k.lower(): v for k, v in resp.headers.items()}
-            raw = _read_stream_with_deadline(resp, deadline)
+            raw = _read_stream_with_deadline(
+                resp,
+                deadline,
+                abort_controller=abort_controller,
+                request_epoch=request_epoch,
+            )
             return status, resp_headers, raw
     except urllib_error.HTTPError as exc:
         try:
-            raw = _read_stream_with_deadline(exc, deadline)
+            raw = _read_stream_with_deadline(
+                exc,
+                deadline,
+                abort_controller=abort_controller,
+                request_epoch=request_epoch,
+            )
             resp_headers = {k.lower(): v for k, v in exc.headers.items()} if exc.headers else {}
             return int(exc.code), resp_headers, raw
         finally:
             try:
                 exc.close()
             except Exception:
+                pass
+    except http.client.HTTPException as exc:
+        raise urllib_error.URLError(f"HTTP connection aborted: {exc}") from exc
+    finally:
+        for sock in tracked_sockets:
+            if abort_controller is not None:
+                abort_controller.unregister_socket(sock)
+            try:
+                sock.close()
+            except OSError:
                 pass
 
 
@@ -668,7 +944,7 @@ class ServerBackend(SyncBackend):
         self.namespace = validate_namespace(namespace)
         self.client_id = (client_id or "promptboard-client").strip()
         self.schema_version = schema_version
-        self.timeout = max(0.5, float(timeout))
+        self.timeout = max(0.2, float(timeout))
         self._requester: HttpRequester = requester or default_http_requester
 
     def __repr__(self) -> str:
@@ -1472,8 +1748,57 @@ class SyncEngine:
         self._state_lock = threading.RLock()
         self.state_store = SyncStateStore(storage.data_dir, lock=self._state_lock)
         self.queue = OfflineQueue(storage.data_dir)
-        self._requester = requester
+        self._custom_requester = requester
+        self._abort_controller = _RequestAbortController()
+        self._cancel_event = threading.Event()
+        self._shutting_down = False
+        self._shutdown_timeout = DEFAULT_SHUTDOWN_HTTP_TIMEOUT
+        self._requester: HttpRequester = self._dispatch_http_request
         self._engine_lock = threading.RLock()
+
+    @property
+    def cancel_event(self) -> threading.Event:
+        return self._cancel_event
+
+    def is_cancelled(self) -> bool:
+        return self._cancel_event.is_set()
+
+    def begin_shutdown(
+        self,
+        *,
+        request_timeout: float = DEFAULT_SHUTDOWN_HTTP_TIMEOUT,
+    ) -> None:
+        """Signal workers to cancel, clamp future request timeouts (<= 1 s), and abort active sockets."""
+        self._shutdown_timeout = min(1.0, max(0.2, float(request_timeout)))
+        self._shutting_down = True
+        self._cancel_event.set()
+        self._abort_controller.abort_all()
+
+    def abort_active_requests(self) -> None:
+        """Forcefully close/abort any currently running HTTP request sockets."""
+        self._abort_controller.abort_all()
+
+    def _dispatch_http_request(
+        self,
+        method: str,
+        url: str,
+        headers: Dict[str, str],
+        body: Optional[bytes],
+        timeout: float,
+    ) -> Tuple[int, Dict[str, str], bytes]:
+        effective_timeout = float(timeout)
+        if self._shutting_down:
+            effective_timeout = min(effective_timeout, self._shutdown_timeout)
+        if self._custom_requester is not None:
+            return self._custom_requester(method, url, headers, body, effective_timeout)
+        return default_http_requester(
+            method,
+            url,
+            headers,
+            body,
+            effective_timeout,
+            abort_controller=self._abort_controller,
+        )
 
     def current_mode(self) -> str:
         raw = self.settings.get_sync_mode()
@@ -2102,6 +2427,8 @@ class SyncEngine:
                 conflict_count=len(self.get_conflicts()),
                 error="Sync server URL and API token are required.",
             )
+        if self.is_cancelled():
+            return SyncOutcome(ok=False, mode=mode, cancelled=True)
 
         coupling_id = self.target_coupling_id()
 
@@ -2157,7 +2484,17 @@ class SyncEngine:
 
             # Step 1: First-time coupling handling if not yet coupled to this target.
             if not is_coupled:
+                if self.is_cancelled():
+                    return SyncOutcome(ok=False, mode=mode, cancelled=True)
                 initial_pull = backend.pull(since_rev=None)
+                if self.is_cancelled():
+                    return SyncOutcome(
+                        ok=False,
+                        mode=mode,
+                        offline=initial_pull.offline,
+                        cancelled=True,
+                        error=initial_pull.error,
+                    )
                 if initial_pull.offline:
                     with self._engine_lock, self._state_lock:
                         live_state = self.state_store.load()
@@ -2285,6 +2622,18 @@ class SyncEngine:
                     self.state_store.save(live_state)
                     pending_to_push = self.queue.load_all(target=coupling_id)
 
+                if self.is_cancelled():
+                    return SyncOutcome(
+                        ok=False,
+                        mode=mode,
+                        pulled_upserts=upserts_applied,
+                        pulled_tombstones=tombs_applied,
+                        pending_queue_count=self.get_pending_count(target=coupling_id),
+                        conflict_count=len(self.get_conflicts()),
+                        cancelled=True,
+                        storage_changed=changed,
+                    )
+
                 push_res = backend.push(pending_to_push) if pending_to_push else PushResult()
 
                 with self._engine_lock, self._state_lock:
@@ -2337,6 +2686,14 @@ class SyncEngine:
 
             pushed_count = 0
             if pending_to_push:
+                if self.is_cancelled():
+                    return SyncOutcome(
+                        ok=False,
+                        mode=mode,
+                        pending_queue_count=self.get_pending_count(target=coupling_id),
+                        conflict_count=len(self.get_conflicts()),
+                        cancelled=True,
+                    )
                 push_res = backend.push(pending_to_push)
                 with self._engine_lock, self._state_lock:
                     live_state = self.state_store.load()
@@ -2357,6 +2714,7 @@ class SyncEngine:
                             pending_queue_count=self.get_pending_count(target=coupling_id),
                             conflict_count=len(live_state.conflicts),
                             offline=True,
+                            cancelled=self.is_cancelled(),
                             error=push_res.error,
                         )
                     pushed_count = self._apply_push_result(
@@ -2371,8 +2729,20 @@ class SyncEngine:
                             live_state
                         )
                     self.state_store.save(live_state)
-                    if target_switched or self.current_mode() != "server":
-                        return SyncOutcome(ok=False, mode=self.current_mode(), cancelled=True)
+                    if (
+                        target_switched
+                        or self.current_mode() != "server"
+                        or self.is_cancelled()
+                    ):
+                        return SyncOutcome(
+                            ok=False,
+                            mode=self.current_mode(),
+                            library_rev=live_state.library_rev,
+                            pushed_count=pushed_count,
+                            pending_queue_count=self.get_pending_count(target=coupling_id),
+                            conflict_count=len(live_state.conflicts),
+                            cancelled=True,
+                        )
                     pull_since_rev = live_state.library_rev
                     pull_etag = live_state.etag or None
             else:
@@ -2385,10 +2755,36 @@ class SyncEngine:
                     pull_since_rev = live_state.library_rev
                     pull_etag = live_state.etag or None
 
+            if self.is_cancelled():
+                return SyncOutcome(
+                    ok=False,
+                    mode=mode,
+                    pushed_count=pushed_count,
+                    cancelled=True,
+                )
+
             pull_res = backend.pull(since_rev=pull_since_rev, etag=pull_etag)
+            if self.is_cancelled():
+                return SyncOutcome(
+                    ok=False,
+                    mode=mode,
+                    pushed_count=pushed_count,
+                    offline=pull_res.offline,
+                    cancelled=True,
+                    error=pull_res.error,
+                )
             full_snapshot = False
             if pull_res.reset_required:
                 pull_res = backend.pull(since_rev=None)
+                if self.is_cancelled():
+                    return SyncOutcome(
+                        ok=False,
+                        mode=mode,
+                        pushed_count=pushed_count,
+                        offline=pull_res.offline,
+                        cancelled=True,
+                        error=pull_res.error,
+                    )
                 full_snapshot = True
 
             if pull_res.offline:
@@ -2502,8 +2898,9 @@ class SyncEngine:
         *,
         kind: str = DEFAULT_KIND,
         copy_suffix: str = "LOCAL COPY",
+        push: bool = True,
     ) -> Optional[LibraryItem]:
-        """Resolve a recorded three-way conflict atomically under ``storage._lock``, then push unlocked."""
+        """Resolve a recorded three-way conflict atomically under ``storage._lock``, then optionally push unlocked."""
         pending_to_push: List[SyncMutation] = []
         backend: Optional[SyncBackend] = None
         eff_target: Optional[str] = None
@@ -2603,7 +3000,9 @@ class SyncEngine:
             self.state_store.save(state)
 
             if (
-                eff_target
+                push
+                and not self.is_cancelled()
+                and eff_target
                 and self.current_mode() == "server"
                 and self.is_configured()
                 and eff_target == self.target_coupling_id()
@@ -2615,7 +3014,7 @@ class SyncEngine:
                     except SyncError:
                         backend = None
 
-        if pending_to_push and isinstance(backend, ServerBackend) and eff_target:
+        if push and not self.is_cancelled() and pending_to_push and isinstance(backend, ServerBackend) and eff_target:
             try:
                 push_res = backend.push(pending_to_push)
                 if not push_res.queued_offline:

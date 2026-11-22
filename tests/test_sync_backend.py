@@ -583,6 +583,7 @@ def test_e2e_push_pull_409_conflict_resolutions_tombstones_and_410(qapp, tmp_pat
         assert conflict_dlg.keep_local_button.isDefault() is True
         assert conflict_dlg.conflict_list.count() == 1
         assert conflict_dlg.apply_resolution("keep_copy") is True
+        assert conflict_dlg.wait_for_background_push(3.0) is True
     finally:
         conflict_dlg.close()
 
@@ -1827,6 +1828,332 @@ def test_b2_hanging_server_never_blocks_enqueue_target_change_or_bounded_quit(qa
             window.close()
     finally:
         release_server_hang.set()
+        hanging_srv.shutdown()
+        hanging_srv.server_close()
+        srv_thread.join(timeout=2.0)
+
+
+# ---------------------------------------------------------------------------
+# Stage 1b follow-up regressions (PR #7 review: non-blocking conflict UI & quit pool drain)
+# ---------------------------------------------------------------------------
+
+
+def test_followup1_conflict_resolution_dialog_never_blocks_gui_on_hanging_server(qapp, tmp_path):
+    """Follow-up 1: ConflictResolutionDialog.apply_resolution returns in < 1 s and pushes via worker."""
+    gui_tid = threading.get_ident()
+    push_started = threading.Event()
+    standalone_push_started = threading.Event()
+    release_hang = threading.Event()
+    worker_tids: List[int] = []
+
+    class HangingPushHandler(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            worker_tids.append(threading.get_ident())
+            release_hang.wait(timeout=15.0)
+            try:
+                self.send_response(503)
+                self.end_headers()
+            except OSError:
+                pass
+
+        def do_POST(self):  # noqa: N802
+            worker_tids.append(threading.get_ident())
+            length = int(self.headers.get("Content-Length", "0") or 0)
+            if length > 0:
+                self.rfile.read(length)
+            if "/ns_standalone/" in self.path:
+                standalone_push_started.set()
+            else:
+                push_started.set()
+            release_hang.wait(timeout=15.0)
+            try:
+                self.send_response(503)
+                self.end_headers()
+            except OSError:
+                pass
+
+        def log_message(self, format, *args):  # noqa: A002
+            return
+
+    hanging_srv = ThreadingHTTPServer(("127.0.0.1", 0), HangingPushHandler)
+    srv_thread = threading.Thread(target=hanging_srv.serve_forever, daemon=True)
+    srv_thread.start()
+    hanging_url = f"http://127.0.0.1:{hanging_srv.server_address[1]}"
+
+    try:
+        from models import item_to_dict
+        from sync_backend import ConflictEntry
+
+        # 1) MainWindow + ConflictResolutionDialog path (hands push to MainWindow.start_sync / QThreadPool)
+        settings, storage = _make_settings_and_storage(
+            tmp_path / "win_case",
+            mode="server",
+            server_url=hanging_url,
+            token="pss_followup1_token",
+            namespace="promptboard",
+        )
+        local_1 = LibraryItem(id="c-1", item_type=ItemType.PROMPT, name="CONF ONE", content="Local v2")
+        server_1 = LibraryItem(id="c-1", item_type=ItemType.PROMPT, name="CONF ONE", content="Server v2")
+        local_2 = LibraryItem(id="c-2", item_type=ItemType.SKILL, name="CONF TWO", content="Local copy v2")
+        server_2 = LibraryItem(id="c-2", item_type=ItemType.SKILL, name="CONF TWO", content="Server canonical v2")
+        storage.upsert_many([local_1, local_2])
+
+        engine = SyncEngine(storage, settings)
+        target_id = engine.target_coupling_id()
+        state = engine.state_store.load()
+        state.active_target = target_id
+        state.coupled_targets = [target_id]
+        state.library_rev = 3
+        state.conflicts = [
+            ConflictEntry(
+                id="c-1",
+                kind="item",
+                title="CONF ONE",
+                source="server",
+                client_base_rev=1,
+                server_rev=3,
+                updated_at="2026-11-22T18:00:00Z",
+                local_op="upsert",
+                local_item=item_to_dict(local_1),
+                server_item=item_to_dict(server_1),
+                server_deleted=False,
+            ),
+            ConflictEntry(
+                id="c-2",
+                kind="item",
+                title="CONF TWO",
+                source="server",
+                client_base_rev=1,
+                server_rev=3,
+                updated_at="2026-11-22T18:01:00Z",
+                local_op="upsert",
+                local_item=item_to_dict(local_2),
+                server_item=item_to_dict(server_2),
+                server_deleted=False,
+            ),
+        ]
+        engine.state_store.save(state)
+
+        window = MainWindow(storage, settings, sync_engine=engine)
+        dlg = ConflictResolutionDialog(
+            engine,
+            parent=window,
+            on_resolved=window._refresh_after_sync_change,
+            on_push_requested=lambda: window.start_sync(interactive=False),
+        )
+        try:
+            t0 = time.perf_counter()
+            assert dlg.apply_resolution("keep_local") is True
+            elapsed_first = time.perf_counter() - t0
+            assert elapsed_first < 1.0
+            assert len(engine.get_conflicts()) == 1
+            assert storage.get_item("c-1").content == "Local v2"
+            assert engine.get_pending_count(target=target_id) == 1
+
+            # Worker thread picks up the queued push and attempts HTTP POST off the GUI thread.
+            assert push_started.wait(timeout=1.5), "Worker did not attempt push"
+            assert worker_tids and all(tid != gui_tid for tid in worker_tids)
+
+            # Second click while worker is still blocked on 127.0.0.1 also returns in < 1 s.
+            t1 = time.perf_counter()
+            assert dlg.apply_resolution("keep_copy") is True
+            elapsed_second = time.perf_counter() - t1
+            assert elapsed_second < 1.0
+            assert engine.get_conflicts() == []
+            assert storage.get_item("c-2").content == "Server canonical v2"
+            assert len(storage.load_items()) == 3
+            assert engine.get_pending_count(target=target_id) == 2
+            assert window._sync_rerun_requested is True
+        finally:
+            dlg.close()
+            window.on_about_to_quit()
+            window.close()
+
+        # 2) Standalone ConflictResolutionDialog (no MainWindow) also returns in < 1 s and attempts worker push.
+        settings_s, storage_s = _make_settings_and_storage(
+            tmp_path / "standalone_case",
+            mode="server",
+            server_url=hanging_url,
+            token="pss_followup1_standalone",
+            namespace="ns_standalone",
+        )
+        storage_s.upsert_item(local_1)
+        engine_s = SyncEngine(storage_s, settings_s)
+        target_s = engine_s.target_coupling_id()
+        st_s = engine_s.state_store.load()
+        st_s.active_target = target_s
+        st_s.coupled_targets = [target_s]
+        st_s.library_rev = 2
+        st_s.conflicts = [
+            ConflictEntry(
+                id="c-1",
+                kind="item",
+                title="CONF ONE",
+                source="server",
+                client_base_rev=1,
+                server_rev=2,
+                updated_at="2026-11-22T18:05:00Z",
+                local_op="upsert",
+                local_item=item_to_dict(local_1),
+                server_item=item_to_dict(server_1),
+                server_deleted=False,
+            )
+        ]
+        engine_s.state_store.save(st_s)
+
+        dlg_s = ConflictResolutionDialog(engine_s)
+        try:
+            t_s = time.perf_counter()
+            assert dlg_s.apply_resolution("keep_local") is True
+            assert (time.perf_counter() - t_s) < 1.0
+            assert engine_s.get_pending_count(target=target_s) == 1
+            assert standalone_push_started.wait(timeout=1.5), "Standalone worker did not attempt push"
+        finally:
+            engine_s.begin_shutdown()
+            assert dlg_s.wait_for_background_push(1.5) is True
+            dlg_s.close()
+    finally:
+        release_hang.set()
+        hanging_srv.shutdown()
+        hanging_srv.server_close()
+        srv_thread.join(timeout=2.0)
+
+
+def test_followup2_quit_aborts_running_sync_uses_short_timeout_and_idles_pool_within_bound(
+    qapp, tmp_path
+):
+    """Follow-up 2: With a hanging server and a running sync, quit finishes and QThreadPool is idle within bound."""
+    get_in_flight_a = threading.Event()
+    get_in_flight_b = threading.Event()
+    post_in_flight_b = threading.Event()
+    release_hang = threading.Event()
+
+    class HangingQuitHandler(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            if "/ns_a/" in self.path:
+                get_in_flight_a.set()
+            else:
+                get_in_flight_b.set()
+            release_hang.wait(timeout=15.0)
+            try:
+                self.send_response(503)
+                self.end_headers()
+            except OSError:
+                pass
+
+        def do_POST(self):  # noqa: N802
+            length = int(self.headers.get("Content-Length", "0") or 0)
+            if length > 0:
+                self.rfile.read(length)
+            post_in_flight_b.set()
+            release_hang.wait(timeout=15.0)
+            try:
+                self.send_response(503)
+                self.end_headers()
+            except OSError:
+                pass
+
+        def log_message(self, format, *args):  # noqa: A002
+            return
+
+    hanging_srv = ThreadingHTTPServer(("127.0.0.1", 0), HangingQuitHandler)
+    srv_thread = threading.Thread(target=hanging_srv.serve_forever, daemon=True)
+    srv_thread.start()
+    hanging_url = f"http://127.0.0.1:{hanging_srv.server_address[1]}"
+
+    try:
+        from sync_backend import default_http_requester
+
+        # Case A: Running sync (10 s timeout on 15 s hanging server) + no pending edits -> aborts & idles fast.
+        settings_a, storage_a = _make_settings_and_storage(
+            tmp_path / "quit_idle_a",
+            mode="server",
+            server_url=hanging_url,
+            token="pss_followup2_a",
+            namespace="ns_a",
+        )
+        engine_a = SyncEngine(storage_a, settings_a)
+        window_a = MainWindow(storage_a, settings_a, sync_engine=engine_a)
+        try:
+            assert window_a.sync_on_start(interactive=False) is None
+            assert get_in_flight_a.wait(timeout=2.0), "Sync GET did not start"
+            assert window_a._sync_thread_pool.activeThreadCount() >= 1
+
+            t0 = time.perf_counter()
+            window_a.on_about_to_quit()
+            quit_elapsed_a = time.perf_counter() - t0
+
+            assert engine_a.is_cancelled() is True
+            assert quit_elapsed_a <= window_a.QUIT_FLUSH_MAX_WAIT_S
+            # Before release_hang is set, the pool must ALREADY be completely idle!
+            assert window_a._sync_thread_pool.activeThreadCount() == 0
+            assert window_a._sync_thread_pool.waitForDone(0) is True
+        finally:
+            window_a.close()
+
+        # Case B: Running sync + dirty pending edit -> aborts GET, runs post-quit flush with <= 1 s timeout,
+        # finishes and leaves QThreadPool completely idle within the 2.5 s quit bound.
+        observed_post_quit_timeouts: List[float] = []
+        quit_started_flag = {"value": False}
+
+        settings_b, storage_b = _make_settings_and_storage(
+            tmp_path / "quit_idle_b",
+            mode="server",
+            server_url=hanging_url,
+            token="pss_followup2_b",
+            namespace="ns_b",
+        )
+        engine_b = SyncEngine(storage_b, settings_b)
+        target_b = engine_b.target_coupling_id()
+        st_b = engine_b.state_store.load()
+        st_b.active_target = target_b
+        st_b.coupled_targets = [target_b]
+        engine_b.state_store.save(st_b)
+
+        def observing_requester(
+            method: str,
+            url: str,
+            headers: Dict[str, str],
+            body: Optional[bytes],
+            timeout: float,
+        ):
+            if quit_started_flag["value"]:
+                observed_post_quit_timeouts.append(timeout)
+            return default_http_requester(
+                method,
+                url,
+                headers,
+                body,
+                timeout,
+                abort_controller=engine_b._abort_controller,
+            )
+
+        engine_b._custom_requester = observing_requester
+        window_b = MainWindow(storage_b, settings_b, sync_engine=engine_b)
+        try:
+            assert window_b.sync_on_start(interactive=False) is None
+            assert get_in_flight_b.wait(timeout=2.0), "Steady-state GET did not start"
+            assert window_b._sync_thread_pool.activeThreadCount() >= 1
+
+            window_b.create_item()
+            window_b.content_edit.setPlainText("Unsaved quit edit")
+            quit_started_flag["value"] = True
+
+            t1 = time.perf_counter()
+            window_b.on_about_to_quit()
+            quit_elapsed_b = time.perf_counter() - t1
+
+            assert post_in_flight_b.is_set() is True
+            assert observed_post_quit_timeouts
+            assert all(t <= 1.0 for t in observed_post_quit_timeouts)
+            assert quit_elapsed_b <= window_b.QUIT_FLUSH_MAX_WAIT_S
+            assert window_b._sync_thread_pool.activeThreadCount() == 0
+            assert window_b._sync_thread_pool.waitForDone(0) is True
+            assert engine_b.get_pending_count(target=target_b) >= 1
+        finally:
+            window_b.close()
+    finally:
+        release_hang.set()
         hanging_srv.shutdown()
         hanging_srv.server_close()
         srv_thread.join(timeout=2.0)

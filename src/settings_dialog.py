@@ -238,10 +238,25 @@ class ConflictResolutionDialog(QtWidgets.QDialog):
         sync_engine: SyncEngine,
         parent: Optional[QtWidgets.QWidget] = None,
         on_resolved: Optional[Callable[[], None]] = None,
+        on_push_requested: Optional[Callable[[], Any]] = None,
     ) -> None:
         super().__init__(parent)
         self.sync_engine = sync_engine
         self._on_resolved = on_resolved
+        if on_push_requested is None:
+            ancestor = parent
+            while ancestor is not None:
+                start_fn = getattr(ancestor, "start_sync", None)
+                if callable(start_fn):
+                    def _trigger_host_sync(fn: Callable[..., Any] = start_fn) -> Any:
+                        return fn(interactive=False)
+
+                    on_push_requested = _trigger_host_sync
+                    break
+                ancestor = ancestor.parentWidget()
+        self._on_push_requested = on_push_requested
+        self._worker_pool: Optional[QtCore.QThreadPool] = None
+        self._active_runnables: set[_DialogWorkerRunnable] = set()
 
         self.setWindowTitle(tr("dialog.sync_conflicts.title"))
         self.setModal(True)
@@ -358,6 +373,31 @@ class ConflictResolutionDialog(QtWidgets.QDialog):
             return self._conflicts[row]
         return None
 
+    def _schedule_background_push(self) -> bool:
+        if self.sync_engine.is_cancelled():
+            return False
+        if self.sync_engine.current_mode() != "server" or not self.sync_engine.is_configured():
+            return False
+        if self.sync_engine.get_pending_count() <= 0:
+            return False
+        if self._on_push_requested is not None:
+            return bool(self._on_push_requested())
+        if self._worker_pool is None:
+            self._worker_pool = QtCore.QThreadPool()
+            self._worker_pool.setMaxThreadCount(1)
+        runnable = _DialogWorkerRunnable(self.sync_engine.flush_pending)
+        self._active_runnables.add(runnable)
+        runnable.signals.finished.connect(
+            lambda _res, r=runnable: self._active_runnables.discard(r)
+        )
+        self._worker_pool.start(runnable)
+        return True
+
+    def wait_for_background_push(self, timeout_s: float = 2.0) -> bool:
+        if self._worker_pool is None:
+            return True
+        return bool(self._worker_pool.waitForDone(max(0, int(timeout_s * 1000))))
+
     def apply_resolution(self, choice: ConflictResolutionChoice) -> bool:
         entry = self.current_conflict()
         if entry is None:
@@ -367,9 +407,11 @@ class ConflictResolutionDialog(QtWidgets.QDialog):
             choice,
             kind=entry.kind,
             copy_suffix=tr("sync.copy_suffix"),
+            push=False,
         )
         if self._on_resolved is not None:
             self._on_resolved()
+        self._schedule_background_push()
         self.reload_conflicts()
         if not self._conflicts:
             self.accept()
