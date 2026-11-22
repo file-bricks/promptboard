@@ -32,7 +32,13 @@ from urllib import request as urllib_request
 import uuid
 
 from models import LibraryItem, gen_id, item_from_dict, item_to_dict, now_iso
-from storage import Storage, _atomic_replace_with_retry, atomic_write_json, atomic_write_text
+from storage import (
+    Storage,
+    _atomic_replace_with_retry,
+    atomic_write_json,
+    atomic_write_text,
+    make_unique_tmp_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +207,7 @@ def _write_restricted_json(target: Path, data: Dict[str, Any]) -> None:
         except OSError:
             pass
 
-    tmp = target.parent / f".{target.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
+    tmp = make_unique_tmp_path(target)
     encoded = (json.dumps(data, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
@@ -244,6 +250,7 @@ class TokenStorage:
     ) -> None:
         self.fallback_path = Path(fallback_path) if fallback_path is not None else default_token_file_path()
         self._keyring_override = keyring_backend
+        self._lock = threading.RLock()
 
     def _active_keyring(self) -> Any:
         if self._keyring_override is not None:
@@ -253,63 +260,66 @@ class TokenStorage:
         return _keyring_mod
 
     def get_token(self) -> str:
-        kr = self._active_keyring()
-        if kr is not None:
-            try:
-                secret = kr.get_password(self.SERVICE_NAME, self.ACCOUNT_NAME)
-                if isinstance(secret, str) and secret.strip():
-                    return secret.strip()
-            except Exception:
-                logger.debug("Keyring lookup unavailable; using local token file fallback.")
+        with self._lock:
+            kr = self._active_keyring()
+            if kr is not None:
+                try:
+                    secret = kr.get_password(self.SERVICE_NAME, self.ACCOUNT_NAME)
+                    if isinstance(secret, str) and secret.strip():
+                        return secret.strip()
+                except Exception:
+                    logger.debug("Keyring lookup unavailable; using local token file fallback.")
 
-        if not self.fallback_path.is_file():
+            if not self.fallback_path.is_file():
+                return ""
+            try:
+                raw = json.loads(self.fallback_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                logger.warning("Could not read fallback sync token file.")
+                return ""
+            if isinstance(raw, dict):
+                token = raw.get("token", "")
+                return str(token).strip() if token is not None else ""
             return ""
-        try:
-            raw = json.loads(self.fallback_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            logger.warning("Could not read fallback sync token file.")
-            return ""
-        if isinstance(raw, dict):
-            token = raw.get("token", "")
-            return str(token).strip() if token is not None else ""
-        return ""
 
     def set_token(self, token: str) -> None:
-        cleaned = (token or "").strip()
-        if not cleaned:
-            self.clear_token()
-            return
+        with self._lock:
+            cleaned = (token or "").strip()
+            if not cleaned:
+                self.clear_token()
+                return
 
-        kr = self._active_keyring()
-        stored_in_keyring = False
-        if kr is not None:
-            try:
-                kr.set_password(self.SERVICE_NAME, self.ACCOUNT_NAME, cleaned)
-                stored_in_keyring = True
-            except Exception:
-                logger.debug("Keyring write failed; persisting sync token in 0600 fallback file.")
+            kr = self._active_keyring()
+            stored_in_keyring = False
+            if kr is not None:
+                try:
+                    kr.set_password(self.SERVICE_NAME, self.ACCOUNT_NAME, cleaned)
+                    stored_in_keyring = True
+                except Exception:
+                    logger.debug("Keyring write failed; persisting sync token in 0600 fallback file.")
 
-        if stored_in_keyring:
-            # Remove stale plaintext file if keyring succeeded.
+            if stored_in_keyring:
+                # Remove stale plaintext file if keyring succeeded.
+                try:
+                    self.fallback_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                return
+
+            _write_restricted_json(self.fallback_path, {"version": 1, "token": cleaned})
+
+    def clear_token(self) -> None:
+        with self._lock:
+            kr = self._active_keyring()
+            if kr is not None:
+                try:
+                    kr.delete_password(self.SERVICE_NAME, self.ACCOUNT_NAME)
+                except Exception:
+                    pass
             try:
                 self.fallback_path.unlink(missing_ok=True)
             except OSError:
                 pass
-            return
-
-        _write_restricted_json(self.fallback_path, {"version": 1, "token": cleaned})
-
-    def clear_token(self) -> None:
-        kr = self._active_keyring()
-        if kr is not None:
-            try:
-                kr.delete_password(self.SERVICE_NAME, self.ACCOUNT_NAME)
-            except Exception:
-                pass
-        try:
-            self.fallback_path.unlink(missing_ok=True)
-        except OSError:
-            pass
 
     def __repr__(self) -> str:
         return f"TokenStorage(fallback_path={str(self.fallback_path)!r}, token='***')"
@@ -587,24 +597,23 @@ class _NoRedirectHandler(urllib_request.HTTPRedirectHandler):
         return None
 
 
-def _force_close_socket(sock: Any) -> None:
-    """Forcefully shut down and close a live socket across threads, bypassing _io_refs."""
+_SOCKET_POLL_SLICE_S = 0.05
+
+
+def _shutdown_socket(sock: Any) -> None:
+    """Interrupt blocking socket I/O via ``shutdown(SHUT_RDWR)`` without closing its fd.
+
+    Safe to invoke from a foreign thread: the actual ``close()`` happens exclusively
+    in the owning worker thread's ``finally`` block so the file descriptor can never
+    be recycled while the worker still uses it.
+    """
     if sock is None:
         return
     try:
-        sock.shutdown(socket.SHUT_RDWR)
-    except OSError:
-        pass
-    try:
-        real_close = getattr(sock, "_real_close", None)
-        if callable(real_close):
-            real_close()
+        if isinstance(sock, ssl.SSLSocket):
+            socket.socket.shutdown(sock, socket.SHUT_RDWR)
         else:
-            sock.close()
-    except OSError:
-        pass
-    try:
-        sock.close()
+            sock.shutdown(socket.SHUT_RDWR)
     except OSError:
         pass
 
@@ -635,7 +644,7 @@ class _RequestAbortController:
             else:
                 self._sockets[id(sock)] = (request_epoch, sock)
         if abort_now:
-            _force_close_socket(sock)
+            _shutdown_socket(sock)
             raise OSError("HTTP request aborted during shutdown.")
 
     def unregister_socket(self, sock: Any) -> None:
@@ -651,7 +660,7 @@ class _RequestAbortController:
             self._sockets.clear()
             epoch = self._epoch
         for sock in sockets:
-            _force_close_socket(sock)
+            _shutdown_socket(sock)
         return epoch
 
 
@@ -663,6 +672,7 @@ def _open_tracked_tcp_socket(
     abort_controller: Optional[_RequestAbortController] = None,
     request_epoch: int = 0,
     tracked_sockets: Optional[List[Any]] = None,
+    deadline: Optional[float] = None,
 ) -> socket.socket:
     host, port = address
     if abort_controller is not None and abort_controller.is_epoch_aborted(request_epoch):
@@ -681,8 +691,14 @@ def _open_tracked_tcp_socket(
                 tracked_sockets.append(sock)
             if abort_controller is not None:
                 abort_controller.register_socket(sock, request_epoch)
-            if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
-                sock.settimeout(timeout)
+            eff_timeout = timeout
+            if deadline is not None:
+                rem = deadline - time.monotonic()
+                if rem <= 0:
+                    raise TimeoutError("timed out")
+                eff_timeout = rem if eff_timeout is socket._GLOBAL_DEFAULT_TIMEOUT else min(float(eff_timeout), rem)
+            if eff_timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
+                sock.settimeout(eff_timeout)
             if source_address:
                 sock.bind(source_address)
             sock.connect(sa)
@@ -692,10 +708,63 @@ def _open_tracked_tcp_socket(
             if sock is not None:
                 if abort_controller is not None:
                     abort_controller.unregister_socket(sock)
-                _force_close_socket(sock)
+                try:
+                    sock.close()
+                except OSError:
+                    pass
     if err is not None:
         raise err
     raise OSError("Failed to establish TCP connection.")
+
+
+def _install_abortable_reader(
+    response: http.client.HTTPResponse,
+    sock: Any,
+    *,
+    deadline: float,
+    abort_controller: Optional[_RequestAbortController],
+    request_epoch: int,
+) -> None:
+    """Wrap ``response.fp.raw.readinto`` on the owning worker thread with short poll slices.
+
+    Ensures ``abort_all()`` (``shutdown(SHUT_RDWR)`` + epoch bump) wakes blocked reads
+    promptly on every platform (including Windows/macOS ``select``/``poll``) without ever
+    closing the socket descriptor from a foreign thread.
+    """
+    fp = getattr(response, "fp", None)
+    raw = getattr(fp, "raw", None)
+    if raw is None or sock is None:
+        return
+
+    def _sliced_readinto(buf: Any) -> Optional[int]:
+        raw._checkClosed()
+        raw._checkReadable()
+        if getattr(raw, "_timeout_occurred", False):
+            raise OSError("cannot read from timed out object")
+        while True:
+            if abort_controller is not None and abort_controller.is_epoch_aborted(request_epoch):
+                raise OSError("HTTP request aborted during shutdown.")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raw._timeout_occurred = True
+                raise TimeoutError("timed out")
+            try:
+                sock.settimeout(min(_SOCKET_POLL_SLICE_S, remaining))
+                n = sock.recv_into(buf)
+                if n == 0 and abort_controller is not None and abort_controller.is_epoch_aborted(request_epoch):
+                    raise OSError("HTTP request aborted during shutdown.")
+                return n
+            except TimeoutError:
+                if abort_controller is not None and abort_controller.is_epoch_aborted(request_epoch):
+                    raise OSError("HTTP request aborted during shutdown.")
+                if time.monotonic() >= deadline:
+                    raw._timeout_occurred = True
+                    raise
+                continue
+            except InterruptedError:
+                continue
+
+    raw.readinto = _sliced_readinto
 
 
 class _AbortableHTTPConnection(http.client.HTTPConnection):
@@ -705,13 +774,27 @@ class _AbortableHTTPConnection(http.client.HTTPConnection):
         abort_controller: Optional[_RequestAbortController] = None,
         request_epoch: int = 0,
         tracked_sockets: Optional[List[Any]] = None,
+        deadline: float = 0.0,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._abort_controller = abort_controller
         self._request_epoch = request_epoch
         self._tracked_sockets = tracked_sockets
+        self._deadline = deadline
         self._create_connection = self._create_tracked_connection
+        self.response_class = self._make_response
+
+    def _make_response(self, sock: Any, *args: Any, **kwargs: Any) -> http.client.HTTPResponse:
+        resp = http.client.HTTPResponse(sock, *args, **kwargs)
+        _install_abortable_reader(
+            resp,
+            sock,
+            deadline=self._deadline,
+            abort_controller=self._abort_controller,
+            request_epoch=self._request_epoch,
+        )
+        return resp
 
     def _create_tracked_connection(
         self,
@@ -726,6 +809,7 @@ class _AbortableHTTPConnection(http.client.HTTPConnection):
             abort_controller=self._abort_controller,
             request_epoch=self._request_epoch,
             tracked_sockets=self._tracked_sockets,
+            deadline=self._deadline if self._deadline > 0 else None,
         )
 
 
@@ -736,13 +820,27 @@ class _AbortableHTTPSConnection(http.client.HTTPSConnection):
         abort_controller: Optional[_RequestAbortController] = None,
         request_epoch: int = 0,
         tracked_sockets: Optional[List[Any]] = None,
+        deadline: float = 0.0,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._abort_controller = abort_controller
         self._request_epoch = request_epoch
         self._tracked_sockets = tracked_sockets
+        self._deadline = deadline
         self._create_connection = self._create_tracked_connection
+        self.response_class = self._make_response
+
+    def _make_response(self, sock: Any, *args: Any, **kwargs: Any) -> http.client.HTTPResponse:
+        resp = http.client.HTTPResponse(sock, *args, **kwargs)
+        _install_abortable_reader(
+            resp,
+            sock,
+            deadline=self._deadline,
+            abort_controller=self._abort_controller,
+            request_epoch=self._request_epoch,
+        )
+        return resp
 
     def _create_tracked_connection(
         self,
@@ -757,10 +855,26 @@ class _AbortableHTTPSConnection(http.client.HTTPSConnection):
             abort_controller=self._abort_controller,
             request_epoch=self._request_epoch,
             tracked_sockets=self._tracked_sockets,
+            deadline=self._deadline if self._deadline > 0 else None,
         )
 
     def connect(self) -> None:
-        super().connect()
+        raw_before_tls: Optional[Any] = None
+        orig_create = self._create_connection
+
+        def _capture_raw(*c_args: Any, **c_kwargs: Any) -> socket.socket:
+            nonlocal raw_before_tls
+            raw_before_tls = orig_create(*c_args, **c_kwargs)
+            return raw_before_tls
+
+        self._create_connection = _capture_raw
+        try:
+            super().connect()
+        finally:
+            self._create_connection = orig_create
+            if raw_before_tls is not None and raw_before_tls is not self.sock:
+                if self._abort_controller is not None:
+                    self._abort_controller.unregister_socket(raw_before_tls)
         if self.sock is not None:
             if self._tracked_sockets is not None:
                 self._tracked_sockets.append(self.sock)
@@ -774,11 +888,13 @@ class _AbortableHTTPHandler(urllib_request.HTTPHandler):
         abort_controller: Optional[_RequestAbortController],
         request_epoch: int,
         tracked_sockets: List[Any],
+        deadline: float,
     ) -> None:
         super().__init__()
         self._abort_controller = abort_controller
         self._request_epoch = request_epoch
         self._tracked_sockets = tracked_sockets
+        self._deadline = deadline
 
     def http_open(self, req: urllib_request.Request) -> Any:
         return self.do_open(
@@ -787,6 +903,7 @@ class _AbortableHTTPHandler(urllib_request.HTTPHandler):
             abort_controller=self._abort_controller,
             request_epoch=self._request_epoch,
             tracked_sockets=self._tracked_sockets,
+            deadline=self._deadline,
         )
 
 
@@ -796,12 +913,14 @@ class _AbortableHTTPSHandler(urllib_request.HTTPSHandler):
         abort_controller: Optional[_RequestAbortController],
         request_epoch: int,
         tracked_sockets: List[Any],
+        deadline: float,
         context: Optional[ssl.SSLContext] = None,
     ) -> None:
         super().__init__(context=context)
         self._abort_controller = abort_controller
         self._request_epoch = request_epoch
         self._tracked_sockets = tracked_sockets
+        self._deadline = deadline
 
     def https_open(self, req: urllib_request.Request) -> Any:
         return self.do_open(
@@ -811,6 +930,7 @@ class _AbortableHTTPSHandler(urllib_request.HTTPSHandler):
             abort_controller=self._abort_controller,
             request_epoch=self._request_epoch,
             tracked_sockets=self._tracked_sockets,
+            deadline=self._deadline,
         )
 
 
@@ -849,9 +969,16 @@ def default_http_requester(
     if abort_controller is not None and abort_controller.is_epoch_aborted(request_epoch):
         raise urllib_error.URLError("HTTP request aborted during shutdown.")
 
+    bounded_timeout = max(0.2, float(timeout))
+    deadline = time.monotonic() + bounded_timeout
+
     tracked_sockets: List[Any] = []
-    http_handler = _AbortableHTTPHandler(abort_controller, request_epoch, tracked_sockets)
-    https_handler = _AbortableHTTPSHandler(abort_controller, request_epoch, tracked_sockets)
+    http_handler = _AbortableHTTPHandler(
+        abort_controller, request_epoch, tracked_sockets, deadline
+    )
+    https_handler = _AbortableHTTPSHandler(
+        abort_controller, request_epoch, tracked_sockets, deadline
+    )
 
     parsed = urllib_parse.urlparse(url)
     host = parsed.hostname or ""
@@ -873,8 +1000,6 @@ def default_http_requester(
     if body is not None:
         req_headers.setdefault("Content-Length", str(len(body)))
 
-    bounded_timeout = max(0.2, float(timeout))
-    deadline = time.monotonic() + bounded_timeout
     req = urllib_request.Request(url=url, data=body, headers=req_headers, method=method)
     try:
         with opener.open(req, timeout=bounded_timeout) as resp:
@@ -1775,7 +1900,7 @@ class SyncEngine:
         self._abort_controller.abort_all()
 
     def abort_active_requests(self) -> None:
-        """Forcefully close/abort any currently running HTTP request sockets."""
+        """Abort currently running HTTP request sockets via ``shutdown(SHUT_RDWR)``."""
         self._abort_controller.abort_all()
 
     def _dispatch_http_request(

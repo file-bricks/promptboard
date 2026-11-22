@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import threading
 import uuid
 from pathlib import Path
 
@@ -70,6 +71,7 @@ def _ensure_dir(path: Path, fallback: Path) -> Path:
 class SettingsManager(QtCore.QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._lock = threading.RLock()
         self.qs = QtCore.QSettings(
             QtCore.QSettings.IniFormat,
             QtCore.QSettings.UserScope,
@@ -260,73 +262,82 @@ class SettingsManager(QtCore.QObject):
     MAX_SYNC_INTERVAL_SECONDS = 86400
 
     def _token_storage(self) -> TokenStorage:
-        existing = getattr(self, "_cached_token_storage", None)
-        if existing is None:
-            existing = TokenStorage()
-            self._cached_token_storage = existing
-        return existing
+        with self._lock:
+            existing = getattr(self, "_cached_token_storage", None)
+            if existing is None:
+                existing = TokenStorage()
+                self._cached_token_storage = existing
+            return existing
 
     def get_sync_mode(self) -> str:
-        raw = self.qs.value("sync/mode", "", type=str)
-        if raw not in self.SYNC_MODE_CHOICES:
-            if raw:
-                self.qs.setValue("sync/mode", self.DEFAULT_SYNC_MODE)
-                self.qs.sync()
-            return self.DEFAULT_SYNC_MODE
-        return raw
+        with self._lock:
+            raw = self.qs.value("sync/mode", "", type=str)
+            if raw not in self.SYNC_MODE_CHOICES:
+                if raw:
+                    self.qs.setValue("sync/mode", self.DEFAULT_SYNC_MODE)
+                    self.qs.sync()
+                return self.DEFAULT_SYNC_MODE
+            return raw
 
     def set_sync_mode(self, mode: str) -> None:
-        cleaned = (mode or "").strip().lower()
-        if cleaned not in self.SYNC_MODE_CHOICES:
-            cleaned = self.DEFAULT_SYNC_MODE
-        self.qs.setValue("sync/mode", cleaned)
-        self.qs.sync()
+        with self._lock:
+            cleaned = (mode or "").strip().lower()
+            if cleaned not in self.SYNC_MODE_CHOICES:
+                cleaned = self.DEFAULT_SYNC_MODE
+            self.qs.setValue("sync/mode", cleaned)
+            self.qs.sync()
 
     def get_sync_server_url(self) -> str:
-        raw = self.qs.value("sync/server_url", "", type=str)
-        return (raw or "").strip()
+        with self._lock:
+            raw = self.qs.value("sync/server_url", "", type=str)
+            return (raw or "").strip()
 
     def set_sync_server_url(self, url: str) -> None:
-        self.qs.setValue("sync/server_url", (url or "").strip())
-        self.qs.sync()
+        with self._lock:
+            self.qs.setValue("sync/server_url", (url or "").strip())
+            self.qs.sync()
 
     def get_sync_namespace(self) -> str:
-        raw = self.qs.value("sync/namespace", "", type=str)
-        try:
-            return validate_namespace(raw)
-        except ValueError:
-            self.qs.setValue("sync/namespace", self.DEFAULT_SYNC_NAMESPACE)
-            self.qs.sync()
-            return self.DEFAULT_SYNC_NAMESPACE
+        with self._lock:
+            raw = self.qs.value("sync/namespace", "", type=str)
+            try:
+                return validate_namespace(raw)
+            except ValueError:
+                self.qs.setValue("sync/namespace", self.DEFAULT_SYNC_NAMESPACE)
+                self.qs.sync()
+                return self.DEFAULT_SYNC_NAMESPACE
 
     def set_sync_namespace(self, namespace: str) -> None:
-        try:
-            valid = validate_namespace(namespace)
-        except ValueError:
-            valid = self.DEFAULT_SYNC_NAMESPACE
-        self.qs.setValue("sync/namespace", valid)
-        self.qs.sync()
+        with self._lock:
+            try:
+                valid = validate_namespace(namespace)
+            except ValueError:
+                valid = self.DEFAULT_SYNC_NAMESPACE
+            self.qs.setValue("sync/namespace", valid)
+            self.qs.sync()
 
     def get_sync_interval_seconds(self) -> int:
-        raw = self.qs.value("sync/interval_seconds", self.DEFAULT_SYNC_INTERVAL_SECONDS)
-        try:
-            val = int(raw)
-        except (TypeError, ValueError):
-            val = self.DEFAULT_SYNC_INTERVAL_SECONDS
-        clamped = max(self.MIN_SYNC_INTERVAL_SECONDS, min(self.MAX_SYNC_INTERVAL_SECONDS, val))
-        if clamped != val:
-            self.qs.setValue("sync/interval_seconds", clamped)
-            self.qs.sync()
-        return clamped
+        with self._lock:
+            raw = self.qs.value("sync/interval_seconds", self.DEFAULT_SYNC_INTERVAL_SECONDS)
+            try:
+                val = int(raw)
+            except (TypeError, ValueError):
+                val = self.DEFAULT_SYNC_INTERVAL_SECONDS
+            clamped = max(self.MIN_SYNC_INTERVAL_SECONDS, min(self.MAX_SYNC_INTERVAL_SECONDS, val))
+            if clamped != val:
+                self.qs.setValue("sync/interval_seconds", clamped)
+                self.qs.sync()
+            return clamped
 
     def set_sync_interval_seconds(self, seconds: int) -> None:
-        try:
-            val = int(seconds)
-        except (TypeError, ValueError):
-            val = self.DEFAULT_SYNC_INTERVAL_SECONDS
-        clamped = max(self.MIN_SYNC_INTERVAL_SECONDS, min(self.MAX_SYNC_INTERVAL_SECONDS, val))
-        self.qs.setValue("sync/interval_seconds", clamped)
-        self.qs.sync()
+        with self._lock:
+            try:
+                val = int(seconds)
+            except (TypeError, ValueError):
+                val = self.DEFAULT_SYNC_INTERVAL_SECONDS
+            clamped = max(self.MIN_SYNC_INTERVAL_SECONDS, min(self.MAX_SYNC_INTERVAL_SECONDS, val))
+            self.qs.setValue("sync/interval_seconds", clamped)
+            self.qs.sync()
 
     def get_sync_token(self) -> str:
         return self._token_storage().get_token()

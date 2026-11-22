@@ -233,6 +233,8 @@ class TargetQueueChangeDialog(QtWidgets.QDialog):
 class ConflictResolutionDialog(QtWidgets.QDialog):
     """Three-way conflict resolution dialog (keep local default / keep as copy / take server)."""
 
+    background_push_finished = QtCore.Signal(object)
+
     def __init__(
         self,
         sync_engine: SyncEngine,
@@ -387,15 +389,28 @@ class ConflictResolutionDialog(QtWidgets.QDialog):
             self._worker_pool.setMaxThreadCount(1)
         runnable = _DialogWorkerRunnable(self.sync_engine.flush_pending)
         self._active_runnables.add(runnable)
-        runnable.signals.finished.connect(
-            lambda _res, r=runnable: self._active_runnables.discard(r)
-        )
+
+        def _on_worker_done(res: Any, r: _DialogWorkerRunnable = runnable) -> None:
+            self._active_runnables.discard(r)
+            try:
+                self.background_push_finished.emit(res)
+            except RuntimeError:
+                pass
+
+        runnable.signals.finished.connect(_on_worker_done)
         self._worker_pool.start(runnable)
         return True
 
     def wait_for_background_push(self, timeout_s: float = 2.0) -> bool:
         if self._worker_pool is None:
             return True
+        return bool(self._worker_pool.waitForDone(max(0, int(timeout_s * 1000))))
+
+    def shutdown_workers(self, timeout_s: float = 2.0) -> bool:
+        self.sync_engine.begin_shutdown()
+        if self._worker_pool is None:
+            return True
+        self._worker_pool.clear()
         return bool(self._worker_pool.waitForDone(max(0, int(timeout_s * 1000))))
 
     def apply_resolution(self, choice: ConflictResolutionChoice) -> bool:
@@ -770,6 +785,14 @@ class SettingsDialog(QtWidgets.QDialog):
         if (self.sync_mode_combo.currentData() or "off") == "server":
             self._persist_sync_fields()
         self.accept()
+
+    def shutdown_workers(self, timeout_ms: int = 2000) -> bool:
+        self._worker_pool.clear()
+        return bool(self._worker_pool.waitForDone(max(0, int(timeout_ms))))
+
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        self.shutdown_workers(timeout_ms=2000)
+        super().closeEvent(event)
 
     def _persist_sync_fields(self) -> None:
         engine = self._get_or_create_sync_engine()
