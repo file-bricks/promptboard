@@ -28,6 +28,7 @@ def isolated_appdata(tmp_path, monkeypatch):
     monkeypatch.setenv("APPDATA", str(home / "AppData" / "Roaming"))
     monkeypatch.setenv("LOCALAPPDATA", str(home / "AppData" / "Local"))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(home / ".config"))
+    monkeypatch.setenv("PROMPTBOARD_DISABLE_KEYRING", "1")
 
     QtCore.QSettings.setDefaultFormat(QtCore.QSettings.IniFormat)
     QtCore.QSettings.setPath(

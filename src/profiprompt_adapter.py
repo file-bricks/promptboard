@@ -221,19 +221,14 @@ def _map_prompt(
     )
 
 
-def load_profiprompt_items(data_dir: Path) -> list[LibraryItem]:
-    data_dir = Path(data_dir)
-    prompts_file = data_dir / "prompts.json"
-    if not prompts_file.exists():
+def load_profiprompt_export_payload(payload: dict[str, Any]) -> list[LibraryItem]:
+    """Map a ``profiprompt-library-v1`` export or sync snapshot read-only to ``LibraryItem`` entries."""
+    if not isinstance(payload, dict):
         return []
-
-    prompts_payload = _load_json_object(prompts_file)
-    prompts = prompts_payload.get("prompts", [])
+    prompts = payload.get("prompts", [])
     if not isinstance(prompts, list) or not prompts:
         return []
-
-    boards_payload = _load_json_object(data_dir / "boards.json")
-    boards = boards_payload.get("boards", [])
+    boards = payload.get("boards", [])
     if not isinstance(boards, list):
         boards = []
 
@@ -257,6 +252,26 @@ def load_profiprompt_items(data_dir: Path) -> list[LibraryItem]:
         reverse=True,
     )
     return items
+
+
+def load_profiprompt_items(data_dir: Path) -> list[LibraryItem]:
+    data_dir = Path(data_dir)
+    prompts_file = data_dir / "prompts.json"
+    if not prompts_file.exists():
+        return []
+
+    prompts_payload = _load_json_object(prompts_file)
+    prompts = prompts_payload.get("prompts", [])
+    if not isinstance(prompts, list) or not prompts:
+        return []
+
+    boards_payload = _load_json_object(data_dir / "boards.json")
+    return load_profiprompt_export_payload(
+        {
+            "prompts": prompts,
+            "boards": boards_payload.get("boards", []),
+        }
+    )
 
 
 def load_latest_profiprompt_item(data_dir: Path) -> Optional[LibraryItem]:

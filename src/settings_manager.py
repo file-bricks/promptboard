@@ -8,6 +8,13 @@ from pathlib import Path
 from PySide6 import QtCore
 
 from library_query import DEFAULT_SORT_MODE, coerce_sort_mode
+from sync_backend import (
+     DEFAULT_NAMESPACE,
+     DEFAULT_SYNC_MODE,
+     SYNC_MODES,
+     TokenStorage,
+     validate_namespace,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -241,3 +248,88 @@ class SettingsManager(QtCore.QObject):
     def set_onboarding_shown(self, value: bool = True) -> None:
         self.qs.setValue("session/onboarding_shown", bool(value))
         self.qs.sync()
+
+    # ---- Synchronization settings (Stage 1b) ----------------------------
+
+    SYNC_MODE_CHOICES = SYNC_MODES
+    UI_SYNC_MODE_CHOICES = ("off", "server")
+    DEFAULT_SYNC_MODE = DEFAULT_SYNC_MODE
+    DEFAULT_SYNC_NAMESPACE = DEFAULT_NAMESPACE
+    DEFAULT_SYNC_INTERVAL_SECONDS = 300
+    MIN_SYNC_INTERVAL_SECONDS = 15
+    MAX_SYNC_INTERVAL_SECONDS = 86400
+
+    def _token_storage(self) -> TokenStorage:
+        existing = getattr(self, "_cached_token_storage", None)
+        if existing is None:
+            existing = TokenStorage()
+            self._cached_token_storage = existing
+        return existing
+
+    def get_sync_mode(self) -> str:
+        raw = self.qs.value("sync/mode", "", type=str)
+        if raw not in self.SYNC_MODE_CHOICES:
+            if raw:
+                self.qs.setValue("sync/mode", self.DEFAULT_SYNC_MODE)
+                self.qs.sync()
+            return self.DEFAULT_SYNC_MODE
+        return raw
+
+    def set_sync_mode(self, mode: str) -> None:
+        cleaned = (mode or "").strip().lower()
+        if cleaned not in self.SYNC_MODE_CHOICES:
+            cleaned = self.DEFAULT_SYNC_MODE
+        self.qs.setValue("sync/mode", cleaned)
+        self.qs.sync()
+
+    def get_sync_server_url(self) -> str:
+        raw = self.qs.value("sync/server_url", "", type=str)
+        return (raw or "").strip()
+
+    def set_sync_server_url(self, url: str) -> None:
+        self.qs.setValue("sync/server_url", (url or "").strip())
+        self.qs.sync()
+
+    def get_sync_namespace(self) -> str:
+        raw = self.qs.value("sync/namespace", "", type=str)
+        try:
+            return validate_namespace(raw)
+        except ValueError:
+            self.qs.setValue("sync/namespace", self.DEFAULT_SYNC_NAMESPACE)
+            self.qs.sync()
+            return self.DEFAULT_SYNC_NAMESPACE
+
+    def set_sync_namespace(self, namespace: str) -> None:
+        try:
+            valid = validate_namespace(namespace)
+        except ValueError:
+            valid = self.DEFAULT_SYNC_NAMESPACE
+        self.qs.setValue("sync/namespace", valid)
+        self.qs.sync()
+
+    def get_sync_interval_seconds(self) -> int:
+        raw = self.qs.value("sync/interval_seconds", self.DEFAULT_SYNC_INTERVAL_SECONDS)
+        try:
+            val = int(raw)
+        except (TypeError, ValueError):
+            val = self.DEFAULT_SYNC_INTERVAL_SECONDS
+        clamped = max(self.MIN_SYNC_INTERVAL_SECONDS, min(self.MAX_SYNC_INTERVAL_SECONDS, val))
+        if clamped != val:
+            self.qs.setValue("sync/interval_seconds", clamped)
+            self.qs.sync()
+        return clamped
+
+    def set_sync_interval_seconds(self, seconds: int) -> None:
+        try:
+            val = int(seconds)
+        except (TypeError, ValueError):
+            val = self.DEFAULT_SYNC_INTERVAL_SECONDS
+        clamped = max(self.MIN_SYNC_INTERVAL_SECONDS, min(self.MAX_SYNC_INTERVAL_SECONDS, val))
+        self.qs.setValue("sync/interval_seconds", clamped)
+        self.qs.sync()
+
+    def get_sync_token(self) -> str:
+        return self._token_storage().get_token()
+
+    def set_sync_token(self, token: str) -> None:
+        self._token_storage().set_token(token)

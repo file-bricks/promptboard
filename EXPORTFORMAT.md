@@ -77,14 +77,16 @@ serverseitiges Datenmodell nutzen.
 
 ## Server-/Team-Grenze
 
-`library.json` kann eine Team-Promptbase initial befüllen oder einzelne
-Bibliotheken aus ihr exportieren. Es soll aber keine direkte Mehrnutzer-
-Synchronisierung abbilden. Für kollaborative Nutzung braucht eine separate
-Server-Linie zusätzliche Objekte wie Nutzer, Rollen, Rechte, Versionen,
-Review-Status und Änderungsverlauf.
+`library.json` bleibt lokal rein dateibasiert (`{"items": [...]}`). Im optionalen
+Servermodus (`prompt-sync-server`, Namespace `promptboard`, Schema
+`promptboard-library-v1`) ergänzt Server-Export additiv ein Top-Level-Objekt
+`"manifest"` (`app`, `version`, `updated_at`, `item_count`, `library_rev`,
+`schema_version`), während `Storage.load_items()` unbekannte Top-Level-Felder
+wie `"manifest"` kompatibel ignoriert.
 
 ## Datenschutzgrenze
 
-Das Format enthält bewusst nur Bibliothekseinträge. Es soll keine Logs, lokalen
-Fensterzustände, Store-Metadaten, Hotkey-Konfigurationen, absoluten
-Materialisierungspfade oder Systeminformationen exportieren.
+Das Format enthält bewusst nur Bibliothekseinträge. Es exportiert keine Logs,
+lokalen Fensterzustände, Store-Metadaten, Hotkey-Konfigurationen, absoluten
+Materialisierungspfade, API-Tokens oder lokalen Sync-Metadaten (`sync_state.json`,
+`sync_queue.json`).
