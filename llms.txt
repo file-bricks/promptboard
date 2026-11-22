@@ -40,12 +40,18 @@ Release boundary (readback 2026-09-18):
 - Store identity harmonized on `Geiger.PromptBoard` / `CN=52596601-BAB4-4F3F-B182-E8F3F273B202` (`1.1.3.0`); elevated WACK / `makeappx.exe` signoff remains a local admin SDK step.
 
 Public documentation:
-- README.md: English-first overview, key features, global hotkeys, installation, and quickstart
+- README.md: English-first overview, key features, global hotkeys, installation, and quickstart; this remains authoritative. README editions: EN/DE/ES/ZH/JA/RU/FR/HI/AR/BN/PT.
 - README_de.md: German translation of the project overview
-- README_es.md: Spanish translation of the project overview
-- README_zh.md: Simplified Chinese translation of the project overview
-- README_ja.md: Japanese translation of the project overview
-- README_ru.md: Russian translation of the project overview
+- README_es.md: Spanish translation of the English project overview
+- README_zh.md: Simplified Chinese translation of the English project overview
+- README_ja.md: Japanese translation of the English project overview
+- README_ru.md: Russian translation of the English project overview
+- README_fr.md: French translation of the English project overview
+- README_hi.md: Hindi translation of the English project overview; documentation only
+- README_ar.md: Arabic translation of the English project overview; documentation only
+- README_bn.md: Bengali translation of the English project overview; documentation only
+- README_pt.md: Portuguese translation of the English project overview; documentation only
+- README translations do not imply additional app UI languages; the app UI supports DE/EN/ES/ZH/JA/RU.
 - ARCHITECTURE.md: module structure, PySide6 components, and adapter design
 - STORE_LISTING.md: 6-language Windows Store metadata and Policy 10.1.3 keywords
 
