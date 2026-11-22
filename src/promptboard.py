@@ -122,7 +122,8 @@ class _SyncTaskRunnable(QtCore.QRunnable):
 
 class MainWindow(QtWidgets.QMainWindow):
     SYNC_DEBOUNCE_MS = 3000
-    QUIT_FLUSH_HTTP_TIMEOUT_S = 0.8
+    QUIT_FLUSH_HTTP_TIMEOUT_S = 0.6
+    QUIT_INTERNAL_BUDGET_S = 1.8
     QUIT_FLUSH_MAX_WAIT_S = 2.5
 
     sync_finished = QtCore.Signal(object)
@@ -1431,44 +1432,70 @@ class MainWindow(QtWidgets.QMainWindow):
         """Idempotent shutdown handler: cancel running sync, flush bounded once, drain worker pool."""
         if self._quit_sync_done:
             return
-        quit_deadline = time.monotonic() + self.QUIT_FLUSH_MAX_WAIT_S
+        started_at = time.monotonic()
+        target_budget = min(
+            self.QUIT_INTERNAL_BUDGET_S,
+            max(0.5, self.QUIT_FLUSH_MAX_WAIT_S - 0.5),
+        )
+        internal_deadline = started_at + target_budget
+        hard_deadline = started_at + max(0.6, self.QUIT_FLUSH_MAX_WAIT_S - 0.2)
+
         self._quit_sync_done = True
         self._shutting_down = True
         self._sync_rerun_requested = False
         self._sync_rerun_interactive = False
+        self.save_timer.stop()
         self.sync_debounce_timer.stop()
         self.sync_interval_timer.stop()
-        self.save_current_item()
 
+        # Signal running workers to abort in parallel while persisting any dirty editor item.
         self.sync_engine.begin_shutdown(request_timeout=self.QUIT_FLUSH_HTTP_TIMEOUT_S)
         self._sync_thread_pool.clear()
+        self.save_current_item()
 
+        pool_drain_reserve_s = 0.35
         try:
             if (
                 self.settings.get_sync_mode() == "server"
                 and self.sync_engine.is_configured()
                 and self.sync_engine.get_pending_count() > 0
             ):
-                remaining = quit_deadline - time.monotonic()
-                if remaining > 0.25:
+                flush_budget = internal_deadline - time.monotonic() - pool_drain_reserve_s
+                if flush_budget >= 0.25:
                     http_timeout = min(
                         self.QUIT_FLUSH_HTTP_TIMEOUT_S,
-                        max(0.2, remaining - 0.35),
+                        max(0.2, flush_budget - 0.05),
                     )
                     flush_task = _SyncTaskRunnable(
                         lambda: self.sync_engine.flush_pending(timeout=http_timeout)
                     )
                     self._sync_thread_pool.start(flush_task)
                     flush_wait = min(
-                        http_timeout + 0.2,
-                        max(0.0, quit_deadline - time.monotonic() - 0.15),
+                        http_timeout + 0.15,
+                        max(0.0, internal_deadline - time.monotonic() - 0.25),
                     )
                     flush_task.done_event.wait(timeout=flush_wait)
         finally:
             self.sync_engine.abort_active_requests()
             self._sync_thread_pool.clear()
-            pool_wait_ms = max(1, int((quit_deadline - time.monotonic() - 0.02) * 1000))
+            now = time.monotonic()
+            remaining_internal = internal_deadline - now
+            remaining_hard = hard_deadline - now
+            wait_s = max(min(0.25, remaining_hard), remaining_internal)
+            pool_wait_ms = max(1, int(wait_s * 1000))
             self._sync_thread_pool.waitForDone(pool_wait_ms)
+
+    def shutdown_sync_workers(self, timeout_ms: int = 2000) -> bool:
+        """Stop sync timers, abort active requests, and drain the worker pool."""
+        self._shutting_down = True
+        self._sync_rerun_requested = False
+        self._sync_rerun_interactive = False
+        self.save_timer.stop()
+        self.sync_debounce_timer.stop()
+        self.sync_interval_timer.stop()
+        self.sync_engine.begin_shutdown(request_timeout=self.QUIT_FLUSH_HTTP_TIMEOUT_S)
+        self._sync_thread_pool.clear()
+        return bool(self._sync_thread_pool.waitForDone(max(0, int(timeout_ms))))
 
     # ------------------------------------------------------------ misc
 
@@ -1482,9 +1509,7 @@ class MainWindow(QtWidgets.QMainWindow):
             event.ignore()
             self.status_label.setText(tr("status.minimized_to_tray"))
             return
-        self._shutting_down = True
-        self.sync_debounce_timer.stop()
-        self.sync_interval_timer.stop()
+        self.shutdown_sync_workers(timeout_ms=2000)
         super().closeEvent(event)
 
 

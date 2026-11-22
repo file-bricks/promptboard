@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import json
 import logging
 import os
@@ -13,6 +14,17 @@ import uuid
 from models import LibraryItem, item_from_dict, item_to_dict
 
 logger = logging.getLogger(__name__)
+
+_TMP_WRITE_SEQ = itertools.count()
+
+
+def make_unique_tmp_path(target: Path) -> Path:
+    """Build a per-write unique temp path safe across concurrent threads and processes."""
+    name_hint = target.name[:40]
+    seq = next(_TMP_WRITE_SEQ)
+    tid = threading.get_ident()
+    token = uuid.uuid4().hex[:12]
+    return target.parent / f".{name_hint}.{os.getpid()}.{tid}.{seq:x}.{token}.tmp"
 
 
 def _atomic_replace_with_retry(tmp: Path, target: Path) -> None:
@@ -64,9 +76,9 @@ def atomic_write_text(target: Path, content: str, *, encoding: str = "utf-8") ->
         raise NotADirectoryError(f"Übergeordneter Pfad ist kein Verzeichnis: {target.parent}")
     target.parent.mkdir(parents=True, exist_ok=True)
 
-    tmp = target.parent / f".{target.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
+    tmp = make_unique_tmp_path(target)
     try:
-        with open(tmp, "w", encoding=encoding) as fh:
+        with open(tmp, "x", encoding=encoding) as fh:
             fh.write(content)
             fh.flush()
             os.fsync(fh.fileno())

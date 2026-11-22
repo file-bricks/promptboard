@@ -124,6 +124,82 @@ def _make_settings_and_storage(
     return settings, storage
 
 
+class _DaemonThreadingHTTPServer(ThreadingHTTPServer):
+    daemon_threads = True
+
+
+def _start_http_server(
+    handler_cls: type[BaseHTTPRequestHandler],
+) -> Tuple[ThreadingHTTPServer, threading.Thread, str]:
+    srv = _DaemonThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
+    thread = threading.Thread(
+        target=srv.serve_forever,
+        kwargs={"poll_interval": 0.02},
+        daemon=True,
+    )
+    thread.start()
+    return srv, thread, f"http://127.0.0.1:{srv.server_address[1]}"
+
+
+def _stop_http_server(
+    srv: ThreadingHTTPServer,
+    thread: threading.Thread,
+    *,
+    release_events: Tuple[threading.Event, ...] = (),
+    timeout: float = 3.0,
+) -> None:
+    for ev in release_events:
+        ev.set()
+    srv.shutdown()
+    srv.server_close()
+    thread.join(timeout=timeout)
+
+
+class _SignalRecorder:
+    """Deterministic QSignalSpy-style helper backed by QEventLoop and QTimer."""
+
+    def __init__(self, signal: Any) -> None:
+        self._signal = signal
+        self.emissions: List[Any] = []
+        self.thread_ids: List[int] = []
+        self._wait_loops: List[QtCore.QEventLoop] = []
+        self._target_count: int = 1
+        self._signal.connect(self._on_emit)
+
+    def _on_emit(self, payload: Any = None) -> None:
+        self.emissions.append(payload)
+        self.thread_ids.append(threading.get_ident())
+        if len(self.emissions) >= self._target_count:
+            for loop in list(self._wait_loops):
+                if loop.isRunning():
+                    loop.quit()
+
+    def wait(self, *, count: int = 1, timeout_ms: int = 3000) -> bool:
+        self._target_count = max(1, int(count))
+        if len(self.emissions) >= self._target_count:
+            return True
+        loop = QtCore.QEventLoop()
+        self._wait_loops.append(loop)
+        timer = QtCore.QTimer()
+        timer.setSingleShot(True)
+        timer.timeout.connect(loop.quit)
+        timer.start(max(1, int(timeout_ms)))
+        try:
+            if len(self.emissions) < self._target_count:
+                loop.exec()
+        finally:
+            timer.stop()
+            if loop in self._wait_loops:
+                self._wait_loops.remove(loop)
+        return len(self.emissions) >= self._target_count
+
+    def close(self) -> None:
+        try:
+            self._signal.disconnect(self._on_emit)
+        except (RuntimeError, TypeError):
+            pass
+
+
 # ---------------------------------------------------------------------------
 # Mode = off guarantees & transport validation
 # ---------------------------------------------------------------------------
@@ -733,10 +809,8 @@ def test_redirect_blocked_no_token_leak_across_test_pull_and_push(tmp_path):
         def log_message(self, format, *args):  # noqa: A002
             return
 
-    collector_srv = ThreadingHTTPServer(("127.0.0.1", 0), CollectorHandler)
-    collector_thread = threading.Thread(target=collector_srv.serve_forever, daemon=True)
-    collector_thread.start()
-    collector_url = f"http://127.0.0.1:{collector_srv.server_address[1]}/trap"
+    collector_srv, collector_thread, collector_base = _start_http_server(CollectorHandler)
+    collector_url = f"{collector_base}/trap"
 
     redirect_code = {"status": 302}
 
@@ -759,10 +833,7 @@ def test_redirect_blocked_no_token_leak_across_test_pull_and_push(tmp_path):
         def log_message(self, format, *args):  # noqa: A002
             return
 
-    redirect_srv = ThreadingHTTPServer(("127.0.0.1", 0), RedirectingHandler)
-    redirect_thread = threading.Thread(target=redirect_srv.serve_forever, daemon=True)
-    redirect_thread.start()
-    redirect_base = f"http://127.0.0.1:{redirect_srv.server_address[1]}"
+    redirect_srv, redirect_thread, redirect_base = _start_http_server(RedirectingHandler)
 
     try:
         settings, storage = _make_settings_and_storage(
@@ -791,12 +862,8 @@ def test_redirect_blocked_no_token_leak_across_test_pull_and_push(tmp_path):
 
         assert leaked_requests == []
     finally:
-        redirect_srv.shutdown()
-        redirect_srv.server_close()
-        collector_srv.shutdown()
-        collector_srv.server_close()
-        redirect_thread.join(timeout=2.0)
-        collector_thread.join(timeout=2.0)
+        _stop_http_server(redirect_srv, redirect_thread)
+        _stop_http_server(collector_srv, collector_thread)
 
 
 def test_first_coupling_take_server_backup_removed_count_and_second_confirmation(
@@ -898,18 +965,24 @@ def test_first_coupling_take_server_backup_removed_count_and_second_confirmation
         final_ids = {it.id for it in storage_b.load_items()}
         assert final_ids == {"shared-1", "srv-only-1"}
     finally:
+        window.shutdown_sync_workers(timeout_ms=3000)
         window.close()
+        qapp.processEvents()
 
 
 def test_async_qthreadpool_worker_nonblocking_startup_and_bounded_quit_flush(qapp, tmp_path):
-    """Finding 3: Network runs on QThreadPool/QRunnable via signals; startup never blocks show; quit flush <= 3 s."""
+    """Finding 3: Network runs on QThreadPool/QRunnable via signals; startup never blocks show; quit flush <= 2.5 s."""
     gui_thread_id = threading.get_ident()
     worker_threads: List[int] = []
+    get_entered = threading.Event()
+    release_get = threading.Event()
+    release_post = threading.Event()
 
     class SlowSyncHandler(BaseHTTPRequestHandler):
         def do_GET(self):  # noqa: N802
             worker_threads.append(threading.get_ident())
-            time.sleep(0.35)
+            get_entered.set()
+            release_get.wait(timeout=5.0)
             body = json.dumps(
                 {
                     "namespace": "promptboard",
@@ -944,7 +1017,7 @@ def test_async_qthreadpool_worker_nonblocking_startup_and_bounded_quit_flush(qap
             if length > 0:
                 self.rfile.read(length)
             # Simulate an unresponsive/stalling server on push to test bounded quit flush.
-            time.sleep(6.0)
+            release_post.wait(timeout=15.0)
             try:
                 self.send_response(503)
                 self.end_headers()
@@ -954,10 +1027,7 @@ def test_async_qthreadpool_worker_nonblocking_startup_and_bounded_quit_flush(qap
         def log_message(self, format, *args):  # noqa: A002
             return
 
-    slow_srv = ThreadingHTTPServer(("127.0.0.1", 0), SlowSyncHandler)
-    srv_thread = threading.Thread(target=slow_srv.serve_forever, daemon=True)
-    srv_thread.start()
-    slow_url = f"http://127.0.0.1:{slow_srv.server_address[1]}"
+    slow_srv, srv_thread, slow_url = _start_http_server(SlowSyncHandler)
 
     try:
         settings, storage = _make_settings_and_storage(
@@ -967,48 +1037,49 @@ def test_async_qthreadpool_worker_nonblocking_startup_and_bounded_quit_flush(qap
             token="pss_async_worker_token",
         )
         window = MainWindow(storage, settings)
-        delivered_on_threads: List[int] = []
-        outcomes: List[ Any] = []
-
-        def _on_finished(outcome):
-            delivered_on_threads.append(threading.get_ident())
-            outcomes.append(outcome)
-
-        window.sync_finished.connect(_on_finished)
+        spy = _SignalRecorder(window.sync_finished)
         try:
             t0 = time.perf_counter()
             assert window.sync_on_start(interactive=False) is None
             window.show()
             startup_elapsed = time.perf_counter() - t0
-            # Startup pull runs in QThreadPool and must not block window.show() (server sleeps 0.35s).
-            assert startup_elapsed < 0.2
+            # Startup pull runs in QThreadPool while release_get is still held, never blocking window.show().
+            assert startup_elapsed < 1.0
             assert window.isVisible()
+            assert len(spy.emissions) == 0
 
-            deadline = time.perf_counter() + 3.0
-            while not outcomes and time.perf_counter() < deadline:
-                qapp.processEvents()
-                time.sleep(0.01)
+            assert get_entered.wait(timeout=3.0), "Background startup GET did not start"
+            release_get.set()
+            assert spy.wait(count=1, timeout_ms=3000) is True
 
-            assert len(outcomes) == 1
-            assert outcomes[0].ok is True
+            assert len(spy.emissions) == 1
+            assert spy.emissions[0].ok is True
             assert worker_threads and all(tid != gui_thread_id for tid in worker_threads)
-            assert delivered_on_threads == [gui_thread_id]
+            assert spy.thread_ids == [gui_thread_id]
             assert storage.get_item("async-1") is not None
 
-            # Enqueue a local edit and verify bounded quit flush never hangs shutdown (>6s server stall).
+            # Enqueue a local edit and verify bounded quit flush never hangs shutdown (>15s server stall).
             window.create_item()
             assert window.sync_engine.get_pending_count() == 1
             t_quit = time.perf_counter()
             window.on_about_to_quit()
             quit_elapsed = time.perf_counter() - t_quit
-            assert quit_elapsed <= 3.0
+            assert quit_elapsed <= window.QUIT_FLUSH_MAX_WAIT_S
+            assert window._sync_thread_pool.waitForDone(0) is True
             assert window.sync_engine.get_pending_count() == 1
         finally:
+            spy.close()
+            release_get.set()
+            release_post.set()
+            window.shutdown_sync_workers(timeout_ms=3000)
             window.close()
+            qapp.processEvents()
     finally:
-        slow_srv.shutdown()
-        slow_srv.server_close()
-        srv_thread.join(timeout=2.0)
+        _stop_http_server(
+            slow_srv,
+            srv_thread,
+            release_events=(release_get, release_post),
+        )
 
 
 def test_settings_dialog_reads_token_only_when_server_mode_and_shown_or_used(qapp, tmp_path):
@@ -1720,10 +1791,7 @@ def test_b2_hanging_server_never_blocks_enqueue_target_change_or_bounded_quit(qa
         def log_message(self, format, *args):  # noqa: A002
             return
 
-    hanging_srv = ThreadingHTTPServer(("127.0.0.1", 0), NeverAnsweringHandler)
-    srv_thread = threading.Thread(target=hanging_srv.serve_forever, daemon=True)
-    srv_thread.start()
-    hanging_url = f"http://127.0.0.1:{hanging_srv.server_address[1]}"
+    hanging_srv, srv_thread, hanging_url = _start_http_server(NeverAnsweringHandler)
 
     try:
         settings, storage = _make_settings_and_storage(
@@ -1753,7 +1821,7 @@ def test_b2_hanging_server_never_blocks_enqueue_target_change_or_bounded_quit(qa
         try:
             # Start background sync_once() which hangs inside HTTP GET (10 s timeout).
             assert window.sync_on_start(interactive=False) is None
-            assert first_request_hanging.wait(timeout=2.0), "Background sync request did not start"
+            assert first_request_hanging.wait(timeout=3.0), "Background sync request did not start"
 
             # 1) enqueue_upsert must return in < 1 s while sync_once is hanging in I/O.
             up_item = LibraryItem(
@@ -1804,6 +1872,7 @@ def test_b2_hanging_server_never_blocks_enqueue_target_change_or_bounded_quit(qa
                 dlg_elapsed = time.perf_counter() - t0
                 assert dlg_elapsed < 1.0
             finally:
+                dlg.shutdown_workers(timeout_ms=2000)
                 dlg.close()
 
             # 4) Quit path with a dirty GUI item + hanging request must finish within the 2.5 s bound.
@@ -1816,21 +1885,23 @@ def test_b2_hanging_server_never_blocks_enqueue_target_change_or_bounded_quit(qa
             t_quit = time.perf_counter()
             window.on_about_to_quit()
             quit_elapsed = time.perf_counter() - t_quit
-            assert quit_elapsed <= window.QUIT_FLUSH_MAX_WAIT_S + 0.15
-            assert quit_elapsed <= 2.5
+            assert quit_elapsed <= window.QUIT_FLUSH_MAX_WAIT_S
+            assert window._sync_thread_pool.waitForDone(0) is True
             saved_on_quit = storage.get_item(dirty_id)
             assert saved_on_quit is not None
             assert saved_on_quit.content == "Dirty editor text saved on quit"
             assert engine.get_pending_count(target=primary_target) >= 3
         finally:
             release_server_hang.set()
-            window._sync_thread_pool.waitForDone(2000)
+            assert window.shutdown_sync_workers(timeout_ms=3000) is True
             window.close()
+            qapp.processEvents()
     finally:
-        release_server_hang.set()
-        hanging_srv.shutdown()
-        hanging_srv.server_close()
-        srv_thread.join(timeout=2.0)
+        _stop_http_server(
+            hanging_srv,
+            srv_thread,
+            release_events=(release_server_hang,),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1845,10 +1916,12 @@ def test_followup1_conflict_resolution_dialog_never_blocks_gui_on_hanging_server
     standalone_push_started = threading.Event()
     release_hang = threading.Event()
     worker_tids: List[int] = []
+    worker_lock = threading.Lock()
 
     class HangingPushHandler(BaseHTTPRequestHandler):
         def do_GET(self):  # noqa: N802
-            worker_tids.append(threading.get_ident())
+            with worker_lock:
+                worker_tids.append(threading.get_ident())
             release_hang.wait(timeout=15.0)
             try:
                 self.send_response(503)
@@ -1857,7 +1930,8 @@ def test_followup1_conflict_resolution_dialog_never_blocks_gui_on_hanging_server
                 pass
 
         def do_POST(self):  # noqa: N802
-            worker_tids.append(threading.get_ident())
+            with worker_lock:
+                worker_tids.append(threading.get_ident())
             length = int(self.headers.get("Content-Length", "0") or 0)
             if length > 0:
                 self.rfile.read(length)
@@ -1875,10 +1949,7 @@ def test_followup1_conflict_resolution_dialog_never_blocks_gui_on_hanging_server
         def log_message(self, format, *args):  # noqa: A002
             return
 
-    hanging_srv = ThreadingHTTPServer(("127.0.0.1", 0), HangingPushHandler)
-    srv_thread = threading.Thread(target=hanging_srv.serve_forever, daemon=True)
-    srv_thread.start()
-    hanging_url = f"http://127.0.0.1:{hanging_srv.server_address[1]}"
+    hanging_srv, srv_thread, hanging_url = _start_http_server(HangingPushHandler)
 
     try:
         from models import item_to_dict
@@ -1951,8 +2022,9 @@ def test_followup1_conflict_resolution_dialog_never_blocks_gui_on_hanging_server
             assert engine.get_pending_count(target=target_id) == 1
 
             # Worker thread picks up the queued push and attempts HTTP POST off the GUI thread.
-            assert push_started.wait(timeout=1.5), "Worker did not attempt push"
-            assert worker_tids and all(tid != gui_tid for tid in worker_tids)
+            assert push_started.wait(timeout=3.0), "Worker did not attempt push"
+            with worker_lock:
+                assert worker_tids and all(tid != gui_tid for tid in worker_tids)
 
             # Second click while worker is still blocked on 127.0.0.1 also returns in < 1 s.
             t1 = time.perf_counter()
@@ -1965,11 +2037,14 @@ def test_followup1_conflict_resolution_dialog_never_blocks_gui_on_hanging_server
             assert engine.get_pending_count(target=target_id) == 2
             assert window._sync_rerun_requested is True
         finally:
+            assert dlg.shutdown_workers(timeout_s=3.0) is True
             dlg.close()
             window.on_about_to_quit()
+            assert window.shutdown_sync_workers(timeout_ms=3000) is True
             window.close()
+            qapp.processEvents()
 
-        # 2) Standalone ConflictResolutionDialog (no MainWindow) also returns in < 1 s and attempts worker push.
+        # 2) Standalone ConflictResolutionDialog (no MainWindow) returns in < 1 s and signals worker completion.
         settings_s, storage_s = _make_settings_and_storage(
             tmp_path / "standalone_case",
             mode="server",
@@ -2002,21 +2077,28 @@ def test_followup1_conflict_resolution_dialog_never_blocks_gui_on_hanging_server
         engine_s.state_store.save(st_s)
 
         dlg_s = ConflictResolutionDialog(engine_s)
+        standalone_spy = _SignalRecorder(dlg_s.background_push_finished)
         try:
             t_s = time.perf_counter()
             assert dlg_s.apply_resolution("keep_local") is True
             assert (time.perf_counter() - t_s) < 1.0
             assert engine_s.get_pending_count(target=target_s) == 1
-            assert standalone_push_started.wait(timeout=1.5), "Standalone worker did not attempt push"
-        finally:
+            assert standalone_push_started.wait(timeout=3.0), "Standalone worker did not attempt push"
+
             engine_s.begin_shutdown()
-            assert dlg_s.wait_for_background_push(1.5) is True
+            assert standalone_spy.wait(count=1, timeout_ms=3000) is True
+            assert dlg_s.wait_for_background_push(3.0) is True
+        finally:
+            standalone_spy.close()
+            assert dlg_s.shutdown_workers(timeout_s=3.0) is True
             dlg_s.close()
+            qapp.processEvents()
     finally:
-        release_hang.set()
-        hanging_srv.shutdown()
-        hanging_srv.server_close()
-        srv_thread.join(timeout=2.0)
+        _stop_http_server(
+            hanging_srv,
+            srv_thread,
+            release_events=(release_hang,),
+        )
 
 
 def test_followup2_quit_aborts_running_sync_uses_short_timeout_and_idles_pool_within_bound(
@@ -2056,10 +2138,7 @@ def test_followup2_quit_aborts_running_sync_uses_short_timeout_and_idles_pool_wi
         def log_message(self, format, *args):  # noqa: A002
             return
 
-    hanging_srv = ThreadingHTTPServer(("127.0.0.1", 0), HangingQuitHandler)
-    srv_thread = threading.Thread(target=hanging_srv.serve_forever, daemon=True)
-    srv_thread.start()
-    hanging_url = f"http://127.0.0.1:{hanging_srv.server_address[1]}"
+    hanging_srv, srv_thread, hanging_url = _start_http_server(HangingQuitHandler)
 
     try:
         from sync_backend import default_http_requester
@@ -2076,7 +2155,7 @@ def test_followup2_quit_aborts_running_sync_uses_short_timeout_and_idles_pool_wi
         window_a = MainWindow(storage_a, settings_a, sync_engine=engine_a)
         try:
             assert window_a.sync_on_start(interactive=False) is None
-            assert get_in_flight_a.wait(timeout=2.0), "Sync GET did not start"
+            assert get_in_flight_a.wait(timeout=3.0), "Sync GET did not start"
             assert window_a._sync_thread_pool.activeThreadCount() >= 1
 
             t0 = time.perf_counter()
@@ -2086,15 +2165,17 @@ def test_followup2_quit_aborts_running_sync_uses_short_timeout_and_idles_pool_wi
             assert engine_a.is_cancelled() is True
             assert quit_elapsed_a <= window_a.QUIT_FLUSH_MAX_WAIT_S
             # Before release_hang is set, the pool must ALREADY be completely idle!
-            assert window_a._sync_thread_pool.activeThreadCount() == 0
             assert window_a._sync_thread_pool.waitForDone(0) is True
+            assert window_a._sync_thread_pool.activeThreadCount() == 0
         finally:
+            assert window_a.shutdown_sync_workers(timeout_ms=3000) is True
             window_a.close()
+            qapp.processEvents()
 
         # Case B: Running sync + dirty pending edit -> aborts GET, runs post-quit flush with <= 1 s timeout,
         # finishes and leaves QThreadPool completely idle within the 2.5 s quit bound.
         observed_post_quit_timeouts: List[float] = []
-        quit_started_flag = {"value": False}
+        quit_started = threading.Event()
 
         settings_b, storage_b = _make_settings_and_storage(
             tmp_path / "quit_idle_b",
@@ -2117,7 +2198,7 @@ def test_followup2_quit_aborts_running_sync_uses_short_timeout_and_idles_pool_wi
             body: Optional[bytes],
             timeout: float,
         ):
-            if quit_started_flag["value"]:
+            if quit_started.is_set():
                 observed_post_quit_timeouts.append(timeout)
             return default_http_requester(
                 method,
@@ -2132,28 +2213,165 @@ def test_followup2_quit_aborts_running_sync_uses_short_timeout_and_idles_pool_wi
         window_b = MainWindow(storage_b, settings_b, sync_engine=engine_b)
         try:
             assert window_b.sync_on_start(interactive=False) is None
-            assert get_in_flight_b.wait(timeout=2.0), "Steady-state GET did not start"
+            assert get_in_flight_b.wait(timeout=3.0), "Steady-state GET did not start"
             assert window_b._sync_thread_pool.activeThreadCount() >= 1
 
             window_b.create_item()
             window_b.content_edit.setPlainText("Unsaved quit edit")
-            quit_started_flag["value"] = True
+            quit_started.set()
 
             t1 = time.perf_counter()
             window_b.on_about_to_quit()
             quit_elapsed_b = time.perf_counter() - t1
 
-            assert post_in_flight_b.is_set() is True
+            assert post_in_flight_b.wait(timeout=1.0) is True
             assert observed_post_quit_timeouts
             assert all(t <= 1.0 for t in observed_post_quit_timeouts)
             assert quit_elapsed_b <= window_b.QUIT_FLUSH_MAX_WAIT_S
-            assert window_b._sync_thread_pool.activeThreadCount() == 0
             assert window_b._sync_thread_pool.waitForDone(0) is True
+            assert window_b._sync_thread_pool.activeThreadCount() == 0
             assert engine_b.get_pending_count(target=target_b) >= 1
         finally:
+            assert window_b.shutdown_sync_workers(timeout_ms=3000) is True
             window_b.close()
+            qapp.processEvents()
     finally:
-        release_hang.set()
-        hanging_srv.shutdown()
-        hanging_srv.server_close()
-        srv_thread.join(timeout=2.0)
+        _stop_http_server(
+            hanging_srv,
+            srv_thread,
+            release_events=(release_hang,),
+        )
+
+
+def test_foreign_thread_abort_uses_shutdown_only_and_closes_on_owning_worker_thread(monkeypatch):
+    """Fix 1: Foreign thread calls shutdown(SHUT_RDWR) only; socket close happens exclusively on worker."""
+    import socket as socket_mod
+    from sync_backend import _RequestAbortController, default_http_requester
+
+    req_in_flight = threading.Event()
+    release_hang = threading.Event()
+
+    class SilentHoldHandler(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            req_in_flight.set()
+            release_hang.wait(timeout=10.0)
+
+        def log_message(self, format, *args):  # noqa: A002
+            return
+
+    srv, srv_thread, base_url = _start_http_server(SilentHoldHandler)
+    controller = _RequestAbortController()
+    main_tid = threading.get_ident()
+    worker_tid_box: Dict[str, int] = {}
+    shutdown_tids: List[int] = []
+    close_tids: List[int] = []
+    tracked_ids: set[int] = set()
+    event_lock = threading.Lock()
+
+    orig_register = controller.register_socket
+    orig_shutdown = socket_mod.socket.shutdown
+    orig_close = socket_mod.socket.close
+    orig_real_close = socket_mod.socket._real_close
+
+    def hooked_register(sock: Any, epoch: int) -> None:
+        with event_lock:
+            tracked_ids.add(id(sock))
+        orig_register(sock, epoch)
+
+    def hooked_shutdown(self: socket_mod.socket, how: int) -> None:
+        if id(self) in tracked_ids:
+            with event_lock:
+                shutdown_tids.append(threading.get_ident())
+        return orig_shutdown(self, how)
+
+    def hooked_close(self: socket_mod.socket) -> None:
+        if id(self) in tracked_ids:
+            with event_lock:
+                close_tids.append(threading.get_ident())
+        return orig_close(self)
+
+    def hooked_real_close(self: socket_mod.socket) -> None:
+        if id(self) in tracked_ids:
+            with event_lock:
+                close_tids.append(threading.get_ident())
+        return orig_real_close(self)
+
+    monkeypatch.setattr(controller, "register_socket", hooked_register)
+    monkeypatch.setattr(socket_mod.socket, "shutdown", hooked_shutdown)
+    monkeypatch.setattr(socket_mod.socket, "close", hooked_close)
+    monkeypatch.setattr(socket_mod.socket, "_real_close", hooked_real_close)
+
+    worker_errors: List[BaseException] = []
+
+    def _worker() -> None:
+        worker_tid_box["tid"] = threading.get_ident()
+        try:
+            default_http_requester(
+                "GET",
+                f"{base_url}/v1/libraries",
+                {},
+                None,
+                10.0,
+                abort_controller=controller,
+            )
+        except BaseException as exc:  # noqa: BLE001
+            worker_errors.append(exc)
+
+    worker_thread = threading.Thread(target=_worker)
+    try:
+        worker_thread.start()
+        assert req_in_flight.wait(timeout=3.0), "Worker request never reached server"
+        controller.abort_all()
+        worker_thread.join(timeout=2.0)
+        assert not worker_thread.is_alive(), "Worker thread did not abort promptly"
+        assert worker_errors, "Aborted request should raise transport error"
+        worker_tid = worker_tid_box["tid"]
+        assert worker_tid != main_tid
+        assert main_tid in shutdown_tids
+        assert close_tids, "Tracked socket must be closed by owning worker thread"
+        assert set(close_tids) == {worker_tid}
+    finally:
+        _stop_http_server(srv, srv_thread, release_events=(release_hang,))
+        worker_thread.join(timeout=2.0)
+
+
+def test_concurrent_worker_atomic_writes_use_unique_temp_files(tmp_path, monkeypatch):
+    """Fix 4: Concurrent atomic writes from multiple threads never share temp filenames."""
+    real_replace = storage_mod._atomic_replace_with_retry
+    seen_tmps: List[Path] = []
+    seen_lock = threading.Lock()
+    barrier = threading.Barrier(6)
+
+    def recording_replace(tmp: Path, target: Path) -> None:
+        with seen_lock:
+            seen_tmps.append(tmp)
+        return real_replace(tmp, target)
+
+    monkeypatch.setattr(storage_mod, "_atomic_replace_with_retry", recording_replace)
+    target_file = tmp_path / "shared_state.json"
+    errors: List[BaseException] = []
+
+    def _writer(thread_idx: int) -> None:
+        try:
+            barrier.wait(timeout=5.0)
+            for step in range(5):
+                storage_mod.atomic_write_json(
+                    target_file,
+                    {"writer": thread_idx, "step": step},
+                )
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=_writer, args=(i,)) for i in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=5.0)
+        assert not t.is_alive()
+
+    assert errors == []
+    assert len(seen_tmps) == 30
+    assert len(set(seen_tmps)) == 30
+    assert list(tmp_path.glob("*.tmp")) == []
+    final_doc = json.loads(target_file.read_text(encoding="utf-8"))
+    assert "writer" in final_doc and "step" in final_doc
