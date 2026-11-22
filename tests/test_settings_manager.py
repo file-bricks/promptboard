@@ -77,6 +77,29 @@ def test_materialize_path_round_trip(tmp_path):
     assert SettingsManager().get_materialize_path() == target
 
 
+def test_materialize_path_default_uses_known_desktop_folder(tmp_path, monkeypatch):
+    desktop = tmp_path / "OneDriveDesktop"
+    monkeypatch.setattr("settings_manager._known_desktop_folder", lambda: desktop)
+
+    settings = SettingsManager()
+
+    assert settings.get_materialize_path() == desktop
+    assert desktop.is_dir()
+
+
+def test_materialize_path_unusable_falls_back_to_known_desktop_folder(tmp_path, monkeypatch):
+    desktop = tmp_path / "OneDriveDesktop"
+    blocking_file = tmp_path / "not_a_dir"
+    blocking_file.write_text("x", encoding="utf-8")
+    monkeypatch.setattr("settings_manager._known_desktop_folder", lambda: desktop)
+
+    settings = SettingsManager()
+    settings.set_materialize_path(blocking_file)
+
+    assert settings.get_materialize_path() == desktop
+    assert desktop.is_dir()
+
+
 def test_last_active_item_id_round_trip():
     settings = SettingsManager()
     assert settings.get_last_active_item_id() == ""
