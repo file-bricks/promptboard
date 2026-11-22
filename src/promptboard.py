@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import sys
+import threading
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Callable, List, Optional
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -18,11 +19,21 @@ from logging_setup import configure_logging
 from materializer import render_item, resolve_batch_targets
 from models import ItemType, LibraryItem, gen_id, normalize_name, now_iso, parse_tags
 from profiprompt_adapter import load_profiprompt_items
-from settings_dialog import ConflictResolutionDialog, FirstCouplingDialog, SettingsDialog
+from settings_dialog import (
+    ConflictResolutionDialog,
+    FirstCouplingDialog,
+    SettingsDialog,
+    TargetQueueChangeDialog,
+)
 from settings_manager import SettingsManager
 from single_instance import SingleInstance
 from storage import Storage, atomic_write_text
-from sync_backend import FirstCouplingChoice, SyncEngine, SyncOutcome
+from sync_backend import (
+    FirstCouplingChoice,
+    SyncEngine,
+    SyncOutcome,
+    TargetChangeQueueChoice,
+)
 from theme import apply_theme
 
 logger = logging.getLogger(__name__)
@@ -66,8 +77,44 @@ def load_app_icon() -> QtGui.QIcon:
     return QtGui.QIcon()
 
 
+class _SyncWorkerSignals(QtCore.QObject):
+    finished = QtCore.Signal(object)
+
+
+class _SyncTaskRunnable(QtCore.QRunnable):
+    """Executes sync network I/O in QThreadPool and delivers results back via Qt signals."""
+
+    def __init__(self, fn: Callable[[], Any]) -> None:
+        super().__init__()
+        self.setAutoDelete(True)
+        self.signals = _SyncWorkerSignals()
+        self._fn = fn
+        self.done_event = threading.Event()
+        self.result: Any = None
+        self.error: Optional[BaseException] = None
+
+    def run(self) -> None:
+        try:
+            self.result = self._fn()
+        except BaseException as exc:  # noqa: BLE001
+            self.error = exc
+        finally:
+            self.done_event.set()
+            try:
+                if self.error is not None:
+                    self.signals.finished.emit(self.error)
+                else:
+                    self.signals.finished.emit(self.result)
+            except RuntimeError:
+                pass
+
+
 class MainWindow(QtWidgets.QMainWindow):
     SYNC_DEBOUNCE_MS = 3000
+    QUIT_FLUSH_HTTP_TIMEOUT_S = 2.0
+    QUIT_FLUSH_MAX_WAIT_S = 2.5
+
+    sync_finished = QtCore.Signal(object)
 
     def __init__(
         self,
@@ -86,6 +133,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self._dirty = False
         self._quit_hook_registered = False
         self._quit_sync_done = False
+        self._shutting_down = False
+        self._sync_in_progress = False
+        self._sync_rerun_requested = False
+        self._sync_rerun_interactive = False
+        self._sync_thread_pool = QtCore.QThreadPool()
+        self._sync_thread_pool.setMaxThreadCount(2)
+        self._active_sync_runnables: set[_SyncTaskRunnable] = set()
         self.tray_icon: Optional[QtWidgets.QSystemTrayIcon] = None
         self.tray_menu: Optional[QtWidgets.QMenu] = None
         self.hotkeys: Optional[PromptBoardHotkeys] = None
@@ -1133,16 +1187,41 @@ class MainWindow(QtWidgets.QMainWindow):
             self.sync_debounce_timer.start()
 
     def _on_sync_debounce_timeout(self) -> None:
-        self.run_sync(interactive=False)
+        self.start_sync(interactive=False)
 
     def _on_sync_interval_timeout(self) -> None:
-        self.run_sync(interactive=False)
+        self.start_sync(interactive=False)
 
-    def prompt_first_coupling(self, remote_count: int, remote_rev: int) -> FirstCouplingChoice:
-        dlg = FirstCouplingDialog(remote_count, remote_rev, parent=self)
+    def prompt_first_coupling(
+        self,
+        remote_count: int,
+        remote_rev: int,
+        removed_local_count: int = 0,
+    ) -> FirstCouplingChoice:
+        dlg = FirstCouplingDialog(
+            remote_count,
+            remote_rev,
+            parent=self,
+            removed_local_count=removed_local_count,
+        )
         if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             return dlg.choice
         return "cancel"
+
+    def prompt_target_queue_change(
+        self,
+        old_target: str,
+        new_target: str,
+        pending_count: int,
+    ) -> TargetChangeQueueChoice:
+        dlg = TargetQueueChangeDialog(
+            old_target,
+            new_target,
+            pending_count,
+            parent=self,
+        )
+        dlg.exec()
+        return dlg.choice
 
     def _refresh_after_sync_change(self) -> None:
         active_id = self.current_item_id
@@ -1163,13 +1242,35 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         dlg.exec()
 
-    def run_sync(self, *, interactive: bool = False) -> SyncOutcome:
-        if self.settings.get_sync_mode() != "server":
-            return SyncOutcome(ok=True, mode=self.settings.get_sync_mode())
-        self.save_current_item()
-        outcome = self.sync_engine.sync_once(
-            on_first_coupling=self.prompt_first_coupling if interactive else None,
+    def _submit_sync_worker(
+        self,
+        *,
+        interactive: bool,
+        first_coupling_choice: Optional[FirstCouplingChoice] = None,
+        target_change_choice: Optional[TargetChangeQueueChoice] = None,
+    ) -> None:
+        self._sync_in_progress = True
+        self.status_label.setText(tr("sync.status.syncing"))
+        runnable = _SyncTaskRunnable(
+            lambda: self.sync_engine.sync_once(
+                defer_first_coupling_prompt=interactive and first_coupling_choice is None,
+                first_coupling_choice=first_coupling_choice,
+                defer_target_change_prompt=interactive and target_change_choice is None,
+                target_change_choice=target_change_choice,
+            )
         )
+        self._active_sync_runnables.add(runnable)
+        runnable.signals.finished.connect(
+            lambda res, r=runnable, inter=interactive, t_choice=target_change_choice: self._on_sync_worker_finished(
+                r,
+                res,
+                interactive=inter,
+                prior_target_choice=t_choice,
+            )
+        )
+        self._sync_thread_pool.start(runnable)
+
+    def _apply_sync_outcome_to_ui(self, outcome: SyncOutcome, *, interactive: bool) -> None:
         if outcome.storage_changed:
             self._refresh_after_sync_change()
         if outcome.conflict_count > 0:
@@ -1182,12 +1283,127 @@ class MainWindow(QtWidgets.QMainWindow):
             )
         elif outcome.ok:
             self.status_label.setText(tr("sync.status.synced", rev=outcome.library_rev))
-        return outcome
+        elif outcome.error:
+            self.status_label.setText(tr("sync.status.test_failed", detail=outcome.error))
+
+    def _on_sync_worker_finished(
+        self,
+        runnable: _SyncTaskRunnable,
+        res: Any,
+        *,
+        interactive: bool,
+        prior_target_choice: Optional[TargetChangeQueueChoice] = None,
+    ) -> None:
+        self._active_sync_runnables.discard(runnable)
+        self._sync_in_progress = False
+        if self._shutting_down or self._quit_sync_done:
+            return
+
+        if isinstance(res, BaseException):
+            outcome = SyncOutcome(
+                ok=False,
+                mode=self.settings.get_sync_mode(),
+                error=str(res),
+            )
+        else:
+            outcome = res
+
+        if outcome.needs_target_queue_prompt and interactive:
+            q_choice = self.prompt_target_queue_change(
+                outcome.old_target,
+                outcome.new_target,
+                outcome.old_target_pending_count,
+            )
+            self._submit_sync_worker(
+                interactive=interactive,
+                target_change_choice=q_choice,
+            )
+            return
+
+        if outcome.needs_first_coupling and interactive:
+            c_choice = self.prompt_first_coupling(
+                outcome.remote_item_count,
+                outcome.library_rev,
+                outcome.removed_local_count,
+            )
+            if c_choice == "cancel":
+                cancelled_outcome = SyncOutcome(
+                    ok=False,
+                    mode=self.settings.get_sync_mode(),
+                    cancelled=True,
+                    pending_queue_count=self.sync_engine.get_pending_count(),
+                    conflict_count=len(self.sync_engine.get_conflicts()),
+                )
+                self.status_label.setText(tr("status.ready"))
+                self.sync_finished.emit(cancelled_outcome)
+                return
+            self._submit_sync_worker(
+                interactive=interactive,
+                first_coupling_choice=c_choice,
+                target_change_choice=prior_target_choice,
+            )
+            return
+
+        self._apply_sync_outcome_to_ui(outcome, interactive=interactive)
+        self.sync_finished.emit(outcome)
+
+        if self._sync_rerun_requested and not self._shutting_down and not self._quit_sync_done:
+            rerun_inter = self._sync_rerun_interactive
+            self._sync_rerun_requested = False
+            self._sync_rerun_interactive = False
+            self.start_sync(interactive=rerun_inter)
+
+    def start_sync(self, *, interactive: bool = False) -> bool:
+        """Schedule non-blocking synchronization on QThreadPool; delivers results via signals."""
+        if self._shutting_down or self._quit_sync_done:
+            return False
+        if self.settings.get_sync_mode() != "server" or not self.sync_engine.is_configured():
+            return False
+        self.save_current_item()
+        if self._sync_in_progress:
+            self._sync_rerun_requested = True
+            self._sync_rerun_interactive = self._sync_rerun_interactive or interactive
+            return True
+        self._submit_sync_worker(interactive=interactive)
+        return True
+
+    def run_sync(self, *, interactive: bool = False) -> SyncOutcome:
+        """Run sync via QThreadPool worker while keeping the GUI event loop responsive."""
+        mode = self.settings.get_sync_mode()
+        if mode != "server":
+            return SyncOutcome(ok=True, mode=mode)
+        self.save_current_item()
+        if not self.sync_engine.is_configured():
+            return self.sync_engine.sync_once()
+
+        loop = QtCore.QEventLoop(self)
+        holder: dict[str, SyncOutcome] = {}
+
+        def _capture(outcome: SyncOutcome) -> None:
+            holder["outcome"] = outcome
+            if loop.isRunning():
+                loop.quit()
+
+        self.sync_finished.connect(_capture)
+        try:
+            started = self.start_sync(interactive=interactive)
+            if not started:
+                return SyncOutcome(ok=False, mode=mode, cancelled=True)
+            if "outcome" not in holder:
+                loop.exec()
+        finally:
+            try:
+                self.sync_finished.disconnect(_capture)
+            except (RuntimeError, TypeError):
+                pass
+        return holder.get("outcome", SyncOutcome(ok=False, mode=mode))
 
     def sync_on_start(self, *, interactive: bool = False) -> Optional[SyncOutcome]:
+        """Kick off non-blocking startup pull in QThreadPool without delaying window.show()."""
         if self.settings.get_sync_mode() != "server" or not self.sync_engine.is_configured():
             return None
-        return self.run_sync(interactive=interactive)
+        self.start_sync(interactive=interactive)
+        return None
 
     def register_quit_hook(self, app: Optional[QtCore.QCoreApplication] = None) -> bool:
         """Connect ``aboutToQuit`` idempotently (at most once per window instance)."""
@@ -1199,15 +1415,24 @@ class MainWindow(QtWidgets.QMainWindow):
         return True
 
     def on_about_to_quit(self) -> None:
-        """Idempotent shutdown handler: save pending edits, stop timers, flush sync queue once."""
+        """Idempotent shutdown handler: save pending edits, stop timers, bounded flush once."""
         if self._quit_sync_done:
             return
         self._quit_sync_done = True
+        self._shutting_down = True
         self.sync_debounce_timer.stop()
         self.sync_interval_timer.stop()
         self.save_current_item()
-        if self.settings.get_sync_mode() == "server":
-            self.sync_engine.flush_pending(timeout=2.0)
+        if self.settings.get_sync_mode() != "server" or not self.sync_engine.is_configured():
+            return
+        if self.sync_engine.get_pending_count() <= 0:
+            return
+        self._sync_thread_pool.clear()
+        flush_task = _SyncTaskRunnable(
+            lambda: self.sync_engine.flush_pending(timeout=self.QUIT_FLUSH_HTTP_TIMEOUT_S)
+        )
+        self._sync_thread_pool.start(flush_task)
+        flush_task.done_event.wait(timeout=self.QUIT_FLUSH_MAX_WAIT_S)
 
     # ------------------------------------------------------------ misc
 
@@ -1221,6 +1446,9 @@ class MainWindow(QtWidgets.QMainWindow):
             event.ignore()
             self.status_label.setText(tr("status.minimized_to_tray"))
             return
+        self._shutting_down = True
+        self.sync_debounce_timer.stop()
+        self.sync_interval_timer.stop()
         super().closeEvent(event)
 
 
@@ -1307,10 +1535,10 @@ def main() -> int:
         window.status_label.setText(tr("status.hotkeys_unavailable"))
     app.aboutToQuit.connect(hotkeys.stop)
     window.register_quit_hook(app)
-    window.sync_on_start(interactive=True)
     _seed_initial_item_if_empty(storage, window)
     window.show()
     window.maybe_show_onboarding()
+    window.sync_on_start(interactive=True)
     return app.exec()
 
 

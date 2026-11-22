@@ -1,34 +1,47 @@
 """Unit, UI-headless, and end-to-end tests for Stage 1b server synchronization."""
 from __future__ import annotations
 
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
 import stat
 import sys
 import threading
+import time
 from typing import Any, Dict, List, Optional, Tuple
 from urllib import error as urllib_error
 
 import pytest
+from PySide6 import QtCore
 
 from i18n import set_language
 from models import ItemType, LibraryItem
 from profiprompt_adapter import load_profiprompt_export_payload
 from promptboard import MainWindow
-from settings_dialog import ConflictResolutionDialog, FirstCouplingDialog, SettingsDialog
+from settings_dialog import (
+    ConfirmReplaceLibraryDialog,
+    ConflictResolutionDialog,
+    FirstCouplingDialog,
+    SettingsDialog,
+    TargetQueueChangeDialog,
+)
 from settings_manager import SettingsManager
+import storage as storage_mod
 from storage import Storage
 from sync_backend import (
      FileSlotBackend,
      NullBackend,
      OfflineQueue,
+     REDIRECT_ERROR_MESSAGE,
      ServerBackend,
      SyncAuthError,
      SyncEngine,
      SyncTransportError,
      TokenStorage,
+     _NoRedirectHandler,
      create_sync_backend,
+     format_coupling_target,
      make_object_key,
      validate_namespace,
      validate_server_url,
@@ -689,3 +702,543 @@ def test_profiprompt_export_payload_read_only_mapping():
     assert mapped[0].id == "profiprompt:prompt:pp-1"
     assert mapped[0].category == "Engineering"
     assert "Inspect module coupling." in mapped[0].content
+
+
+# ---------------------------------------------------------------------------
+# Stage 1b review fix regressions (findings 1..6)
+# ---------------------------------------------------------------------------
+
+
+def test_redirect_blocked_no_token_leak_across_test_pull_and_push(tmp_path):
+    """Finding 1: 3xx redirects are never followed and never leak Authorization headers."""
+    assert _NoRedirectHandler().redirect_request(None, None, 302, "Found", {}, "http://127.0.0.1/") is None
+
+    leaked_requests: List[Tuple[str, Optional[str]]] = []
+
+    class CollectorHandler(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            leaked_requests.append((self.path, self.headers.get("Authorization")))
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"namespaces": []}')
+
+        def do_POST(self):  # noqa: N802
+            leaked_requests.append((self.path, self.headers.get("Authorization")))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, format, *args):  # noqa: A002
+            return
+
+    collector_srv = ThreadingHTTPServer(("127.0.0.1", 0), CollectorHandler)
+    collector_thread = threading.Thread(target=collector_srv.serve_forever, daemon=True)
+    collector_thread.start()
+    collector_url = f"http://127.0.0.1:{collector_srv.server_address[1]}/trap"
+
+    redirect_code = {"status": 302}
+
+    class RedirectingHandler(BaseHTTPRequestHandler):
+        def _send_redirect(self):
+            self.send_response(redirect_code["status"])
+            self.send_header("Location", collector_url)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def do_GET(self):  # noqa: N802
+            self._send_redirect()
+
+        def do_POST(self):  # noqa: N802
+            length = int(self.headers.get("Content-Length", "0") or 0)
+            if length > 0:
+                self.rfile.read(length)
+            self._send_redirect()
+
+        def log_message(self, format, *args):  # noqa: A002
+            return
+
+    redirect_srv = ThreadingHTTPServer(("127.0.0.1", 0), RedirectingHandler)
+    redirect_thread = threading.Thread(target=redirect_srv.serve_forever, daemon=True)
+    redirect_thread.start()
+    redirect_base = f"http://127.0.0.1:{redirect_srv.server_address[1]}"
+
+    try:
+        settings, storage = _make_settings_and_storage(
+            tmp_path,
+            mode="server",
+            server_url=redirect_base,
+            token="pss_test_no_leak_secret",
+        )
+        engine = SyncEngine(storage, settings)
+
+        for status_code in (301, 302, 307, 308):
+            redirect_code["status"] = status_code
+            conn = engine.test_connection()
+            assert conn.ok is False
+            assert REDIRECT_ERROR_MESSAGE in conn.detail
+
+        out = engine.sync_once()
+        assert out.ok is False
+        assert REDIRECT_ERROR_MESSAGE in out.error
+
+        backend = ServerBackend(server_url=redirect_base, token="pss_test_no_leak_secret")
+        sample = LibraryItem(id="r-1", item_type=ItemType.PROMPT, name="REDIR", content="Body")
+        mut = OfflineQueue(tmp_path / "rq").enqueue_upsert(sample, known_base_rev=0)[0]
+        with pytest.raises(SyncTransportError, match=REDIRECT_ERROR_MESSAGE):
+            backend.push([mut])
+
+        assert leaked_requests == []
+    finally:
+        redirect_srv.shutdown()
+        redirect_srv.server_close()
+        collector_srv.shutdown()
+        collector_srv.server_close()
+        redirect_thread.join(timeout=2.0)
+        collector_thread.join(timeout=2.0)
+
+
+def test_first_coupling_take_server_backup_removed_count_and_second_confirmation(
+    qapp, tmp_path, live_sync_server
+):
+    """Finding 2: 'take_server' shows removed count, requires 2nd confirmation, and backs up library.json."""
+    base_url = live_sync_server["base_url"]
+    token = live_sync_server["token"]
+
+    # Seed server with 2 entries via client A.
+    settings_a, storage_a = _make_settings_and_storage(
+        tmp_path / "seed_a",
+        mode="server",
+        server_url=base_url,
+        token=token,
+    )
+    storage_a.upsert_many(
+        [
+            LibraryItem(id="shared-1", item_type=ItemType.PROMPT, name="SHARED", content="Server shared"),
+            LibraryItem(id="srv-only-1", item_type=ItemType.SKILL, name="SRV SKILL", content="Server skill"),
+        ]
+    )
+    assert SyncEngine(storage_a, settings_a).sync_once().ok is True
+
+    # Client B has 1 shared entry + 2 local-only entries that would be removed by take_server.
+    settings_b, storage_b = _make_settings_and_storage(
+        tmp_path / "client_b",
+        mode="server",
+        server_url=base_url,
+        token=token,
+    )
+    storage_b.upsert_many(
+        [
+            LibraryItem(id="shared-1", item_type=ItemType.PROMPT, name="SHARED", content="Local shared"),
+            LibraryItem(id="local-rm-1", item_type=ItemType.AGENT, name="LOCAL RM 1", content="Keep me safe 1"),
+            LibraryItem(id="local-rm-2", item_type=ItemType.WORKFLOW, name="LOCAL RM 2", content="Keep me safe 2"),
+        ]
+    )
+    library_bytes_before = storage_b.library_file.read_bytes()
+
+    window = MainWindow(storage_b, settings_b)
+    try:
+        observed: Dict[str, Any] = {}
+
+        def _drive_cancel_second_confirmation() -> None:
+            active = qapp.activeModalWidget()
+            if isinstance(active, FirstCouplingDialog):
+                observed["first_default_merge"] = active.merge_button.isDefault()
+                observed["first_removed_count"] = active.removed_local_count
+                observed["first_body"] = active.body_label.text()
+                QtCore.QTimer.singleShot(10, _drive_cancel_second_confirmation)
+                active.take_server_button.click()
+            elif isinstance(active, ConfirmReplaceLibraryDialog):
+                observed["confirm_default_cancel"] = active.cancel_button.isDefault()
+                observed["confirm_body"] = active.body_label.text()
+                active.cancel_button.click()
+            else:
+                QtCore.QTimer.singleShot(10, _drive_cancel_second_confirmation)
+
+        QtCore.QTimer.singleShot(10, _drive_cancel_second_confirmation)
+        cancelled_outcome = window.run_sync(interactive=True)
+
+        assert observed["first_default_merge"] is True
+        assert observed["first_removed_count"] == 2
+        assert "2" in observed["first_body"]
+        assert observed["confirm_default_cancel"] is True
+        assert "2" in observed["confirm_body"]
+        assert cancelled_outcome.cancelled is True
+        assert storage_b.library_file.read_bytes() == library_bytes_before
+        assert list(storage_b.data_dir.glob("library.backup-*.json")) == []
+        assert window.sync_engine.state_store.load().coupled_targets == []
+
+        # Second run: accept both dialogs -> backup written atomically before replacement.
+        def _drive_accept_second_confirmation() -> None:
+            active = qapp.activeModalWidget()
+            if isinstance(active, FirstCouplingDialog):
+                QtCore.QTimer.singleShot(10, _drive_accept_second_confirmation)
+                active.take_server_button.click()
+            elif isinstance(active, ConfirmReplaceLibraryDialog):
+                active.confirm_button.click()
+            else:
+                QtCore.QTimer.singleShot(10, _drive_accept_second_confirmation)
+
+        QtCore.QTimer.singleShot(10, _drive_accept_second_confirmation)
+        accepted_outcome = window.run_sync(interactive=True)
+
+        assert accepted_outcome.ok is True
+        backups = list(storage_b.data_dir.glob("library.backup-*.json"))
+        assert len(backups) == 1
+        assert list(storage_b.data_dir.glob("*.tmp")) == []
+
+        backup_doc = json.loads(backups[0].read_text(encoding="utf-8"))
+        backup_by_id = {entry["id"]: entry for entry in backup_doc["items"]}
+        assert "local-rm-1" in backup_by_id
+        assert "local-rm-2" in backup_by_id
+        assert backup_by_id["local-rm-1"]["content"] == "Keep me safe 1"
+        assert backup_by_id["local-rm-2"]["content"] == "Keep me safe 2"
+
+        final_ids = {it.id for it in storage_b.load_items()}
+        assert final_ids == {"shared-1", "srv-only-1"}
+    finally:
+        window.close()
+
+
+def test_async_qthreadpool_worker_nonblocking_startup_and_bounded_quit_flush(qapp, tmp_path):
+    """Finding 3: Network runs on QThreadPool/QRunnable via signals; startup never blocks show; quit flush <= 3 s."""
+    gui_thread_id = threading.get_ident()
+    worker_threads: List[int] = []
+
+    class SlowSyncHandler(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            worker_threads.append(threading.get_ident())
+            time.sleep(0.35)
+            body = json.dumps(
+                {
+                    "namespace": "promptboard",
+                    "library_rev": 1,
+                    "items": [
+                        {
+                            "id": "async-1",
+                            "kind": "item",
+                            "rev": 1,
+                            "updated_at": "2026-11-22T12:00:00Z",
+                            "payload": {
+                                "id": "async-1",
+                                "item_type": "PROMPT",
+                                "name": "ASYNC ITEM",
+                                "content": "Pulled in background",
+                            },
+                        }
+                    ],
+                    "tombstones": [],
+                }
+            ).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("ETag", '"rev-1"')
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self):  # noqa: N802
+            worker_threads.append(threading.get_ident())
+            length = int(self.headers.get("Content-Length", "0") or 0)
+            if length > 0:
+                self.rfile.read(length)
+            # Simulate an unresponsive/stalling server on push to test bounded quit flush.
+            time.sleep(6.0)
+            try:
+                self.send_response(503)
+                self.end_headers()
+            except OSError:
+                pass
+
+        def log_message(self, format, *args):  # noqa: A002
+            return
+
+    slow_srv = ThreadingHTTPServer(("127.0.0.1", 0), SlowSyncHandler)
+    srv_thread = threading.Thread(target=slow_srv.serve_forever, daemon=True)
+    srv_thread.start()
+    slow_url = f"http://127.0.0.1:{slow_srv.server_address[1]}"
+
+    try:
+        settings, storage = _make_settings_and_storage(
+            tmp_path,
+            mode="server",
+            server_url=slow_url,
+            token="pss_async_worker_token",
+        )
+        window = MainWindow(storage, settings)
+        delivered_on_threads: List[int] = []
+        outcomes: List[ Any] = []
+
+        def _on_finished(outcome):
+            delivered_on_threads.append(threading.get_ident())
+            outcomes.append(outcome)
+
+        window.sync_finished.connect(_on_finished)
+        try:
+            t0 = time.perf_counter()
+            assert window.sync_on_start(interactive=False) is None
+            window.show()
+            startup_elapsed = time.perf_counter() - t0
+            # Startup pull runs in QThreadPool and must not block window.show() (server sleeps 0.35s).
+            assert startup_elapsed < 0.2
+            assert window.isVisible()
+
+            deadline = time.perf_counter() + 3.0
+            while not outcomes and time.perf_counter() < deadline:
+                qapp.processEvents()
+                time.sleep(0.01)
+
+            assert len(outcomes) == 1
+            assert outcomes[0].ok is True
+            assert worker_threads and all(tid != gui_thread_id for tid in worker_threads)
+            assert delivered_on_threads == [gui_thread_id]
+            assert storage.get_item("async-1") is not None
+
+            # Enqueue a local edit and verify bounded quit flush never hangs shutdown (>6s server stall).
+            window.create_item()
+            assert window.sync_engine.get_pending_count() == 1
+            t_quit = time.perf_counter()
+            window.on_about_to_quit()
+            quit_elapsed = time.perf_counter() - t_quit
+            assert quit_elapsed <= 3.0
+            assert window.sync_engine.get_pending_count() == 1
+        finally:
+            window.close()
+    finally:
+        slow_srv.shutdown()
+        slow_srv.server_close()
+        srv_thread.join(timeout=2.0)
+
+
+def test_settings_dialog_reads_token_only_when_server_mode_and_shown_or_used(qapp, tmp_path):
+    """Finding 4: Keyring/token storage is never queried in mode='off' or before sync UI is shown/used."""
+    calls = {"get": 0, "set": 0, "delete": 0}
+    vault = {"secret": "pss_stored_in_keyring"}
+
+    class CountingKeyring:
+        def get_password(self, service: str, account: str) -> Optional[str]:
+            calls["get"] += 1
+            return vault.get("secret")
+
+        def set_password(self, service: str, account: str, secret: str) -> None:
+            calls["set"] += 1
+            vault["secret"] = secret
+
+        def delete_password(self, service: str, account: str) -> None:
+            calls["delete"] += 1
+            vault.pop("secret", None)
+
+    settings = SettingsManager()
+    settings._cached_token_storage = TokenStorage(
+        fallback_path=tmp_path / "fallback_token.json",
+        keyring_backend=CountingKeyring(),
+    )
+    settings.qs.setValue("paths/data", str(tmp_path / "data"))
+    settings.set_sync_mode("off")
+    settings.set_sync_server_url("http://127.0.0.1:8765")
+    settings.qs.sync()
+
+    # 1) Mode = off: construct, show, relabel, and close -> zero keyring reads or writes!
+    dlg_off = SettingsDialog(settings)
+    try:
+        dlg_off.show()
+        qapp.processEvents()
+        assert calls == {"get": 0, "set": 0, "delete": 0}
+        dlg_off.close_button.click()
+        assert calls == {"get": 0, "set": 0, "delete": 0}
+        assert vault["secret"] == "pss_stored_in_keyring"
+    finally:
+        dlg_off.close()
+
+    # 2) Mode = server: constructing hidden dialog does not read; showing sync UI reads once.
+    settings.set_sync_mode("server")
+    dlg_srv = SettingsDialog(settings)
+    try:
+        assert calls["get"] == 0
+        dlg_srv.show()
+        qapp.processEvents()
+        assert calls["get"] == 1
+        assert dlg_srv.sync_token_edit.text() == "pss_stored_in_keyring"
+        dlg_srv.close_button.click()
+        assert calls["set"] == 0
+        assert calls["delete"] == 0
+    finally:
+        dlg_srv.close()
+
+    # 3) Switching from mode='off' to mode='server' in UI loads existing token without wiping it.
+    settings.set_sync_mode("off")
+    calls["get"] = 0
+    dlg_switch = SettingsDialog(settings)
+    try:
+        assert calls["get"] == 0
+        srv_idx = dlg_switch.sync_mode_combo.findData("server")
+        dlg_switch.sync_mode_combo.setCurrentIndex(srv_idx)
+        assert calls["get"] == 1
+        assert dlg_switch.sync_token_edit.text() == "pss_stored_in_keyring"
+        assert calls["delete"] == 0
+        assert vault["secret"] == "pss_stored_in_keyring"
+    finally:
+        dlg_switch.close()
+
+
+def test_target_change_keeps_or_discards_bound_queue_without_sending_to_new_target(
+    qapp, tmp_path, live_sync_server
+):
+    """Finding 5: Offline queue stays bound to its target; target change prompts keep (default) or discard."""
+    base_url = live_sync_server["base_url"]
+    token = live_sync_server["token"]
+
+    settings, storage = _make_settings_and_storage(
+        tmp_path / "node",
+        mode="server",
+        server_url=base_url,
+        token=token,
+        namespace="ns_alpha",
+    )
+    engine = SyncEngine(storage, settings)
+    target_alpha = format_coupling_target(base_url, "ns_alpha")
+    target_beta = format_coupling_target(base_url, "ns_beta")
+
+    item_del = LibraryItem(id="del-alpha", item_type=ItemType.PROMPT, name="DEL ALPHA", content="Alpha")
+    item_keep = LibraryItem(id="keep-alpha", item_type=ItemType.PROMPT, name="KEEP ALPHA", content="Stay")
+    storage.upsert_many([item_del, item_keep])
+    assert engine.sync_once().ok is True
+
+    # Delete item_del locally before syncing (pending delete bound to ns_alpha).
+    storage.delete_item("del-alpha")
+    engine.enqueue_delete("del-alpha")
+    assert engine.get_pending_count(target=target_alpha) == 1
+
+    # Verify TargetQueueChangeDialog defaults to "keep".
+    tq_dlg = TargetQueueChangeDialog(target_alpha, target_beta, pending_count=1)
+    try:
+        assert tq_dlg.keep_button.isDefault() is True
+        tq_dlg.keep_button.click()
+        assert tq_dlg.choice == "keep"
+    finally:
+        tq_dlg.close()
+
+    # Switch to ns_beta in SettingsDialog accepting default "keep".
+    prompted: List[Tuple[str, str, int]] = []
+
+    def _choose_keep(old_t: str, new_t: str, count: int):
+        prompted.append((old_t, new_t, count))
+        return "keep"
+
+    dlg = SettingsDialog(settings, sync_engine=engine, on_target_queue_change=_choose_keep)
+    try:
+        dlg.show()
+        qapp.processEvents()
+        dlg.sync_namespace_edit.setText("ns_beta")
+        dlg.close_button.click()
+    finally:
+        dlg.close()
+
+    assert prompted == [(target_alpha, target_beta, 1)]
+    # Old queue is preserved under target_alpha; target_beta has 0 pending deletes.
+    assert engine.get_pending_count(target=target_alpha) == 1
+    assert engine.get_pending_count(target=target_beta) == 0
+
+    # Syncing with ns_beta must NOT send del-alpha delete to ns_beta; ns_alpha still has del-alpha on server.
+    out_beta = engine.sync_once()
+    assert out_beta.ok is True
+    assert engine.get_pending_count(target=target_alpha) == 1
+
+    probe_alpha = ServerBackend(server_url=base_url, token=token, namespace="ns_alpha")
+    alpha_remote_ids = {it.id for it in probe_alpha.pull(since_rev=None).upserts}
+    assert "del-alpha" in alpha_remote_ids
+
+    # Switching back to ns_alpha restores and flushes the preserved delete to ns_alpha!
+    settings.set_sync_namespace("ns_alpha")
+    out_alpha_back = engine.sync_once()
+    assert out_alpha_back.ok is True
+    assert engine.get_pending_count(target=target_alpha) == 0
+    alpha_remote_ids_after = {it.id for it in probe_alpha.pull(since_rev=None).upserts}
+    assert "del-alpha" not in alpha_remote_ids_after
+
+    # Explicit "discard" on target change drops the old queue cleanly.
+    storage.delete_item("keep-alpha")
+    engine.enqueue_delete("keep-alpha")
+    assert engine.get_pending_count(target=target_alpha) == 1
+
+    settings.set_sync_namespace("ns_beta")
+    out_discard = engine.sync_once(on_target_change_queue=lambda _o, _n, _c: "discard")
+    assert out_discard.ok is True
+    assert engine.get_pending_count(target=target_alpha) == 0
+
+
+def test_about_to_quit_signal_fires_twice_guard_and_offline_queue_atomic_crash(
+    qapp, tmp_path, monkeypatch
+):
+    """Finding 6: _quit_sync_done guards double aboutToQuit emission; OfflineQueue survives pre-replace crash."""
+    # Part A: Emit real qapp.aboutToQuit twice while flush fails offline (so queue stays non-empty!).
+    push_attempts = {"count": 0}
+
+    def failing_requester(method: str, url: str, headers: Dict[str, str], body: Optional[bytes], timeout: float):
+        if method == "POST" and url.endswith("/push"):
+            push_attempts["count"] += 1
+        raise urllib_error.URLError("simulated offline during quit")
+
+    settings, storage = _make_settings_and_storage(
+        tmp_path / "quit_guard",
+        mode="server",
+        server_url="http://127.0.0.1:8765",
+        token="pss_quit_twice_token",
+    )
+    engine = SyncEngine(storage, settings, requester=failing_requester)
+    window = MainWindow(storage, settings, sync_engine=engine)
+    try:
+        assert window.register_quit_hook(qapp) is True
+        window.create_item()
+        assert engine.get_pending_count() == 1
+
+        qapp.aboutToQuit.emit()
+        qapp.aboutToQuit.emit()
+
+        # Even though pending_count is still 1 after the first failed flush, _quit_sync_done stops the 2nd!
+        assert push_attempts["count"] == 1
+        assert engine.get_pending_count() == 1
+    finally:
+        try:
+            qapp.aboutToQuit.disconnect(window.on_about_to_quit)
+        except (RuntimeError, TypeError):
+            pass
+        window.close()
+
+    # Part B: Simulate crash between writing tmp file and os.replace in OfflineQueue.
+    q_dir = tmp_path / "atomic_queue"
+    queue = OfflineQueue(q_dir)
+    first_item = LibraryItem(id="safe-1", item_type=ItemType.PROMPT, name="SAFE", content="Original v1")
+    queue.enqueue_upsert(first_item, known_base_rev=2)
+    bytes_before = queue.path.read_bytes()
+
+    real_replace = storage_mod._atomic_replace_with_retry
+    crash_state = {"tmp_seen": False}
+
+    def crashing_replace(tmp: Path, target: Path) -> None:
+        assert tmp.is_file()
+        assert tmp.stat().st_size > 0
+        crash_state["tmp_seen"] = True
+        # Copy a stray tmp artifact to simulate hard power loss where cleanup also never ran.
+        abandoned = tmp.parent / f"{tmp.name}.abandoned"
+        abandoned.write_bytes(tmp.read_bytes())
+        raise RuntimeError("Simulated crash between tmp write/fsync and replace")
+
+    monkeypatch.setattr(storage_mod, "_atomic_replace_with_retry", crashing_replace)
+    second_item = LibraryItem(id="crash-2", item_type=ItemType.SKILL, name="CRASH", content="Uncommitted")
+    with pytest.raises(RuntimeError, match="Simulated crash"):
+        queue.enqueue_upsert(second_item, known_base_rev=0)
+
+    assert crash_state["tmp_seen"] is True
+    assert queue.path.read_bytes() == bytes_before
+
+    recovered = OfflineQueue(q_dir).load_all()
+    assert len(recovered) == 1
+    assert recovered[0].id == "safe-1"
+    assert recovered[0].base_rev == 2
+    assert recovered[0].payload["content"] == "Original v1"
+
+    # Restore real atomic replace and verify queue continues working cleanly.
+    monkeypatch.setattr(storage_mod, "_atomic_replace_with_retry", real_replace)
+    queue.enqueue_upsert(second_item, known_base_rev=0)
+    assert [m.id for m in OfflineQueue(q_dir).load_all()] == ["safe-1", "crash-2"]

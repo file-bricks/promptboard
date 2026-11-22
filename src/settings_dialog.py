@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 from i18n import set_language as set_global_language
 from i18n import tr
@@ -17,7 +17,77 @@ from sync_backend import (
     FirstCouplingChoice,
     SyncEngine,
     SyncOutcome,
+    TargetChangeQueueChoice,
 )
+
+
+class _DialogWorkerSignals(QtCore.QObject):
+    finished = QtCore.Signal(object)
+
+
+class _DialogWorkerRunnable(QtCore.QRunnable):
+    """Executes sync network calls on a QThreadPool worker thread."""
+
+    def __init__(self, fn: Callable[[], Any]) -> None:
+        super().__init__()
+        self.setAutoDelete(True)
+        self.signals = _DialogWorkerSignals()
+        self._fn = fn
+
+    def run(self) -> None:
+        try:
+            res = self._fn()
+        except BaseException as exc:  # noqa: BLE001
+            res = exc
+        try:
+            self.signals.finished.emit(res)
+        except RuntimeError:
+            pass
+
+
+class ConfirmReplaceLibraryDialog(QtWidgets.QDialog):
+    """Explicit second confirmation before replacing the local library with server state."""
+
+    def __init__(
+        self,
+        remote_count: int,
+        removed_local_count: int,
+        parent: Optional[QtWidgets.QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self.remote_count = max(0, int(remote_count))
+        self.removed_local_count = max(0, int(removed_local_count))
+        self.setWindowTitle(tr("dialog.sync_couple.confirm_title"))
+        self.setModal(True)
+        self.resize(460, 190)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        self.body_label = QtWidgets.QLabel(
+            tr(
+                "dialog.sync_couple.confirm_body",
+                count=self.remote_count,
+                removed=self.removed_local_count,
+            )
+        )
+        self.body_label.setWordWrap(True)
+        layout.addWidget(self.body_label)
+        layout.addStretch(1)
+
+        btn_row = QtWidgets.QHBoxLayout()
+        self.confirm_button = QtWidgets.QPushButton(tr("dialog.sync_couple.confirm_accept"))
+        self.cancel_button = QtWidgets.QPushButton(tr("btn.cancel"))
+
+        self.cancel_button.setDefault(True)
+        self.cancel_button.setAutoDefault(True)
+        self.confirm_button.setAutoDefault(False)
+
+        btn_row.addStretch(1)
+        btn_row.addWidget(self.confirm_button)
+        btn_row.addWidget(self.cancel_button)
+        layout.addLayout(btn_row)
+
+        self.confirm_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
 
 
 class FirstCouplingDialog(QtWidgets.QDialog):
@@ -28,17 +98,26 @@ class FirstCouplingDialog(QtWidgets.QDialog):
         remote_count: int,
         remote_rev: int,
         parent: Optional[QtWidgets.QWidget] = None,
+        *,
+        removed_local_count: int = 0,
+        confirm_take_server: Optional[Callable[[int], bool]] = None,
     ) -> None:
         super().__init__(parent)
         self._choice: FirstCouplingChoice = "cancel"
+        self.remote_count = max(0, int(remote_count))
+        self.remote_rev = max(0, int(remote_rev))
+        self.removed_local_count = max(0, int(removed_local_count))
+        self._confirm_take_server = confirm_take_server
         self.setWindowTitle(tr("dialog.sync_couple.title"))
         self.setModal(True)
-        self.resize(480, 180)
+        self.resize(500, 220)
 
         layout = QtWidgets.QVBoxLayout(self)
-        self.body_label = QtWidgets.QLabel(
-            tr("dialog.sync_couple.body", count=remote_count, rev=remote_rev)
+        body_text = (
+            f"{tr('dialog.sync_couple.body', count=self.remote_count, rev=self.remote_rev)}\n\n"
+            f"{tr('dialog.sync_couple.removed_info', removed=self.removed_local_count)}"
         )
+        self.body_label = QtWidgets.QLabel(body_text)
         self.body_label.setWordWrap(True)
         layout.addWidget(self.body_label)
         layout.addStretch(1)
@@ -50,6 +129,8 @@ class FirstCouplingDialog(QtWidgets.QDialog):
 
         self.merge_button.setDefault(True)
         self.merge_button.setAutoDefault(True)
+        self.take_server_button.setAutoDefault(False)
+        self.cancel_button.setAutoDefault(False)
 
         btn_row.addWidget(self.merge_button)
         btn_row.addWidget(self.take_server_button)
@@ -69,8 +150,83 @@ class FirstCouplingDialog(QtWidgets.QDialog):
         self._choice = "merge"
         self.accept()
 
+    def _ask_second_confirmation(self) -> bool:
+        if self._confirm_take_server is not None:
+            return bool(self._confirm_take_server(self.removed_local_count))
+        confirm_dlg = ConfirmReplaceLibraryDialog(
+            remote_count=self.remote_count,
+            removed_local_count=self.removed_local_count,
+            parent=self,
+        )
+        return confirm_dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted
+
     def _choose_take_server(self) -> None:
+        if not self._ask_second_confirmation():
+            self._choice = "cancel"
+            self.reject()
+            return
         self._choice = "take_server"
+        self.accept()
+
+
+class TargetQueueChangeDialog(QtWidgets.QDialog):
+    """Asks whether to keep (default) or discard the previous coupling target's offline queue."""
+
+    def __init__(
+        self,
+        old_target: str,
+        new_target: str,
+        pending_count: int,
+        parent: Optional[QtWidgets.QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._choice: TargetChangeQueueChoice = "keep"
+        self.old_target = old_target
+        self.new_target = new_target
+        self.pending_count = max(0, int(pending_count))
+        self.setWindowTitle(tr("dialog.sync_target_queue.title"))
+        self.setModal(True)
+        self.resize(500, 200)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        self.body_label = QtWidgets.QLabel(
+            tr(
+                "dialog.sync_target_queue.body",
+                old_target=old_target,
+                new_target=new_target,
+                count=self.pending_count,
+            )
+        )
+        self.body_label.setWordWrap(True)
+        layout.addWidget(self.body_label)
+        layout.addStretch(1)
+
+        btn_row = QtWidgets.QHBoxLayout()
+        self.keep_button = QtWidgets.QPushButton(tr("dialog.sync_target_queue.keep"))
+        self.discard_button = QtWidgets.QPushButton(tr("dialog.sync_target_queue.discard"))
+
+        self.keep_button.setDefault(True)
+        self.keep_button.setAutoDefault(True)
+        self.discard_button.setAutoDefault(False)
+
+        btn_row.addWidget(self.keep_button)
+        btn_row.addStretch(1)
+        btn_row.addWidget(self.discard_button)
+        layout.addLayout(btn_row)
+
+        self.keep_button.clicked.connect(self._choose_keep)
+        self.discard_button.clicked.connect(self._choose_discard)
+
+    @property
+    def choice(self) -> TargetChangeQueueChoice:
+        return self._choice
+
+    def _choose_keep(self) -> None:
+        self._choice = "keep"
+        self.accept()
+
+    def _choose_discard(self) -> None:
+        self._choice = "discard"
         self.accept()
 
 
@@ -241,6 +397,9 @@ class SettingsDialog(QtWidgets.QDialog):
         on_sync_now: Optional[Callable[[], Optional[SyncOutcome]]] = None,
         on_resolve_conflicts: Optional[Callable[[], None]] = None,
         on_sync_settings_changed: Optional[Callable[[], None]] = None,
+        on_target_queue_change: Optional[
+            Callable[[str, str, int], TargetChangeQueueChoice]
+        ] = None,
     ) -> None:
         super().__init__(parent)
         self.settings = settings
@@ -251,6 +410,13 @@ class SettingsDialog(QtWidgets.QDialog):
         self._on_sync_now = on_sync_now
         self._on_resolve_conflicts = on_resolve_conflicts
         self._on_sync_settings_changed = on_sync_settings_changed
+        self._on_target_queue_change = on_target_queue_change
+        self._token_loaded = False
+        self._token_dirty = False
+        self._loading_token_ui = False
+        self._worker_pool = QtCore.QThreadPool()
+        self._worker_pool.setMaxThreadCount(1)
+        self._active_runnables: set[_DialogWorkerRunnable] = set()
 
         self.setWindowTitle(tr("settings.title"))
         self.resize(640, 580)
@@ -398,9 +564,10 @@ class SettingsDialog(QtWidgets.QDialog):
         self.sync_namespace_edit.setPlaceholderText(SettingsManager.DEFAULT_SYNC_NAMESPACE)
         self.sync_server_form.addRow(tr("settings.sync.namespace"), self.sync_namespace_edit)
 
-        self.sync_token_edit = QtWidgets.QLineEdit(self.settings.get_sync_token())
+        self.sync_token_edit = QtWidgets.QLineEdit("")
         self.sync_token_edit.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.sync_token_edit.setPlaceholderText(tr("settings.sync.token.placeholder"))
+        self.sync_token_edit.installEventFilter(self)
         self.sync_server_form.addRow(tr("settings.sync.token"), self.sync_token_edit)
 
         self.sync_interval_spin = QtWidgets.QSpinBox()
@@ -477,6 +644,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.sync_mode_combo.currentIndexChanged.connect(self._on_sync_mode_changed)
         self.sync_url_edit.editingFinished.connect(self._persist_sync_fields)
         self.sync_namespace_edit.editingFinished.connect(self._persist_sync_fields)
+        self.sync_token_edit.textChanged.connect(self._on_sync_token_text_changed)
         self.sync_token_edit.editingFinished.connect(self._persist_sync_fields)
         self.sync_interval_spin.valueChanged.connect(self._on_sync_interval_changed)
         self.test_connection_button.clicked.connect(self.run_test_connection)
@@ -484,16 +652,101 @@ class SettingsDialog(QtWidgets.QDialog):
         self.resolve_conflicts_button.clicked.connect(self.open_conflicts_dialog)
         self.close_button.clicked.connect(self._on_close_clicked)
 
+    def showEvent(self, event: QtGui.QShowEvent) -> None:
+        super().showEvent(event)
+        if (self.sync_mode_combo.currentData() or self.settings.get_sync_mode()) == "server":
+            self._ensure_sync_token_loaded()
+            self._refresh_sync_visibility_and_status()
+
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        if (
+            watched is self.sync_token_edit
+            and event.type() == QtCore.QEvent.Type.FocusIn
+            and (self.sync_mode_combo.currentData() or self.settings.get_sync_mode()) == "server"
+        ):
+            self._ensure_sync_token_loaded()
+        return super().eventFilter(watched, event)
+
+    def _on_sync_token_text_changed(self, _text: str) -> None:
+        if self._loading_token_ui:
+            return
+        self._token_loaded = True
+        self._token_dirty = True
+
+    def _ensure_sync_token_loaded(self) -> None:
+        mode = self.sync_mode_combo.currentData() or self.settings.get_sync_mode()
+        if mode != "server" or self._token_loaded:
+            return
+        self._loading_token_ui = True
+        try:
+            self.sync_token_edit.setText(self.settings.get_sync_token())
+            self._token_loaded = True
+        finally:
+            self._loading_token_ui = False
+
+    def _prompt_target_queue_change(
+        self,
+        old_target: str,
+        new_target: str,
+        pending_count: int,
+    ) -> TargetChangeQueueChoice:
+        if self._on_target_queue_change is not None:
+            return self._on_target_queue_change(old_target, new_target, pending_count)
+        dlg = TargetQueueChangeDialog(old_target, new_target, pending_count, parent=self)
+        dlg.exec()
+        return dlg.choice
+
+    def _run_in_worker_pool(self, fn: Callable[[], Any]) -> Any:
+        loop = QtCore.QEventLoop(self)
+        holder: dict[str, Any] = {}
+        runnable = _DialogWorkerRunnable(fn)
+        self._active_runnables.add(runnable)
+
+        def _done(res: Any) -> None:
+            self._active_runnables.discard(runnable)
+            holder["res"] = res
+            if loop.isRunning():
+                loop.quit()
+
+        runnable.signals.finished.connect(_done)
+        self.finished.connect(loop.quit)
+        try:
+            self._worker_pool.start(runnable)
+            if "res" not in holder:
+                loop.exec()
+        finally:
+            try:
+                self.finished.disconnect(loop.quit)
+            except (RuntimeError, TypeError):
+                pass
+        res = holder.get("res")
+        if isinstance(res, BaseException):
+            raise res
+        return res
+
     def _on_close_clicked(self) -> None:
         if (self.sync_mode_combo.currentData() or "off") == "server":
             self._persist_sync_fields()
         self.accept()
 
     def _persist_sync_fields(self) -> None:
-        self.settings.set_sync_server_url(self.sync_url_edit.text())
-        self.settings.set_sync_namespace(self.sync_namespace_edit.text())
+        engine = self._get_or_create_sync_engine()
+        new_url = self.sync_url_edit.text()
+        new_ns = self.sync_namespace_edit.text()
+        pending_change = engine.inspect_pending_target_change(
+            new_url=new_url,
+            new_namespace=new_ns,
+        )
+        self.settings.set_sync_server_url(new_url)
+        self.settings.set_sync_namespace(new_ns)
         self.sync_namespace_edit.setText(self.settings.get_sync_namespace())
-        self.settings.set_sync_token(self.sync_token_edit.text())
+        if pending_change is not None:
+            old_target, new_target, pending_count = pending_change
+            q_choice = self._prompt_target_queue_change(old_target, new_target, pending_count)
+            engine.apply_target_change(q_choice, new_target=new_target)
+        if self._token_dirty:
+            self.settings.set_sync_token(self.sync_token_edit.text())
+            self._token_dirty = False
         self._notify_sync_settings_changed()
         self._refresh_sync_visibility_and_status()
 
@@ -501,6 +754,7 @@ class SettingsDialog(QtWidgets.QDialog):
         mode = self.sync_mode_combo.currentData() or SettingsManager.DEFAULT_SYNC_MODE
         self.settings.set_sync_mode(mode)
         if mode == "server":
+            self._ensure_sync_token_loaded()
             self._persist_sync_fields()
         else:
             self._notify_sync_settings_changed()
@@ -554,7 +808,8 @@ class SettingsDialog(QtWidgets.QDialog):
             else QtCore.Qt.FocusPolicy.NoFocus
         )
 
-        if not self.sync_url_edit.text().strip() or not self.sync_token_edit.text().strip():
+        has_token = bool(self.sync_token_edit.text().strip()) if self._token_loaded else False
+        if not self.sync_url_edit.text().strip() or not has_token:
             self.sync_status_label.setText(tr("sync.status.unconfigured"))
         elif conflict_count > 0:
             self.sync_status_label.setText(tr("sync.status.conflicts", count=conflict_count))
@@ -564,14 +819,27 @@ class SettingsDialog(QtWidgets.QDialog):
             self.sync_status_label.setText(tr("sync.status.synced", rev=lib_rev))
 
     def run_test_connection(self) -> bool:
+        self._ensure_sync_token_loaded()
         self._persist_sync_fields()
         engine = self._get_or_create_sync_engine()
-        status = engine.test_connection(
-            mode="server",
-            server_url=self.sync_url_edit.text(),
-            token=self.sync_token_edit.text(),
-            namespace=self.sync_namespace_edit.text(),
-        )
+        url = self.sync_url_edit.text()
+        token = self.sync_token_edit.text()
+        namespace = self.sync_namespace_edit.text()
+        self.sync_status_label.setText(tr("sync.status.syncing"))
+        self.test_connection_button.setEnabled(False)
+        try:
+            status = self._run_in_worker_pool(
+                lambda: engine.test_connection(
+                    mode="server",
+                    server_url=url,
+                    token=token,
+                    namespace=namespace,
+                )
+            )
+        finally:
+            self.test_connection_button.setEnabled(True)
+        if status is None:
+            return False
         if status.ok:
             self.sync_status_label.setText(
                 tr(
@@ -585,11 +853,17 @@ class SettingsDialog(QtWidgets.QDialog):
         return False
 
     def run_sync_now(self) -> Optional[SyncOutcome]:
+        self._ensure_sync_token_loaded()
         self._persist_sync_fields()
-        if self._on_sync_now is not None:
-            outcome = self._on_sync_now()
-        else:
-            outcome = self._get_or_create_sync_engine().sync_once()
+        self.sync_now_button.setEnabled(False)
+        try:
+            if self._on_sync_now is not None:
+                outcome = self._on_sync_now()
+            else:
+                engine = self._get_or_create_sync_engine()
+                outcome = self._run_in_worker_pool(engine.sync_once)
+        finally:
+            self.sync_now_button.setEnabled(True)
         self._refresh_sync_visibility_and_status()
         if outcome is not None and not outcome.ok and outcome.error:
             self.sync_status_label.setText(tr("sync.status.test_failed", detail=outcome.error))

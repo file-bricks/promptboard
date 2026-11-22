@@ -1485,6 +1485,14 @@
     "ja": "同期済み（rev {rev}）",
     "ru": "Синхронизировано (рев. {rev})"
   },
+  "sync.status.syncing": {
+    "de": "Synchronisiere…",
+    "en": "Synchronizing…",
+    "es": "Sincronizando…",
+    "zh": "正在同步…",
+    "ja": "同期中…",
+    "ru": "Синхронизация…"
+  },
   "sync.status.offline_pending": {
     "de": "Offline – {count} ausstehend",
     "en": "Offline — {count} pending",
@@ -1548,6 +1556,70 @@
     "zh": "采用服务器版本",
     "ja": "サーバーの内容を採用",
     "ru": "Принять версию сервера"
+  },
+  "dialog.sync_couple.removed_info": {
+    "de": "Bei „Serverstand übernehmen“ werden {removed} lokale Einträge entfernt, die nicht auf dem Server liegen (ein Backup von library.json wird zuvor automatisch angelegt).",
+    "en": "Choosing \"Use server library\" will remove {removed} local entries that are not on the server (a timestamped backup of library.json is created first).",
+    "es": "Al elegir «Usar biblioteca del servidor» se eliminarán {removed} entradas locales que no están en el servidor (antes se creará una copia de seguridad de library.json).",
+    "zh": "选择“采用服务器版本”将移除 {removed} 个不在服务器上的本地条目（替换前会自动备份 library.json）。",
+    "ja": "「サーバーの内容を採用」を選ぶと、サーバー上にないローカル項目 {removed} 件が削除されます（置換前に library.json のバックアップを作成します）。",
+    "ru": "При выборе «Принять версию сервера» будет удалено локальных записей, отсутствующих на сервере: {removed} (перед заменой создаётся резервная копия library.json)."
+  },
+  "dialog.sync_couple.confirm_title": {
+    "de": "Serverstand wirklich übernehmen?",
+    "en": "Replace local library with server state?",
+    "es": "¿Reemplazar la biblioteca local con la del servidor?",
+    "zh": "确定用服务器版本替换本地库吗？",
+    "ja": "ローカルライブラリをサーバーの内容で置き換えますか？",
+    "ru": "Заменить локальную библиотеку версией сервера?"
+  },
+  "dialog.sync_couple.confirm_body": {
+    "de": "Dadurch wird deine lokale Bibliothek durch {count} Server-Einträge ersetzt und {removed} lokale Einträge werden entfernt.\n\nEin Backup von library.json wird zuvor angelegt. Trotzdem fortfahren?",
+    "en": "This will replace your local library with {count} server entries and remove {removed} local entries.\n\nA backup of library.json will be written beforehand. Continue anyway?",
+    "es": "Esto reemplazará su biblioteca local con {count} entradas del servidor y eliminará {removed} entradas locales.\n\nSe guardará antes una copia de seguridad de library.json. ¿Continuar de todos modos?",
+    "zh": "这将用服务器上的 {count} 个条目替换本地库，并移除 {removed} 个本地条目。\n\n替换前会先备份 library.json。仍要继续吗？",
+    "ja": "ローカルライブラリをサーバーの {count} 件で置き換え、ローカルの {removed} 件を削除します。\n\n事前に library.json のバックアップを保存します。続行しますか？",
+    "ru": "Локальная библиотека будет заменена записями сервера ({count}), а локальных записей будет удалено: {removed}.\n\nПредварительно будет создана резервная копия library.json. Продолжить?"
+  },
+  "dialog.sync_couple.confirm_accept": {
+    "de": "Ja, Serverstand übernehmen",
+    "en": "Yes, replace local library",
+    "es": "Sí, reemplazar biblioteca local",
+    "zh": "是，采用服务器版本",
+    "ja": "はい、サーバーの内容で置換",
+    "ru": "Да, заменить локальную библиотеку"
+  },
+  "dialog.sync_target_queue.title": {
+    "de": "Ausstehende Synchronisierungs-Warteschlange",
+    "en": "Pending synchronization queue",
+    "es": "Cola de sincronización pendiente",
+    "zh": "待处理的同步队列",
+    "ja": "保留中の同期キュー",
+    "ru": "Очередь ожидающих изменений синхронизации"
+  },
+  "dialog.sync_target_queue.body": {
+    "de": "Für das bisherige Ziel ({old_target}) stehen noch {count} ungesendete Änderungen in der Warteschlange.\n\nAn das neue Ziel ({new_target}) wird davon nichts gesendet. Möchtest du die alte Warteschlange für das bisherige Ziel behalten oder verwerfen?",
+    "en": "There are still {count} unsent changes queued for the previous target ({old_target}).\n\nNothing from this queue will be sent to the new target ({new_target}). Would you like to keep or discard the old queue?",
+    "es": "Todavía hay {count} cambios pendientes en la cola para el destino anterior ({old_target}).\n\nNo se enviará nada de esa cola al nuevo destino ({new_target}). ¿Desea conservar o descartar la cola anterior?",
+    "zh": "原同步目标（{old_target}）仍有 {count} 项未发送的更改。\n\n这些更改不会发送到新目标（{new_target}）。要保留还是丢弃原队列？",
+    "ja": "以前の同期先（{old_target}）には未送信の変更が {count} 件残っています。\n\n新しい同期先（{new_target}）へは送信されません。古いキューを保持しますか、破棄しますか？",
+    "ru": "Для прежней цели ({old_target}) в очереди остаётся неотправленных изменений: {count}.\n\nНа новую цель ({new_target}) они отправлены не будут. Сохранить старую очередь или отбросить её?"
+  },
+  "dialog.sync_target_queue.keep": {
+    "de": "Alte Warteschlange behalten (Empfohlen)",
+    "en": "Keep old queue (recommended)",
+    "es": "Conservar cola anterior (recomendado)",
+    "zh": "保留原队列（推荐）",
+    "ja": "古いキューを保持（推奨）",
+    "ru": "Сохранить старую очередь (рекомендуется)"
+  },
+  "dialog.sync_target_queue.discard": {
+    "de": "Alte Warteschlange verwerfen",
+    "en": "Discard old queue",
+    "es": "Descartar cola anterior",
+    "zh": "丢弃原队列",
+    "ja": "古いキューを破棄",
+    "ru": "Отбросить старую очередь"
   },
   "dialog.sync_conflicts.title": {
     "de": "Synchronisierungskonflikte auflösen",
