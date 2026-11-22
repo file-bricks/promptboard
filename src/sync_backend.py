@@ -1128,10 +1128,15 @@ class SyncStateStore:
 
     FILENAME = "sync_state.json"
 
-    def __init__(self, data_dir: Path) -> None:
+    def __init__(
+        self,
+        data_dir: Path,
+        *,
+        lock: Optional[threading.RLock] = None,
+    ) -> None:
         self.data_dir = Path(data_dir)
         self.path = self.data_dir / self.FILENAME
-        self._lock = threading.RLock()
+        self._lock = lock if lock is not None else threading.RLock()
 
     def load(self) -> SyncStateData:
         with self._lock:
@@ -1159,10 +1164,15 @@ class OfflineQueue:
 
     FILENAME = "sync_queue.json"
 
-    def __init__(self, data_dir: Path) -> None:
+    def __init__(
+        self,
+        data_dir: Path,
+        *,
+        lock: Optional[threading.RLock] = None,
+    ) -> None:
         self.data_dir = Path(data_dir)
         self.path = self.data_dir / self.FILENAME
-        self._lock = threading.RLock()
+        self._lock = lock if lock is not None else threading.RLock()
 
     def _read_store(self) -> Tuple[str, Dict[str, List[SyncMutation]]]:
         if not self.path.is_file():
@@ -1359,6 +1369,7 @@ class OfflineQueue:
         *,
         target: Optional[str] = None,
         expected_mutation_ids: Optional[Dict[str, str]] = None,
+        applied_revs: Optional[Dict[str, int]] = None,
     ) -> List[SyncMutation]:
         with self._lock:
             active_target, queues = self._read_store()
@@ -1378,6 +1389,16 @@ class OfflineQueue:
                     and m.mutation_id != expected_mutation_ids[obj_key]
                 ):
                     # A newer edit arrived while the previous mutation was in flight.
+                    if applied_revs is not None and obj_key in applied_revs:
+                        m = SyncMutation(
+                            id=m.id,
+                            kind=m.kind,
+                            op=m.op,
+                            base_rev=max(0, int(applied_revs[obj_key])),
+                            payload=dict(m.payload) if isinstance(m.payload, dict) else None,
+                            queued_at=m.queued_at,
+                            mutation_id=m.mutation_id,
+                        )
                     remaining.append(m)
             if remaining:
                 queues[eff_target] = remaining
@@ -1429,7 +1450,15 @@ def create_sync_backend(
 
 
 class SyncEngine:
-    """Coordinates ``Storage``, ``SyncStateStore``, ``OfflineQueue``, and ``SyncBackend``."""
+    """Coordinates ``Storage``, ``SyncStateStore``, ``OfflineQueue``, and ``SyncBackend``.
+
+    Lock hierarchy (acquired strictly in this order, never held across network I/O
+    or interactive callbacks):
+      1. ``_engine_lock`` — local snapshot/apply coordination in sync/flush/resolve
+      2. ``storage._lock`` — atomic read-modify-write across ``load_items``..``save_items``
+      3. ``_state_lock`` — ``SyncStateStore`` & active-target metadata transitions
+      4. ``queue._lock`` — ``OfflineQueue`` compaction and persistence
+    """
 
     def __init__(
         self,
@@ -1440,7 +1469,8 @@ class SyncEngine:
     ) -> None:
         self.storage = storage
         self.settings = settings
-        self.state_store = SyncStateStore(storage.data_dir)
+        self._state_lock = threading.RLock()
+        self.state_store = SyncStateStore(storage.data_dir, lock=self._state_lock)
         self.queue = OfflineQueue(storage.data_dir)
         self._requester = requester
         self._engine_lock = threading.RLock()
@@ -1462,13 +1492,13 @@ class SyncEngine:
             self.settings.get_sync_namespace(),
         )
 
-    def _effective_queue_target(self) -> Optional[str]:
+    def _effective_queue_target(self, state: Optional[SyncStateData] = None) -> Optional[str]:
         raw_url = self.settings.get_sync_server_url().strip()
         if raw_url:
             return self.target_coupling_id()
-        state = self.state_store.load()
-        if state.active_target:
-            return state.active_target
+        loaded = state if state is not None else self.state_store.load()
+        if loaded.active_target:
+            return loaded.active_target
         return None
 
     @staticmethod
@@ -1531,7 +1561,7 @@ class SyncEngine:
         new_namespace: Optional[str] = None,
     ) -> Optional[Tuple[str, str, int]]:
         """Return ``(old_target, new_target, pending_count)`` when switching away from a non-empty queue."""
-        with self._engine_lock:
+        with self._state_lock:
             eff_url = new_url if new_url is not None else self.settings.get_sync_server_url()
             if not (eff_url or "").strip():
                 return None
@@ -1557,7 +1587,7 @@ class SyncEngine:
         new_target: Optional[str] = None,
     ) -> None:
         """Switch active coupling target while preserving or discarding the previous target's queue."""
-        with self._engine_lock:
+        with self._state_lock:
             resolved_new = new_target if new_target is not None else self.target_coupling_id()
             state = self.state_store.load()
             old_target = self._resolve_previous_target(state, resolved_new)
@@ -1653,9 +1683,9 @@ class SyncEngine:
     def enqueue_upsert(self, item: LibraryItem, *, kind: str = DEFAULT_KIND) -> None:
         if self.current_mode() != "server":
             return
-        with self._engine_lock:
+        with self._state_lock:
             state = self.state_store.load()
-            target = self._effective_queue_target()
+            target = self._effective_queue_target(state)
             if target and not state.active_target:
                 state.active_target = target
                 self.state_store.save(state)
@@ -1666,9 +1696,9 @@ class SyncEngine:
     def enqueue_delete(self, item_id: str, *, kind: str = DEFAULT_KIND) -> None:
         if self.current_mode() != "server":
             return
-        with self._engine_lock:
+        with self._state_lock:
             state = self.state_store.load()
-            target = self._effective_queue_target()
+            target = self._effective_queue_target(state)
             if target and not state.active_target:
                 state.active_target = target
                 self.state_store.save(state)
@@ -1737,221 +1767,246 @@ class SyncEngine:
         target: str,
         full_snapshot: bool = False,
     ) -> Tuple[int, int, bool]:
-        """Apply remote upserts and tombstones using three-way conflict detection."""
-        local_items = self.storage.load_items()
-        local_by_id: Dict[str, LibraryItem] = {item.id: item for item in local_items}
-        queued_by_key = {
-            make_object_key(m.kind, m.id): m for m in self.queue.load_all(target=target)
-        }
-        keys_to_unqueue: set[str] = set()
-        storage_changed = False
-        applied_upserts = 0
-        applied_tombstones = 0
+        """Apply remote upserts and tombstones using three-way conflict detection.
 
-        seen_remote_keys: set[str] = set()
+        Holds ``self.storage._lock`` continuously from ``load_items`` through
+        ``save_items`` with zero network I/O inside the critical section.
+        """
+        with self.storage._lock:
+            local_items = self.storage.load_items()
+            local_by_id: Dict[str, LibraryItem] = {item.id: item for item in local_items}
+            queued_by_key = {
+                make_object_key(m.kind, m.id): m for m in self.queue.load_all(target=target)
+            }
+            keys_to_unqueue: set[str] = set()
+            storage_changed = False
+            applied_upserts = 0
+            applied_tombstones = 0
 
-        for remote in pull_res.upserts:
-            key = make_object_key(remote.kind, remote.id)
-            seen_remote_keys.add(key)
-            if remote.kind != DEFAULT_KIND:
-                state.item_revs[key] = remote.rev
-                continue
+            seen_remote_keys: set[str] = set()
 
-            remote_item = item_from_dict(remote.payload)
-            remote_dict = item_to_dict(remote_item)
-            remote_hash = canonical_item_hash(remote_dict)
+            for remote in pull_res.upserts:
+                key = make_object_key(remote.kind, remote.id)
+                seen_remote_keys.add(key)
+                if remote.kind != DEFAULT_KIND:
+                    state.item_revs[key] = remote.rev
+                    continue
 
-            local_existing = local_by_id.get(remote.id)
-            queued_mut = queued_by_key.get(key)
-            locally_dirty = self._is_locally_modified(key, local_existing, state, queued_by_key)
+                remote_item = item_from_dict(remote.payload)
+                remote_dict = item_to_dict(remote_item)
+                remote_hash = canonical_item_hash(remote_dict)
 
-            if not locally_dirty:
-                local_by_id[remote.id] = remote_item
-                state.item_revs[key] = remote.rev
-                state.item_hashes[key] = remote_hash
-                storage_changed = True
-                applied_upserts += 1
-                continue
+                local_existing = local_by_id.get(remote.id)
+                queued_mut = queued_by_key.get(key)
+                locally_dirty = self._is_locally_modified(key, local_existing, state, queued_by_key)
 
-            # Local has uncommitted edits or a pending delete.
-            if local_existing is not None and (queued_mut is None or queued_mut.op == "upsert"):
-                local_dict = item_to_dict(local_existing)
-                if canonical_item_hash(local_dict) == remote_hash:
-                    # Convergent edit: identical content on both sides.
+                if not locally_dirty:
+                    local_by_id[remote.id] = remote_item
                     state.item_revs[key] = remote.rev
                     state.item_hashes[key] = remote_hash
-                    keys_to_unqueue.add(key)
-                    continue
-                self._upsert_conflict(
-                    state.conflicts,
-                    ConflictEntry(
-                        id=remote.id,
-                        kind=remote.kind,
-                        title=local_existing.name or remote_item.name,
-                        source="server",
-                        client_base_rev=state.item_revs.get(key, 0),
-                        server_rev=remote.rev,
-                        updated_at=remote.updated_at,
-                        local_op="upsert",
-                        local_item=local_dict,
-                        server_item=remote_dict,
-                        server_deleted=False,
-                    ),
-                )
-                keys_to_unqueue.add(key)
-            else:
-                # Local deleted the item while server updated it.
-                self._upsert_conflict(
-                    state.conflicts,
-                    ConflictEntry(
-                        id=remote.id,
-                        kind=remote.kind,
-                        title=remote_item.name,
-                        source="server",
-                        client_base_rev=state.item_revs.get(key, 0),
-                        server_rev=remote.rev,
-                        updated_at=remote.updated_at,
-                        local_op="delete",
-                        local_item=None,
-                        server_item=remote_dict,
-                        server_deleted=False,
-                    ),
-                )
-                keys_to_unqueue.add(key)
-
-        for tomb in pull_res.tombstones:
-            key = make_object_key(tomb.kind, tomb.id)
-            seen_remote_keys.add(key)
-            if tomb.kind != DEFAULT_KIND:
-                state.item_revs.pop(key, None)
-                state.item_hashes.pop(key, None)
-                continue
-
-            local_existing = local_by_id.get(tomb.id)
-            queued_mut = queued_by_key.get(key)
-            if local_existing is None:
-                state.item_revs.pop(key, None)
-                state.item_hashes.pop(key, None)
-                keys_to_unqueue.add(key)
-                continue
-
-            locally_dirty = self._is_locally_modified(key, local_existing, state, queued_by_key)
-            if not locally_dirty or (queued_mut is not None and queued_mut.op == "delete"):
-                local_by_id.pop(tomb.id, None)
-                state.item_revs.pop(key, None)
-                state.item_hashes.pop(key, None)
-                keys_to_unqueue.add(key)
-                storage_changed = True
-                applied_tombstones += 1
-            else:
-                # Server deleted the object, but local modified it since base_rev -> conflict!
-                self._upsert_conflict(
-                    state.conflicts,
-                    ConflictEntry(
-                        id=tomb.id,
-                        kind=tomb.kind,
-                        title=local_existing.name,
-                        source="server",
-                        client_base_rev=state.item_revs.get(key, 0),
-                        server_rev=tomb.rev,
-                        updated_at=tomb.deleted_at,
-                        local_op="upsert",
-                        local_item=item_to_dict(local_existing),
-                        server_item=None,
-                        server_deleted=True,
-                    ),
-                )
-                keys_to_unqueue.add(key)
-
-        if full_snapshot:
-            # Reconcile previously tracked items whose tombstones were compacted away (410 reset).
-            for tracked_key in list(state.item_revs.keys()):
-                kind, obj_id = split_object_key(tracked_key)
-                if kind != DEFAULT_KIND or tracked_key in seen_remote_keys:
-                    continue
-                local_existing = local_by_id.get(obj_id)
-                if local_existing is None:
-                    state.item_revs.pop(tracked_key, None)
-                    state.item_hashes.pop(tracked_key, None)
-                    continue
-                if not self._is_locally_modified(tracked_key, local_existing, state, queued_by_key):
-                    local_by_id.pop(obj_id, None)
-                    state.item_revs.pop(tracked_key, None)
-                    state.item_hashes.pop(tracked_key, None)
                     storage_changed = True
-                    applied_tombstones += 1
-                else:
+                    applied_upserts += 1
+                    continue
+
+                # Local has uncommitted edits or a pending delete.
+                if local_existing is not None and (queued_mut is None or queued_mut.op == "upsert"):
+                    local_dict = item_to_dict(local_existing)
+                    if canonical_item_hash(local_dict) == remote_hash:
+                        # Convergent edit: identical content on both sides.
+                        state.item_revs[key] = remote.rev
+                        state.item_hashes[key] = remote_hash
+                        keys_to_unqueue.add(key)
+                        continue
                     self._upsert_conflict(
                         state.conflicts,
                         ConflictEntry(
-                            id=obj_id,
-                            kind=kind,
+                            id=remote.id,
+                            kind=remote.kind,
+                            title=local_existing.name or remote_item.name,
+                            source="server",
+                            client_base_rev=state.item_revs.get(key, 0),
+                            server_rev=remote.rev,
+                            updated_at=remote.updated_at,
+                            local_op="upsert",
+                            local_item=local_dict,
+                            server_item=remote_dict,
+                            server_deleted=False,
+                        ),
+                    )
+                    keys_to_unqueue.add(key)
+                else:
+                    # Local deleted the item while server updated it.
+                    self._upsert_conflict(
+                        state.conflicts,
+                        ConflictEntry(
+                            id=remote.id,
+                            kind=remote.kind,
+                            title=remote_item.name,
+                            source="server",
+                            client_base_rev=state.item_revs.get(key, 0),
+                            server_rev=remote.rev,
+                            updated_at=remote.updated_at,
+                            local_op="delete",
+                            local_item=None,
+                            server_item=remote_dict,
+                            server_deleted=False,
+                        ),
+                    )
+                    keys_to_unqueue.add(key)
+
+            for tomb in pull_res.tombstones:
+                key = make_object_key(tomb.kind, tomb.id)
+                seen_remote_keys.add(key)
+                if tomb.kind != DEFAULT_KIND:
+                    state.item_revs.pop(key, None)
+                    state.item_hashes.pop(key, None)
+                    continue
+
+                local_existing = local_by_id.get(tomb.id)
+                queued_mut = queued_by_key.get(key)
+                if local_existing is None:
+                    state.item_revs.pop(key, None)
+                    state.item_hashes.pop(key, None)
+                    keys_to_unqueue.add(key)
+                    continue
+
+                locally_dirty = self._is_locally_modified(key, local_existing, state, queued_by_key)
+                if not locally_dirty or (queued_mut is not None and queued_mut.op == "delete"):
+                    local_by_id.pop(tomb.id, None)
+                    state.item_revs.pop(key, None)
+                    state.item_hashes.pop(key, None)
+                    keys_to_unqueue.add(key)
+                    storage_changed = True
+                    applied_tombstones += 1
+                else:
+                    # Server deleted the object, but local modified it since base_rev -> conflict!
+                    self._upsert_conflict(
+                        state.conflicts,
+                        ConflictEntry(
+                            id=tomb.id,
+                            kind=tomb.kind,
                             title=local_existing.name,
                             source="server",
-                            client_base_rev=state.item_revs.get(tracked_key, 0),
-                            server_rev=0,
-                            updated_at=now_iso(),
+                            client_base_rev=state.item_revs.get(key, 0),
+                            server_rev=tomb.rev,
+                            updated_at=tomb.deleted_at,
                             local_op="upsert",
                             local_item=item_to_dict(local_existing),
                             server_item=None,
                             server_deleted=True,
                         ),
                     )
-                    keys_to_unqueue.add(tracked_key)
+                    keys_to_unqueue.add(key)
 
-        if keys_to_unqueue:
-            expected_ids = {
-                k: queued_by_key[k].mutation_id for k in keys_to_unqueue if k in queued_by_key
-            }
-            self.queue.remove_keys(
-                keys_to_unqueue,
-                target=target,
-                expected_mutation_ids=expected_ids,
-            )
+            if full_snapshot:
+                # Reconcile previously tracked items whose tombstones were compacted away (410 reset).
+                for tracked_key in list(state.item_revs.keys()):
+                    kind, obj_id = split_object_key(tracked_key)
+                    if kind != DEFAULT_KIND or tracked_key in seen_remote_keys:
+                        continue
+                    local_existing = local_by_id.get(obj_id)
+                    if local_existing is None:
+                        state.item_revs.pop(tracked_key, None)
+                        state.item_hashes.pop(tracked_key, None)
+                        continue
+                    if not self._is_locally_modified(tracked_key, local_existing, state, queued_by_key):
+                        local_by_id.pop(obj_id, None)
+                        state.item_revs.pop(tracked_key, None)
+                        state.item_hashes.pop(tracked_key, None)
+                        storage_changed = True
+                        applied_tombstones += 1
+                    else:
+                        self._upsert_conflict(
+                            state.conflicts,
+                            ConflictEntry(
+                                id=obj_id,
+                                kind=kind,
+                                title=local_existing.name,
+                                source="server",
+                                client_base_rev=state.item_revs.get(tracked_key, 0),
+                                server_rev=0,
+                                updated_at=now_iso(),
+                                local_op="upsert",
+                                local_item=item_to_dict(local_existing),
+                                server_item=None,
+                                server_deleted=True,
+                            ),
+                        )
+                        keys_to_unqueue.add(tracked_key)
 
-        if storage_changed:
-            self.storage.save_items(list(local_by_id.values()))
+            if keys_to_unqueue:
+                expected_ids = {
+                    k: queued_by_key[k].mutation_id for k in keys_to_unqueue if k in queued_by_key
+                }
+                self.queue.remove_keys(
+                    keys_to_unqueue,
+                    target=target,
+                    expected_mutation_ids=expected_ids,
+                )
 
-        state.library_rev = pull_res.cursor
-        state.etag = pull_res.etag
-        return applied_upserts, applied_tombstones, storage_changed
+            if storage_changed:
+                self.storage.save_items(list(local_by_id.values()))
 
-    def _push_pending_queue(
+            state.library_rev = pull_res.cursor
+            state.etag = pull_res.etag
+            return applied_upserts, applied_tombstones, storage_changed
+
+    def _apply_push_result(
         self,
-        backend: ServerBackend,
+        pending_sent: List[SyncMutation],
+        push_res: PushResult,
         state: SyncStateData,
         *,
         target: str,
-        timeout: Optional[float] = None,
-    ) -> Tuple[int, bool, str]:
-        pending = self.queue.load_all(target=target)
-        if not pending:
-            return 0, False, ""
-
-        push_res = backend.push(pending, timeout=timeout)
-        if push_res.queued_offline:
-            return 0, True, push_res.error
-
+        target_switched: bool = False,
+    ) -> int:
+        """Apply a completed network ``PushResult`` to ``state`` and ``OfflineQueue`` under lock."""
         resolved_keys: set[str] = set()
-        pending_by_key = {make_object_key(m.kind, m.id): m for m in pending}
+        pending_by_key = {make_object_key(m.kind, m.id): m for m in pending_sent}
         expected_ids = {k: m.mutation_id for k, m in pending_by_key.items()}
+
+        if not target_switched:
+            item_revs = state.item_revs
+            item_hashes = state.item_hashes
+            conflicts = state.conflicts
+            snap: Dict[str, Any] = {}
+        else:
+            snap = dict(state.target_snapshots.get(target) or {})
+            raw_revs = snap.get("item_revs")
+            raw_hashes = snap.get("item_hashes")
+            raw_confs = snap.get("conflicts")
+            item_revs = (
+                {str(k): int(v) for k, v in raw_revs.items() if v is not None}
+                if isinstance(raw_revs, dict)
+                else {}
+            )
+            item_hashes = (
+                {str(k): str(v) for k, v in raw_hashes.items() if isinstance(v, str)}
+                if isinstance(raw_hashes, dict)
+                else {}
+            )
+            conflicts = (
+                [ConflictEntry.from_dict(c) for c in raw_confs if isinstance(c, dict)]
+                if isinstance(raw_confs, list)
+                else []
+            )
 
         for key, new_rev in push_res.applied_revs.items():
             resolved_keys.add(key)
             mut = pending_by_key.get(key)
             if mut is not None and mut.op == "delete":
-                state.item_revs.pop(key, None)
-                state.item_hashes.pop(key, None)
+                item_revs.pop(key, None)
+                item_hashes.pop(key, None)
             else:
-                state.item_revs[key] = new_rev
+                item_revs[key] = new_rev
                 if mut is not None and mut.payload is not None:
-                    state.item_hashes[key] = canonical_item_hash(mut.payload)
+                    item_hashes[key] = canonical_item_hash(mut.payload)
 
         for conf in push_res.conflicts:
             resolved_keys.add(conf.object_key)
             if conf.local_op == "delete" and conf.server_deleted:
-                state.item_revs.pop(conf.object_key, None)
-                state.item_hashes.pop(conf.object_key, None)
+                item_revs.pop(conf.object_key, None)
+                item_hashes.pop(conf.object_key, None)
                 continue
             if (
                 conf.local_op == "upsert"
@@ -1960,20 +2015,66 @@ class SyncEngine:
                 and conf.server_item is not None
                 and canonical_item_hash(conf.local_item) == canonical_item_hash(conf.server_item)
             ):
-                state.item_revs[conf.object_key] = conf.server_rev
-                state.item_hashes[conf.object_key] = canonical_item_hash(conf.server_item)
+                item_revs[conf.object_key] = conf.server_rev
+                item_hashes[conf.object_key] = canonical_item_hash(conf.server_item)
                 continue
-            self._upsert_conflict(state.conflicts, conf)
+            self._upsert_conflict(conflicts, conf)
 
         self.queue.remove_keys(
             resolved_keys,
             target=target,
             expected_mutation_ids=expected_ids,
+            applied_revs=push_res.applied_revs,
         )
-        if push_res.library_rev is not None and push_res.library_rev > state.library_rev:
-            state.library_rev = push_res.library_rev
-            state.etag = push_res.etag
-        return len(push_res.applied_revs), False, push_res.error
+
+        if not target_switched:
+            if push_res.library_rev is not None and push_res.library_rev > state.library_rev:
+                state.library_rev = push_res.library_rev
+                state.etag = push_res.etag
+        else:
+            snap_rev = max(0, int(snap.get("library_rev", 0) or 0))
+            snap_etag = str(snap.get("etag") or "")
+            if push_res.library_rev is not None and push_res.library_rev > snap_rev:
+                snap_rev = push_res.library_rev
+                snap_etag = push_res.etag
+            state.target_snapshots[target] = {
+                "library_rev": snap_rev,
+                "etag": snap_etag,
+                "item_revs": item_revs,
+                "item_hashes": item_hashes,
+                "conflicts": [c.to_dict() for c in conflicts],
+            }
+
+        return len(push_res.applied_revs)
+
+    @staticmethod
+    def _upsert_in_item_list(items: List[LibraryItem], new_item: LibraryItem) -> None:
+        idx = next((i for i, existing in enumerate(items) if existing.id == new_item.id), -1)
+        if idx >= 0:
+            items[idx] = new_item
+        else:
+            items.append(new_item)
+
+    def _record_sync_error_outcome(
+        self,
+        *,
+        mode: str,
+        coupling_id: str,
+        error_msg: str,
+    ) -> SyncOutcome:
+        with self._engine_lock, self._state_lock:
+            live_state = self.state_store.load()
+            if not (live_state.active_target and live_state.active_target != coupling_id):
+                live_state.target_snapshots[coupling_id] = self._snapshot_from_state(live_state)
+                self.state_store.save(live_state)
+            return SyncOutcome(
+                ok=False,
+                mode=mode,
+                library_rev=live_state.library_rev,
+                pending_queue_count=self.get_pending_count(target=coupling_id),
+                conflict_count=len(live_state.conflicts),
+                error=error_msg,
+            )
 
     def sync_once(
         self,
@@ -1987,7 +2088,7 @@ class SyncEngine:
         defer_target_change_prompt: bool = False,
         target_change_choice: Optional[TargetChangeQueueChoice] = None,
     ) -> SyncOutcome:
-        """Execute a complete sync cycle. Makes zero network calls when mode is ``"off"``."""
+        """Execute a complete sync cycle without holding any lock across network I/O."""
         mode = self.current_mode()
         if mode == "off":
             return SyncOutcome(ok=True, mode="off")
@@ -2002,12 +2103,12 @@ class SyncEngine:
                 error="Sync server URL and API token are required.",
             )
 
-        with self._engine_lock:
-            state = self.state_store.load()
-            state.mode = mode
-            coupling_id = self.target_coupling_id()
+        coupling_id = self.target_coupling_id()
 
-            # Step 0: Keep offline queue bound to its target when URL/namespace changes.
+        # Step 0: Snapshot/resolve target binding under lock; ask prompt callback outside locks.
+        prompt_target_args: Optional[Tuple[str, str, int]] = None
+        with self._engine_lock, self._state_lock:
+            state = self.state_store.load()
             old_target = self._resolve_previous_target(state, coupling_id)
             if old_target and old_target != coupling_id:
                 old_pending = self.queue.load_all(target=old_target)
@@ -2020,58 +2121,74 @@ class SyncEngine:
                         new_target=coupling_id,
                         old_target_pending_count=len(old_pending),
                     )
-                if target_change_choice is not None:
-                    q_choice: TargetChangeQueueChoice = target_change_choice
-                elif old_pending and on_target_change_queue is not None:
-                    q_choice = on_target_change_queue(old_target, coupling_id, len(old_pending))
-                else:
-                    q_choice = "keep"
+                if (
+                    target_change_choice is None
+                    and old_pending
+                    and on_target_change_queue is not None
+                ):
+                    prompt_target_args = (old_target, coupling_id, len(old_pending))
 
-                state.target_snapshots[old_target] = self._snapshot_from_state(state)
-                if q_choice == "discard":
-                    self.queue.clear(target=old_target)
-                self._restore_snapshot_into_state(
-                    state,
-                    state.target_snapshots.get(coupling_id),
-                )
+        resolved_target_choice: Optional[TargetChangeQueueChoice] = target_change_choice
+        if prompt_target_args is not None and on_target_change_queue is not None:
+            resolved_target_choice = on_target_change_queue(*prompt_target_args)
 
-            state.active_target = coupling_id
-            self.queue.set_active_target(coupling_id)
-            is_coupled = coupling_id in state.coupled_targets
-
-            try:
+        try:
+            with self._engine_lock, self._state_lock:
+                state = self.state_store.load()
+                state.mode = mode
+                old_target = self._resolve_previous_target(state, coupling_id)
+                if old_target and old_target != coupling_id:
+                    q_choice: TargetChangeQueueChoice = (
+                        resolved_target_choice if resolved_target_choice is not None else "keep"
+                    )
+                    state.target_snapshots[old_target] = self._snapshot_from_state(state)
+                    if q_choice == "discard":
+                        self.queue.clear(target=old_target)
+                    self._restore_snapshot_into_state(
+                        state,
+                        state.target_snapshots.get(coupling_id),
+                    )
+                state.active_target = coupling_id
+                self.queue.set_active_target(coupling_id)
+                self.state_store.save(state)
+                is_coupled = coupling_id in state.coupled_targets
                 backend = self.build_backend(client_id=state.client_id)
                 assert isinstance(backend, ServerBackend)
 
-                # Step 1: First-time coupling handling if not yet coupled to this target.
-                if not is_coupled:
-                    initial_pull = backend.pull(since_rev=None)
-                    if initial_pull.offline:
-                        self.state_store.save(state)
+            # Step 1: First-time coupling handling if not yet coupled to this target.
+            if not is_coupled:
+                initial_pull = backend.pull(since_rev=None)
+                if initial_pull.offline:
+                    with self._engine_lock, self._state_lock:
+                        live_state = self.state_store.load()
+                        if not (live_state.active_target and live_state.active_target != coupling_id):
+                            self.state_store.save(live_state)
                         return SyncOutcome(
                             ok=False,
                             mode=mode,
-                            library_rev=state.library_rev,
+                            library_rev=live_state.library_rev,
                             pending_queue_count=self.get_pending_count(target=coupling_id),
-                            conflict_count=len(state.conflicts),
+                            conflict_count=len(live_state.conflicts),
                             offline=True,
                             error=initial_pull.error,
                         )
 
-                    remote_count = len(initial_pull.upserts)
-                    current_local_items = self.storage.load_items()
+                remote_count = len(initial_pull.upserts)
+                choice: FirstCouplingChoice = "merge"
+                if first_coupling_choice is not None:
+                    choice = first_coupling_choice
+                elif remote_count > 0 and (
+                    defer_first_coupling_prompt or on_first_coupling is not None
+                ):
+                    with self.storage._lock:
+                        preview_local_items = self.storage.load_items()
                     remote_item_ids = {
                         r.id for r in initial_pull.upserts if r.kind == DEFAULT_KIND
                     }
                     removed_local_count = sum(
-                        1 for it in current_local_items if it.id not in remote_item_ids
+                        1 for it in preview_local_items if it.id not in remote_item_ids
                     )
-
-                    choice: FirstCouplingChoice = "merge"
-                    if first_coupling_choice is not None:
-                        choice = first_coupling_choice
-                    elif remote_count > 0 and defer_first_coupling_prompt:
-                        self.state_store.save(state)
+                    if defer_first_coupling_prompt:
                         return SyncOutcome(
                             ok=False,
                             mode=mode,
@@ -2080,200 +2197,303 @@ class SyncEngine:
                             remote_item_count=remote_count,
                             removed_local_count=removed_local_count,
                         )
-                    elif remote_count > 0 and on_first_coupling is not None:
-                        choice = _invoke_first_coupling_callback(
-                            on_first_coupling,
-                            remote_count,
-                            initial_pull.cursor,
-                            removed_local_count,
-                        )
+                    assert on_first_coupling is not None
+                    choice = _invoke_first_coupling_callback(
+                        on_first_coupling,
+                        remote_count,
+                        initial_pull.cursor,
+                        removed_local_count,
+                    )
 
-                    if choice == "cancel":
+                if choice == "cancel":
+                    with self._state_lock:
+                        live_state = self.state_store.load()
                         return SyncOutcome(
                             ok=False,
                             mode=mode,
                             cancelled=True,
                             pending_queue_count=self.get_pending_count(target=coupling_id),
-                            conflict_count=len(state.conflicts),
+                            conflict_count=len(live_state.conflicts),
                         )
 
-                    if choice == "take_server":
+                if choice == "take_server":
+                    adopted_items: List[LibraryItem] = []
+                    new_revs: Dict[str, int] = {}
+                    new_hashes: Dict[str, str] = {}
+                    for remote in initial_pull.upserts:
+                        key = make_object_key(remote.kind, remote.id)
+                        new_revs[key] = remote.rev
+                        if remote.kind == DEFAULT_KIND:
+                            lib_item = item_from_dict(remote.payload)
+                            adopted_items.append(lib_item)
+                            new_hashes[key] = canonical_item_hash(item_to_dict(lib_item))
+
+                    with self._engine_lock, self.storage._lock, self._state_lock:
+                        live_state = self.state_store.load()
+                        if (
+                            live_state.active_target and live_state.active_target != coupling_id
+                        ) or self.current_mode() != "server":
+                            return SyncOutcome(
+                                ok=False, mode=self.current_mode(), cancelled=True
+                            )
+                        current_local_items = self.storage.load_items()
                         backup_path = self._write_library_backup(current_local_items)
                         self.queue.clear(target=coupling_id)
-                        state.conflicts.clear()
-                        state.item_revs.clear()
-                        state.item_hashes.clear()
-                        adopted_items: List[LibraryItem] = []
-                        for remote in initial_pull.upserts:
-                            key = make_object_key(remote.kind, remote.id)
-                            state.item_revs[key] = remote.rev
-                            if remote.kind == DEFAULT_KIND:
-                                lib_item = item_from_dict(remote.payload)
-                                adopted_items.append(lib_item)
-                                state.item_hashes[key] = canonical_item_hash(
-                                    item_to_dict(lib_item)
-                                )
+                        live_state.conflicts.clear()
+                        live_state.item_revs = new_revs
+                        live_state.item_hashes = new_hashes
                         self.storage.save_items(adopted_items)
-                        state.library_rev = initial_pull.cursor
-                        state.etag = initial_pull.etag
-                        if coupling_id not in state.coupled_targets:
-                            state.coupled_targets.append(coupling_id)
-                        state.target_snapshots[coupling_id] = self._snapshot_from_state(state)
-                        self.state_store.save(state)
-                        return SyncOutcome(
-                            ok=True,
-                            mode=mode,
-                            library_rev=state.library_rev,
-                            pulled_upserts=len(adopted_items),
-                            storage_changed=True,
-                            backup_path=str(backup_path),
+                        live_state.library_rev = initial_pull.cursor
+                        live_state.etag = initial_pull.etag
+                        if coupling_id not in live_state.coupled_targets:
+                            live_state.coupled_targets.append(coupling_id)
+                        live_state.target_snapshots[coupling_id] = self._snapshot_from_state(
+                            live_state
                         )
+                        self.state_store.save(live_state)
+                        final_rev = live_state.library_rev
 
-                    # Default non-destructive "merge": queue all local items first so shared IDs
-                    # with differing payloads surface in the conflict list instead of being overwritten.
-                    local_items = {it.id: it for it in current_local_items}
+                    return SyncOutcome(
+                        ok=True,
+                        mode=mode,
+                        library_rev=final_rev,
+                        pulled_upserts=len(adopted_items),
+                        storage_changed=True,
+                        backup_path=str(backup_path),
+                    )
+
+                # Default non-destructive "merge": reconcile local+remote under lock, then push outside lock.
+                with self._engine_lock, self.storage._lock, self._state_lock:
+                    live_state = self.state_store.load()
+                    if (
+                        live_state.active_target and live_state.active_target != coupling_id
+                    ) or self.current_mode() != "server":
+                        return SyncOutcome(ok=False, mode=self.current_mode(), cancelled=True)
+                    local_items = {it.id: it for it in self.storage.load_items()}
                     self._detect_unqueued_local_changes(
-                        state, local_items, target=coupling_id
+                        live_state, local_items, target=coupling_id
                     )
                     upserts_applied, tombs_applied, changed = self._reconcile_pull(
                         initial_pull,
-                        state,
+                        live_state,
                         target=coupling_id,
                         full_snapshot=False,
                     )
-                    pushed_count, offline_push, push_err = self._push_pending_queue(
-                        backend, state, target=coupling_id
+                    live_state.target_snapshots[coupling_id] = self._snapshot_from_state(
+                        live_state
                     )
-                    if not offline_push and coupling_id not in state.coupled_targets:
-                        state.coupled_targets.append(coupling_id)
-                    state.target_snapshots[coupling_id] = self._snapshot_from_state(state)
-                    self.state_store.save(state)
+                    self.state_store.save(live_state)
+                    pending_to_push = self.queue.load_all(target=coupling_id)
+
+                push_res = backend.push(pending_to_push) if pending_to_push else PushResult()
+
+                with self._engine_lock, self._state_lock:
+                    live_state = self.state_store.load()
+                    target_switched = bool(
+                        live_state.active_target and live_state.active_target != coupling_id
+                    )
+                    pushed_count = 0
+                    offline_push = push_res.queued_offline
+                    push_err = push_res.error
+                    if pending_to_push and not offline_push:
+                        pushed_count = self._apply_push_result(
+                            pending_to_push,
+                            push_res,
+                            live_state,
+                            target=coupling_id,
+                            target_switched=target_switched,
+                        )
+                    if not offline_push and not target_switched:
+                        if coupling_id not in live_state.coupled_targets:
+                            live_state.coupled_targets.append(coupling_id)
+                        live_state.target_snapshots[coupling_id] = self._snapshot_from_state(
+                            live_state
+                        )
+                    self.state_store.save(live_state)
                     return SyncOutcome(
                         ok=not offline_push,
                         mode=mode,
-                        library_rev=state.library_rev,
+                        library_rev=live_state.library_rev,
                         pulled_upserts=upserts_applied,
                         pulled_tombstones=tombs_applied,
                         pushed_count=pushed_count,
                         pending_queue_count=self.get_pending_count(target=coupling_id),
-                        conflict_count=len(state.conflicts),
+                        conflict_count=len(live_state.conflicts),
                         offline=offline_push,
                         storage_changed=changed,
                         error=push_err,
                     )
 
-                # Step 2: Coupled steady-state sync (detect untracked local edits -> push queue -> pull delta).
+            # Step 2: Coupled steady-state sync (snapshot queue -> unlocked push -> unlocked pull -> locked merge).
+            with self._engine_lock, self.storage._lock, self._state_lock:
+                live_state = self.state_store.load()
+                if (
+                    live_state.active_target and live_state.active_target != coupling_id
+                ) or self.current_mode() != "server":
+                    return SyncOutcome(ok=False, mode=self.current_mode(), cancelled=True)
                 local_by_id = {it.id: it for it in self.storage.load_items()}
-                self._detect_unqueued_local_changes(state, local_by_id, target=coupling_id)
+                self._detect_unqueued_local_changes(live_state, local_by_id, target=coupling_id)
+                pending_to_push = self.queue.load_all(target=coupling_id)
 
-                pushed_count, offline_push, push_err = self._push_pending_queue(
-                    backend, state, target=coupling_id
-                )
-                if offline_push:
-                    state.target_snapshots[coupling_id] = self._snapshot_from_state(state)
-                    self.state_store.save(state)
-                    return SyncOutcome(
-                        ok=False,
-                        mode=mode,
-                        library_rev=state.library_rev,
-                        pushed_count=pushed_count,
-                        pending_queue_count=self.get_pending_count(target=coupling_id),
-                        conflict_count=len(state.conflicts),
-                        offline=True,
-                        error=push_err,
+            pushed_count = 0
+            if pending_to_push:
+                push_res = backend.push(pending_to_push)
+                with self._engine_lock, self._state_lock:
+                    live_state = self.state_store.load()
+                    target_switched = bool(
+                        live_state.active_target and live_state.active_target != coupling_id
                     )
+                    if push_res.queued_offline:
+                        if not target_switched:
+                            live_state.target_snapshots[coupling_id] = (
+                                self._snapshot_from_state(live_state)
+                            )
+                            self.state_store.save(live_state)
+                        return SyncOutcome(
+                            ok=False,
+                            mode=mode,
+                            library_rev=live_state.library_rev,
+                            pushed_count=0,
+                            pending_queue_count=self.get_pending_count(target=coupling_id),
+                            conflict_count=len(live_state.conflicts),
+                            offline=True,
+                            error=push_res.error,
+                        )
+                    pushed_count = self._apply_push_result(
+                        pending_to_push,
+                        push_res,
+                        live_state,
+                        target=coupling_id,
+                        target_switched=target_switched,
+                    )
+                    if not target_switched:
+                        live_state.target_snapshots[coupling_id] = self._snapshot_from_state(
+                            live_state
+                        )
+                    self.state_store.save(live_state)
+                    if target_switched or self.current_mode() != "server":
+                        return SyncOutcome(ok=False, mode=self.current_mode(), cancelled=True)
+                    pull_since_rev = live_state.library_rev
+                    pull_etag = live_state.etag or None
+            else:
+                with self._state_lock:
+                    live_state = self.state_store.load()
+                    if (
+                        live_state.active_target and live_state.active_target != coupling_id
+                    ) or self.current_mode() != "server":
+                        return SyncOutcome(ok=False, mode=self.current_mode(), cancelled=True)
+                    pull_since_rev = live_state.library_rev
+                    pull_etag = live_state.etag or None
 
-                pull_res = backend.pull(since_rev=state.library_rev, etag=state.etag or None)
-                full_snapshot = False
-                if pull_res.reset_required:
-                    pull_res = backend.pull(since_rev=None)
-                    full_snapshot = True
+            pull_res = backend.pull(since_rev=pull_since_rev, etag=pull_etag)
+            full_snapshot = False
+            if pull_res.reset_required:
+                pull_res = backend.pull(since_rev=None)
+                full_snapshot = True
 
-                if pull_res.offline:
-                    state.target_snapshots[coupling_id] = self._snapshot_from_state(state)
-                    self.state_store.save(state)
+            if pull_res.offline:
+                with self._engine_lock, self._state_lock:
+                    live_state = self.state_store.load()
+                    if not (
+                        live_state.active_target and live_state.active_target != coupling_id
+                    ):
+                        live_state.target_snapshots[coupling_id] = self._snapshot_from_state(
+                            live_state
+                        )
+                        self.state_store.save(live_state)
                     return SyncOutcome(
                         ok=False,
                         mode=mode,
-                        library_rev=state.library_rev,
+                        library_rev=live_state.library_rev,
                         pushed_count=pushed_count,
                         pending_queue_count=self.get_pending_count(target=coupling_id),
-                        conflict_count=len(state.conflicts),
+                        conflict_count=len(live_state.conflicts),
                         offline=True,
                         error=pull_res.error,
                     )
 
+            with self._engine_lock, self.storage._lock, self._state_lock:
+                live_state = self.state_store.load()
+                if (
+                    live_state.active_target and live_state.active_target != coupling_id
+                ) or self.current_mode() != "server":
+                    return SyncOutcome(ok=False, mode=self.current_mode(), cancelled=True)
                 upserts_applied = 0
                 tombs_applied = 0
                 changed = False
                 if not pull_res.not_modified:
                     upserts_applied, tombs_applied, changed = self._reconcile_pull(
                         pull_res,
-                        state,
+                        live_state,
                         target=coupling_id,
                         full_snapshot=full_snapshot,
                     )
-
-                state.target_snapshots[coupling_id] = self._snapshot_from_state(state)
-                self.state_store.save(state)
+                live_state.target_snapshots[coupling_id] = self._snapshot_from_state(live_state)
+                self.state_store.save(live_state)
                 return SyncOutcome(
                     ok=True,
                     mode=mode,
-                    library_rev=state.library_rev,
+                    library_rev=live_state.library_rev,
                     pulled_upserts=upserts_applied,
                     pulled_tombstones=tombs_applied,
                     pushed_count=pushed_count,
                     pending_queue_count=self.get_pending_count(target=coupling_id),
-                    conflict_count=len(state.conflicts),
+                    conflict_count=len(live_state.conflicts),
                     storage_changed=changed,
                 )
-            except SyncError as exc:
-                state.target_snapshots[coupling_id] = self._snapshot_from_state(state)
-                self.state_store.save(state)
-                return SyncOutcome(
-                    ok=False,
-                    mode=mode,
-                    library_rev=state.library_rev,
-                    pending_queue_count=self.get_pending_count(target=coupling_id),
-                    conflict_count=len(state.conflicts),
-                    error=str(exc),
-                )
+        except SyncError as exc:
+            return self._record_sync_error_outcome(
+                mode=mode,
+                coupling_id=coupling_id,
+                error_msg=str(exc),
+            )
 
     def flush_pending(self, *, timeout: float = 2.0) -> PushResult:
-        """Best-effort push of pending queue mutations for the active target (used on quit)."""
+        """Best-effort push of pending queue mutations for the active target without holding locks across I/O."""
         if self.current_mode() != "server" or not self.is_configured():
             return PushResult()
-        coupling_id = self.target_coupling_id()
-        state = self.state_store.load()
-        if state.active_target and state.active_target != coupling_id:
-            # Target changed without syncing yet; never send old target's queue to new target.
-            pending = self.queue.load_all(target=coupling_id)
-        else:
-            pending = self.queue.load_all(target=coupling_id)
-        if not pending:
-            return PushResult()
-        with self._engine_lock:
+        with self._engine_lock, self._state_lock:
+            coupling_id = self.target_coupling_id()
             state = self.state_store.load()
+            pending = self.queue.load_all(target=coupling_id)
+            if not pending:
+                return PushResult()
             try:
                 backend = self.build_backend(client_id=state.client_id)
                 assert isinstance(backend, ServerBackend)
-                pushed_count, offline, err = self._push_pending_queue(
-                    backend,
-                    state,
-                    target=coupling_id,
-                    timeout=timeout,
-                )
-                state.target_snapshots[coupling_id] = self._snapshot_from_state(state)
-                self.state_store.save(state)
-                return PushResult(
-                    applied_revs={} if pushed_count == 0 else {"_count": pushed_count},
-                    conflicts=list(state.conflicts),
-                    queued_offline=offline,
-                    library_rev=state.library_rev,
-                    error=err,
-                )
             except SyncError as exc:
                 return PushResult(queued_offline=True, error=str(exc))
+
+        try:
+            push_res = backend.push(pending, timeout=timeout)
+        except SyncError as exc:
+            return PushResult(queued_offline=True, error=str(exc))
+
+        if push_res.queued_offline:
+            return push_res
+
+        with self._engine_lock, self._state_lock:
+            live_state = self.state_store.load()
+            target_switched = bool(
+                live_state.active_target and live_state.active_target != coupling_id
+            )
+            pushed_count = self._apply_push_result(
+                pending,
+                push_res,
+                live_state,
+                target=coupling_id,
+                target_switched=target_switched,
+            )
+            if not target_switched:
+                live_state.target_snapshots[coupling_id] = self._snapshot_from_state(live_state)
+            self.state_store.save(live_state)
+            return PushResult(
+                applied_revs={} if pushed_count == 0 else {"_count": pushed_count},
+                conflicts=list(live_state.conflicts),
+                queued_offline=False,
+                library_rev=live_state.library_rev,
+                error=push_res.error,
+            )
 
     def resolve_conflict(
         self,
@@ -2283,10 +2503,14 @@ class SyncEngine:
         kind: str = DEFAULT_KIND,
         copy_suffix: str = "LOCAL COPY",
     ) -> Optional[LibraryItem]:
-        """Resolve a recorded three-way conflict and synchronize the chosen outcome."""
-        with self._engine_lock:
+        """Resolve a recorded three-way conflict atomically under ``storage._lock``, then push unlocked."""
+        pending_to_push: List[SyncMutation] = []
+        backend: Optional[SyncBackend] = None
+        eff_target: Optional[str] = None
+
+        with self._engine_lock, self.storage._lock, self._state_lock:
             state = self.state_store.load()
-            eff_target = state.active_target or self._effective_queue_target()
+            eff_target = state.active_target or self._effective_queue_target(state)
             target_key = make_object_key(kind, item_id)
             conflict = next((c for c in state.conflicts if c.object_key == target_key), None)
             if conflict is None:
@@ -2294,10 +2518,11 @@ class SyncEngine:
 
             state.conflicts = [c for c in state.conflicts if c.object_key != target_key]
             created_copy: Optional[LibraryItem] = None
+            items = self.storage.load_items()
 
             if resolution == "keep_local":
                 if conflict.local_op == "delete" or conflict.local_item is None:
-                    self.storage.delete_item(conflict.id)
+                    items = [it for it in items if it.id != conflict.id]
                     self.queue.remove_keys({target_key}, target=eff_target)
                     if conflict.server_rev > 0 and not conflict.server_deleted:
                         self.queue.enqueue_delete(
@@ -2312,7 +2537,7 @@ class SyncEngine:
                 else:
                     local_obj = item_from_dict(conflict.local_item)
                     local_obj.updated_at = now_iso()
-                    self.storage.upsert_item(local_obj)
+                    self._upsert_in_item_list(items, local_obj)
                     state.item_revs[target_key] = conflict.server_rev
                     self.queue.remove_keys({target_key}, target=eff_target)
                     self.queue.enqueue_upsert(
@@ -2326,12 +2551,12 @@ class SyncEngine:
                 # 1) Apply canonical server version to the original ID.
                 self.queue.remove_keys({target_key}, target=eff_target)
                 if conflict.server_deleted or conflict.server_item is None:
-                    self.storage.delete_item(conflict.id)
+                    items = [it for it in items if it.id != conflict.id]
                     state.item_revs.pop(target_key, None)
                     state.item_hashes.pop(target_key, None)
                 else:
                     srv_obj = item_from_dict(conflict.server_item)
-                    self.storage.upsert_item(srv_obj)
+                    self._upsert_in_item_list(items, srv_obj)
                     state.item_revs[target_key] = conflict.server_rev
                     state.item_hashes[target_key] = canonical_item_hash(item_to_dict(srv_obj))
 
@@ -2350,7 +2575,7 @@ class SyncEngine:
                         created_at=ts,
                         updated_at=ts,
                     )
-                    self.storage.upsert_item(created_copy)
+                    self._upsert_in_item_list(items, created_copy)
                     self.queue.enqueue_upsert(
                         created_copy,
                         known_base_rev=0,
@@ -2361,32 +2586,56 @@ class SyncEngine:
             elif resolution == "take_server":
                 self.queue.remove_keys({target_key}, target=eff_target)
                 if conflict.server_deleted or conflict.server_item is None:
-                    self.storage.delete_item(conflict.id)
+                    items = [it for it in items if it.id != conflict.id]
                     state.item_revs.pop(target_key, None)
                     state.item_hashes.pop(target_key, None)
                 else:
                     srv_obj = item_from_dict(conflict.server_item)
-                    self.storage.upsert_item(srv_obj)
+                    self._upsert_in_item_list(items, srv_obj)
                     state.item_revs[target_key] = conflict.server_rev
                     state.item_hashes[target_key] = canonical_item_hash(item_to_dict(srv_obj))
             else:
                 raise ValueError(f"Unsupported conflict resolution '{resolution}'.")
 
+            self.storage.save_items(items)
             if eff_target:
                 state.target_snapshots[eff_target] = self._snapshot_from_state(state)
             self.state_store.save(state)
+
             if (
-                self.current_mode() == "server"
+                eff_target
+                and self.current_mode() == "server"
                 and self.is_configured()
                 and eff_target == self.target_coupling_id()
-                and self.queue.load_all(target=eff_target)
             ):
-                try:
-                    backend = self.build_backend(client_id=state.client_id)
-                    assert isinstance(backend, ServerBackend)
-                    self._push_pending_queue(backend, state, target=eff_target)
-                    state.target_snapshots[eff_target] = self._snapshot_from_state(state)
-                    self.state_store.save(state)
-                except SyncError:
-                    pass
-            return created_copy
+                pending_to_push = self.queue.load_all(target=eff_target)
+                if pending_to_push:
+                    try:
+                        backend = self.build_backend(client_id=state.client_id)
+                    except SyncError:
+                        backend = None
+
+        if pending_to_push and isinstance(backend, ServerBackend) and eff_target:
+            try:
+                push_res = backend.push(pending_to_push)
+                if not push_res.queued_offline:
+                    with self._engine_lock, self._state_lock:
+                        live_state = self.state_store.load()
+                        target_switched = bool(
+                            live_state.active_target and live_state.active_target != eff_target
+                        )
+                        self._apply_push_result(
+                            pending_to_push,
+                            push_res,
+                            live_state,
+                            target=eff_target,
+                            target_switched=target_switched,
+                        )
+                        if not target_switched:
+                            live_state.target_snapshots[eff_target] = self._snapshot_from_state(
+                                live_state
+                            )
+                        self.state_store.save(live_state)
+            except SyncError:
+                pass
+        return created_copy

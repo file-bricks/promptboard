@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any, Callable, List, Optional
 
@@ -138,7 +139,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._sync_rerun_requested = False
         self._sync_rerun_interactive = False
         self._sync_thread_pool = QtCore.QThreadPool()
-        self._sync_thread_pool.setMaxThreadCount(2)
+        self._sync_thread_pool.setMaxThreadCount(4)
         self._active_sync_runnables: set[_SyncTaskRunnable] = set()
         self.tray_icon: Optional[QtWidgets.QSystemTrayIcon] = None
         self.tray_menu: Optional[QtWidgets.QMenu] = None
@@ -1176,14 +1177,14 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         for item in items:
             self.sync_engine.enqueue_upsert(item)
-        if self.sync_engine.is_configured():
+        if self.sync_engine.is_configured() and not self._shutting_down:
             self.sync_debounce_timer.start()
 
     def _notify_local_delete(self, item_id: str) -> None:
         if self.settings.get_sync_mode() != "server":
             return
         self.sync_engine.enqueue_delete(item_id)
-        if self.sync_engine.is_configured():
+        if self.sync_engine.is_configured() and not self._shutting_down:
             self.sync_debounce_timer.start()
 
     def _on_sync_debounce_timeout(self) -> None:
@@ -1418,6 +1419,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """Idempotent shutdown handler: save pending edits, stop timers, bounded flush once."""
         if self._quit_sync_done:
             return
+        quit_deadline = time.monotonic() + self.QUIT_FLUSH_MAX_WAIT_S
         self._quit_sync_done = True
         self._shutting_down = True
         self.sync_debounce_timer.stop()
@@ -1428,11 +1430,16 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.sync_engine.get_pending_count() <= 0:
             return
         self._sync_thread_pool.clear()
+        remaining = quit_deadline - time.monotonic()
+        if remaining <= 0.05:
+            return
+        http_timeout = min(self.QUIT_FLUSH_HTTP_TIMEOUT_S, max(0.2, remaining - 0.2))
         flush_task = _SyncTaskRunnable(
-            lambda: self.sync_engine.flush_pending(timeout=self.QUIT_FLUSH_HTTP_TIMEOUT_S)
+            lambda: self.sync_engine.flush_pending(timeout=http_timeout)
         )
         self._sync_thread_pool.start(flush_task)
-        flush_task.done_event.wait(timeout=self.QUIT_FLUSH_MAX_WAIT_S)
+        wait_budget = max(0.0, quit_deadline - time.monotonic() - 0.05)
+        flush_task.done_event.wait(timeout=wait_budget)
 
     # ------------------------------------------------------------ misc
 

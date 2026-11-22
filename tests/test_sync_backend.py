@@ -1242,3 +1242,591 @@ def test_about_to_quit_signal_fires_twice_guard_and_offline_queue_atomic_crash(
     monkeypatch.setattr(storage_mod, "_atomic_replace_with_retry", real_replace)
     queue.enqueue_upsert(second_item, known_base_rev=0)
     assert [m.id for m in OfflineQueue(q_dir).load_all()] == ["safe-1", "crash-2"]
+
+
+# ---------------------------------------------------------------------------
+# Stage 1b review round 2 regressions (B1 lost update & B2 GUI freeze)
+# ---------------------------------------------------------------------------
+
+
+def _run_concurrent_upsert_in_storage_window(
+    storage: Storage,
+    user_item: LibraryItem,
+    run_target_op,
+    *,
+    arm_event: Optional[threading.Event] = None,
+    upsert_done_event: Optional[threading.Event] = None,
+) -> Dict[str, bool]:
+    """Deterministically trigger ``storage.upsert_item(user_item)`` on a 2nd thread inside ``load_items..save_items``.
+
+    Uses pure ``threading.Event`` synchronisation (zero ``time.sleep`` calls):
+    - When the target operation calls ``load_items()`` (once ``arm_event`` is set, if given),
+      ``window_entered`` wakes Thread 2.
+    - Thread 2 probes ``storage._lock.acquire(blocking=False)`` to verify ``Storage._lock`` is
+      held by Thread 1, signals ``probe_ready`` so Thread 1 can proceed to ``save_items()``,
+      and immediately executes ``storage.upsert_item(user_item)``.
+    - If ``Storage._lock`` were NOT held, Thread 2 would complete ``upsert_item`` before
+      signalling ``probe_ready``, causing Thread 1's subsequent ``save_items()`` to overwrite it.
+    """
+    window_entered = threading.Event()
+    probe_ready = threading.Event()
+    in_window = threading.Event()
+    save_finished = threading.Event()
+    observations = {
+        "window_hit": False,
+        "lock_held_in_window": False,
+    }
+
+    orig_load = storage.load_items
+    orig_save = storage.save_items
+    worker_tid_box: Dict[str, Optional[int]] = {"tid": None}
+
+    def hooked_load_items():
+        items = orig_load()
+        if (
+            threading.get_ident() == worker_tid_box["tid"]
+            and (arm_event is None or arm_event.is_set())
+            and not window_entered.is_set()
+        ):
+            observations["window_hit"] = True
+            in_window.set()
+            window_entered.set()
+            assert probe_ready.wait(timeout=5.0), "Timed out waiting for concurrent upsert thread"
+        return items
+
+    def hooked_save_items(items):
+        try:
+            return orig_save(items)
+        finally:
+            if threading.get_ident() == worker_tid_box["tid"] and window_entered.is_set():
+                in_window.clear()
+                save_finished.set()
+
+    storage.load_items = hooked_load_items  # type: ignore[method-assign]
+    storage.save_items = hooked_save_items  # type: ignore[method-assign]
+
+    errors: List[BaseException] = []
+
+    def thread1_main():
+        worker_tid_box["tid"] = threading.get_ident()
+        try:
+            run_target_op()
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+            window_entered.set()
+
+    def thread2_concurrent_gui_save():
+        try:
+            assert window_entered.wait(timeout=5.0), "Target load_items..save_items window never opened"
+            if errors:
+                probe_ready.set()
+                return
+            can_steal = storage._lock.acquire(blocking=False)
+            if can_steal:
+                storage._lock.release()
+                storage.upsert_item(user_item)
+                if upsert_done_event is not None:
+                    upsert_done_event.set()
+                probe_ready.set()
+            else:
+                observations["lock_held_in_window"] = True
+                probe_ready.set()
+                storage.upsert_item(user_item)
+                if upsert_done_event is not None:
+                    upsert_done_event.set()
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+            if upsert_done_event is not None:
+                upsert_done_event.set()
+            probe_ready.set()
+
+    try:
+        t1 = threading.Thread(target=thread1_main)
+        t2 = threading.Thread(target=thread2_concurrent_gui_save)
+        t1.start()
+        t2.start()
+        t1.join(timeout=5.0)
+        t2.join(timeout=5.0)
+        assert not t1.is_alive(), "Thread 1 deadlocked"
+        assert not t2.is_alive(), "Thread 2 deadlocked"
+        if errors:
+            raise errors[0]
+        observations["in_window_cleared"] = not in_window.is_set()
+        observations["save_finished"] = save_finished.is_set()
+        return observations
+    finally:
+        storage.load_items = orig_load  # type: ignore[method-assign]
+        storage.save_items = orig_save  # type: ignore[method-assign]
+
+
+def test_b1_reconcile_pull_holds_storage_lock_and_preserves_concurrent_upsert(tmp_path):
+    """B1 path 1 (_reconcile_pull): concurrent GUI upsert_item inside load..save survives; no I/O under lock."""
+    pull_fetched = threading.Event()
+    network_under_storage_lock = {"violation": False}
+    settings_holder: Dict[str, Storage] = {}
+
+    def probe_lock_held_from_other_thread(storage_obj: Storage) -> bool:
+        held = {"value": False}
+
+        def _check():
+            if storage_obj._lock.acquire(blocking=False):
+                storage_obj._lock.release()
+            else:
+                held["value"] = True
+
+        probe_t = threading.Thread(target=_check)
+        probe_t.start()
+        probe_t.join(timeout=2.0)
+        return held["value"]
+
+    step = {"phase": "couple"}
+
+    def fake_requester(method: str, url: str, headers: Dict[str, str], body: Optional[bytes], timeout: float):
+        st_obj = settings_holder["storage"]
+        if probe_lock_held_from_other_thread(st_obj):
+            network_under_storage_lock["violation"] = True
+
+        if step["phase"] == "couple":
+            if method == "GET":
+                return 200, {"etag": '"rev-1"'}, json.dumps(
+                    {
+                        "namespace": "promptboard",
+                        "library_rev": 1,
+                        "items": [
+                            {
+                                "id": "seed-1",
+                                "kind": "item",
+                                "rev": 1,
+                                "updated_at": "2026-11-22T12:00:00Z",
+                                "payload": {
+                                    "id": "seed-1",
+                                    "item_type": "PROMPT",
+                                    "name": "SEED",
+                                    "content": "Initial",
+                                },
+                            }
+                        ],
+                        "tombstones": [],
+                    }
+                ).encode("utf-8")
+            raise AssertionError(f"Unexpected request during coupling: {method} {url}")
+
+        if method == "GET" and "/changes?since_rev=1" in url:
+            pull_fetched.set()
+            return 200, {"etag": '"rev-2"'}, json.dumps(
+                {
+                    "namespace": "promptboard",
+                    "library_rev": 2,
+                    "items": [
+                        {
+                            "id": "remote-new",
+                            "kind": "item",
+                            "rev": 2,
+                            "updated_at": "2026-11-22T12:05:00Z",
+                            "payload": {
+                                "id": "remote-new",
+                                "item_type": "SKILL",
+                                "name": "REMOTE SKILL",
+                                "content": "From server rev 2",
+                            },
+                        }
+                    ],
+                    "tombstones": [],
+                }
+            ).encode("utf-8")
+        raise AssertionError(f"Unexpected request: {method} {url}")
+
+    settings, storage = _make_settings_and_storage(
+        tmp_path,
+        mode="server",
+        server_url="http://127.0.0.1:8765",
+        token="pss_b1_reconcile",
+    )
+    settings_holder["storage"] = storage
+    engine = SyncEngine(storage, settings, requester=fake_requester)
+    assert engine.sync_once().ok is True
+
+    step["phase"] = "steady_pull"
+    gui_saved = LibraryItem(
+        id="gui-concurrent-reconcile",
+        item_type=ItemType.PROMPT,
+        name="GUI CONCURRENT",
+        content="Must survive _reconcile_pull",
+    )
+    outcomes: List[Any] = []
+    obs = _run_concurrent_upsert_in_storage_window(
+        storage,
+        gui_saved,
+        lambda: outcomes.append(engine.sync_once()),
+        arm_event=pull_fetched,
+    )
+
+    assert obs["window_hit"] is True
+    assert obs["lock_held_in_window"] is True
+    assert obs["save_finished"] is True
+    assert network_under_storage_lock["violation"] is False
+    assert outcomes and outcomes[0].ok is True
+    assert storage.get_item("remote-new") is not None
+    surviving = storage.get_item("gui-concurrent-reconcile")
+    assert surviving is not None
+    assert surviving.content == "Must survive _reconcile_pull"
+
+
+def test_b1_take_server_holds_storage_lock_and_preserves_concurrent_upsert(tmp_path):
+    """B1 path 2 (take_server): concurrent GUI upsert_item inside load..save survives; no I/O under lock."""
+    pull_fetched = threading.Event()
+    network_under_storage_lock = {"violation": False}
+    storage_ref: Dict[str, Storage] = {}
+
+    def fake_requester(method: str, url: str, headers: Dict[str, str], body: Optional[bytes], timeout: float):
+        st_obj = storage_ref["storage"]
+
+        def _check_lock():
+            if st_obj._lock.acquire(blocking=False):
+                st_obj._lock.release()
+            else:
+                network_under_storage_lock["violation"] = True
+
+        probe = threading.Thread(target=_check_lock)
+        probe.start()
+        probe.join(timeout=2.0)
+
+        assert method == "GET"
+        pull_fetched.set()
+        return 200, {"etag": '"rev-3"'}, json.dumps(
+            {
+                "namespace": "promptboard",
+                "library_rev": 3,
+                "items": [
+                    {
+                        "id": "srv-adopted",
+                        "kind": "item",
+                        "rev": 3,
+                        "updated_at": "2026-11-22T13:00:00Z",
+                        "payload": {
+                            "id": "srv-adopted",
+                            "item_type": "PROMPT",
+                            "name": "ADOPTED",
+                            "content": "Canonical server item",
+                        },
+                    }
+                ],
+                "tombstones": [],
+            }
+        ).encode("utf-8")
+
+    settings, storage = _make_settings_and_storage(
+        tmp_path,
+        mode="server",
+        server_url="http://127.0.0.1:8765",
+        token="pss_b1_take_server",
+    )
+    storage_ref["storage"] = storage
+    pre_existing = LibraryItem(
+        id="pre-local-only",
+        item_type=ItemType.AGENT,
+        name="PRE LOCAL",
+        content="Backed up before take_server",
+    )
+    storage.upsert_item(pre_existing)
+    engine = SyncEngine(storage, settings, requester=fake_requester)
+
+    gui_saved = LibraryItem(
+        id="gui-concurrent-take-server",
+        item_type=ItemType.PROMPT,
+        name="LIVE GUI EDIT",
+        content="Must survive take_server window",
+    )
+    outcomes: List[Any] = []
+    obs = _run_concurrent_upsert_in_storage_window(
+        storage,
+        gui_saved,
+        lambda: outcomes.append(engine.sync_once(first_coupling_choice="take_server")),
+        arm_event=pull_fetched,
+    )
+
+    assert obs["window_hit"] is True
+    assert obs["lock_held_in_window"] is True
+    assert obs["save_finished"] is True
+    assert network_under_storage_lock["violation"] is False
+    assert outcomes and outcomes[0].ok is True
+
+    backups = list(storage.data_dir.glob("library.backup-*.json"))
+    assert len(backups) == 1
+    backup_ids = {entry["id"] for entry in json.loads(backups[0].read_text(encoding="utf-8"))["items"]}
+    assert "pre-local-only" in backup_ids
+
+    assert storage.get_item("srv-adopted") is not None
+    surviving = storage.get_item("gui-concurrent-take-server")
+    assert surviving is not None
+    assert surviving.content == "Must survive take_server window"
+
+
+@pytest.mark.parametrize("resolution", ["keep_copy", "keep_local", "take_server"])
+def test_b1_resolve_conflict_holds_storage_lock_and_preserves_concurrent_upsert(
+    tmp_path, resolution
+):
+    """B1 path 3 (resolve_conflict): concurrent upsert_item inside load..save survives; push runs unlocked."""
+    network_under_storage_lock = {"violation": False}
+    upsert_completed = threading.Event()
+    push_count = {"n": 0}
+    storage_ref: Dict[str, Storage] = {}
+
+    def fake_requester(method: str, url: str, headers: Dict[str, str], body: Optional[bytes], timeout: float):
+        st_obj = storage_ref["storage"]
+        # While Thread 1 is paused here inside HTTP push, Thread 2 must be able to acquire
+        # Storage._lock and finish upsert_item (which would deadlock if Thread 1 still held it).
+        if not upsert_completed.wait(timeout=2.0):
+            network_under_storage_lock["violation"] = True
+        else:
+            def _check_lock():
+                if st_obj._lock.acquire(blocking=False):
+                    st_obj._lock.release()
+                else:
+                    network_under_storage_lock["violation"] = True
+
+            probe = threading.Thread(target=_check_lock)
+            probe.start()
+            probe.join(timeout=2.0)
+
+        assert method == "POST" and url.endswith("/push")
+        push_count["n"] += 1
+        doc = json.loads(body.decode("utf-8"))
+        return 200, {"etag": '"rev-5"'}, json.dumps(
+            {
+                "namespace": "promptboard",
+                "library_rev": 5,
+                "applied": [
+                    {"id": m["id"], "kind": m["kind"], "op": m["op"], "rev": 5}
+                    for m in doc["mutations"]
+                ],
+                "conflicts": [],
+            }
+        ).encode("utf-8")
+
+    settings, storage = _make_settings_and_storage(
+        tmp_path,
+        mode="server",
+        server_url="http://127.0.0.1:8765",
+        token="pss_b1_resolve",
+    )
+    storage_ref["storage"] = storage
+    local_conflict_item = LibraryItem(
+        id="conf-item",
+        item_type=ItemType.PROMPT,
+        name="CONFLICTED",
+        content="Local conflict draft",
+    )
+    server_conflict_item = LibraryItem(
+        id="conf-item",
+        item_type=ItemType.PROMPT,
+        name="CONFLICTED",
+        content="Server conflict version",
+    )
+    storage.upsert_item(local_conflict_item)
+
+    engine = SyncEngine(storage, settings, requester=fake_requester)
+    target_id = engine.target_coupling_id()
+    state = engine.state_store.load()
+    state.active_target = target_id
+    state.coupled_targets = [target_id]
+    state.library_rev = 4
+    from sync_backend import ConflictEntry
+    from models import item_to_dict
+
+    state.conflicts = [
+        ConflictEntry(
+            id="conf-item",
+            kind="item",
+            title="CONFLICTED",
+            source="server",
+            client_base_rev=1,
+            server_rev=4,
+            updated_at="2026-11-22T14:00:00Z",
+            local_op="upsert",
+            local_item=item_to_dict(local_conflict_item),
+            server_item=item_to_dict(server_conflict_item),
+            server_deleted=False,
+        )
+    ]
+    engine.state_store.save(state)
+
+    gui_saved = LibraryItem(
+        id=f"gui-concurrent-{resolution}",
+        item_type=ItemType.WORKFLOW,
+        name="CONCURRENT WORKFLOW",
+        content=f"Must survive resolve_conflict({resolution})",
+    )
+    resolved_copy: List[Optional[LibraryItem]] = []
+    obs = _run_concurrent_upsert_in_storage_window(
+        storage,
+        gui_saved,
+        lambda: resolved_copy.append(engine.resolve_conflict("conf-item", resolution)),
+        upsert_done_event=upsert_completed,
+    )
+
+    assert obs["window_hit"] is True
+    assert obs["lock_held_in_window"] is True
+    assert obs["save_finished"] is True
+    assert network_under_storage_lock["violation"] is False
+    assert engine.get_conflicts() == []
+
+    surviving = storage.get_item(gui_saved.id)
+    assert surviving is not None
+    assert surviving.content == f"Must survive resolve_conflict({resolution})"
+
+    resolved_main = storage.get_item("conf-item")
+    assert resolved_main is not None
+    if resolution == "keep_local":
+        assert resolved_main.content == "Local conflict draft"
+        assert push_count["n"] == 1
+    elif resolution == "keep_copy":
+        assert resolved_main.content == "Server conflict version"
+        assert resolved_copy[0] is not None
+        assert storage.get_item(resolved_copy[0].id) is not None
+        assert push_count["n"] == 1
+    else:
+        assert resolved_main.content == "Server conflict version"
+
+
+def test_b2_hanging_server_never_blocks_enqueue_target_change_or_bounded_quit(qapp, tmp_path):
+    """B2: While a sync request hangs on 127.0.0.1, enqueue_*, target change (<1s) and quit (<=2.5s) stay fast."""
+    first_request_hanging = threading.Event()
+    release_server_hang = threading.Event()
+
+    class NeverAnsweringHandler(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            first_request_hanging.set()
+            release_server_hang.wait(timeout=15.0)
+            try:
+                self.send_response(503)
+                self.end_headers()
+            except OSError:
+                pass
+
+        def do_POST(self):  # noqa: N802
+            length = int(self.headers.get("Content-Length", "0") or 0)
+            if length > 0:
+                self.rfile.read(length)
+            first_request_hanging.set()
+            release_server_hang.wait(timeout=15.0)
+            try:
+                self.send_response(503)
+                self.end_headers()
+            except OSError:
+                pass
+
+        def log_message(self, format, *args):  # noqa: A002
+            return
+
+    hanging_srv = ThreadingHTTPServer(("127.0.0.1", 0), NeverAnsweringHandler)
+    srv_thread = threading.Thread(target=hanging_srv.serve_forever, daemon=True)
+    srv_thread.start()
+    hanging_url = f"http://127.0.0.1:{hanging_srv.server_address[1]}"
+
+    try:
+        settings, storage = _make_settings_and_storage(
+            tmp_path,
+            mode="server",
+            server_url=hanging_url,
+            token="pss_hanging_token",
+            namespace="ns_primary",
+        )
+        seed_delete = LibraryItem(
+            id="to-delete",
+            item_type=ItemType.PROMPT,
+            name="DELETE ME",
+            content="Seeded item",
+        )
+        storage.upsert_item(seed_delete)
+        engine = SyncEngine(storage, settings)
+        primary_target = format_coupling_target(hanging_url, "ns_primary")
+        secondary_target = format_coupling_target(hanging_url, "ns_secondary")
+        init_state = engine.state_store.load()
+        init_state.active_target = primary_target
+        init_state.coupled_targets = [primary_target]
+        init_state.item_revs[make_object_key("item", "to-delete")] = 1
+        engine.state_store.save(init_state)
+
+        window = MainWindow(storage, settings, sync_engine=engine)
+        try:
+            # Start background sync_once() which hangs inside HTTP GET (10 s timeout).
+            assert window.sync_on_start(interactive=False) is None
+            assert first_request_hanging.wait(timeout=2.0), "Background sync request did not start"
+
+            # 1) enqueue_upsert must return in < 1 s while sync_once is hanging in I/O.
+            up_item = LibraryItem(
+                id="fast-upsert",
+                item_type=ItemType.PROMPT,
+                name="FAST UPSERT",
+                content="No freeze on save",
+            )
+            t0 = time.perf_counter()
+            engine.enqueue_upsert(up_item)
+            upsert_elapsed = time.perf_counter() - t0
+            assert upsert_elapsed < 1.0
+
+            # 2) enqueue_delete must return in < 1 s while sync_once is hanging in I/O.
+            t0 = time.perf_counter()
+            engine.enqueue_delete("to-delete")
+            delete_elapsed = time.perf_counter() - t0
+            assert delete_elapsed < 1.0
+            assert engine.get_pending_count(target=primary_target) == 2
+
+            # 3) inspect_pending_target_change & apply_target_change must each return in < 1 s.
+            t0 = time.perf_counter()
+            pending_info = engine.inspect_pending_target_change(
+                new_url=hanging_url,
+                new_namespace="ns_secondary",
+            )
+            inspect_elapsed = time.perf_counter() - t0
+            assert inspect_elapsed < 1.0
+            assert pending_info == (primary_target, secondary_target, 2)
+
+            t0 = time.perf_counter()
+            engine.apply_target_change("keep", new_target=secondary_target)
+            apply_elapsed = time.perf_counter() - t0
+            assert apply_elapsed < 1.0
+            assert engine.get_pending_count(target=primary_target) == 2
+            assert engine.get_pending_count(target=secondary_target) == 0
+
+            # Switch back to primary_target via SettingsDialog UI while request is still hanging.
+            dlg = SettingsDialog(
+                settings,
+                sync_engine=engine,
+                on_target_queue_change=lambda *_args: "keep",
+            )
+            try:
+                t0 = time.perf_counter()
+                dlg.sync_namespace_edit.setText("ns_primary")
+                dlg._persist_sync_fields()
+                dlg_elapsed = time.perf_counter() - t0
+                assert dlg_elapsed < 1.0
+            finally:
+                dlg.close()
+
+            # 4) Quit path with a dirty GUI item + hanging request must finish within the 2.5 s bound.
+            window.create_item()
+            dirty_id = window.current_item_id
+            assert dirty_id is not None
+            window.content_edit.setPlainText("Dirty editor text saved on quit")
+            assert window._dirty is True
+
+            t_quit = time.perf_counter()
+            window.on_about_to_quit()
+            quit_elapsed = time.perf_counter() - t_quit
+            assert quit_elapsed <= window.QUIT_FLUSH_MAX_WAIT_S + 0.15
+            assert quit_elapsed <= 2.5
+            saved_on_quit = storage.get_item(dirty_id)
+            assert saved_on_quit is not None
+            assert saved_on_quit.content == "Dirty editor text saved on quit"
+            assert engine.get_pending_count(target=primary_target) >= 3
+        finally:
+            release_server_hang.set()
+            window._sync_thread_pool.waitForDone(2000)
+            window.close()
+    finally:
+        release_server_hang.set()
+        hanging_srv.shutdown()
+        hanging_srv.server_close()
+        srv_thread.join(timeout=2.0)
