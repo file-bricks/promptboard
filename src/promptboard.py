@@ -85,34 +85,44 @@ class _SyncWorkerSignals(QtCore.QObject):
 class _SyncTaskRunnable(QtCore.QRunnable):
     """Executes sync network I/O in QThreadPool and delivers results back via Qt signals."""
 
-    def __init__(self, fn: Callable[[], Any]) -> None:
+    def __init__(
+        self,
+        fn: Callable[[], Any],
+        *,
+        cancel_event: Optional[threading.Event] = None,
+    ) -> None:
         super().__init__()
         self.setAutoDelete(True)
         self.signals = _SyncWorkerSignals()
         self._fn = fn
+        self._cancel_event = cancel_event
         self.done_event = threading.Event()
         self.result: Any = None
         self.error: Optional[BaseException] = None
 
     def run(self) -> None:
+        if self._cancel_event is not None and self._cancel_event.is_set():
+            self.done_event.set()
+            return
         try:
             self.result = self._fn()
         except BaseException as exc:  # noqa: BLE001
             self.error = exc
         finally:
             self.done_event.set()
-            try:
-                if self.error is not None:
-                    self.signals.finished.emit(self.error)
-                else:
-                    self.signals.finished.emit(self.result)
-            except RuntimeError:
-                pass
+            if self._cancel_event is None or not self._cancel_event.is_set():
+                try:
+                    if self.error is not None:
+                        self.signals.finished.emit(self.error)
+                    else:
+                        self.signals.finished.emit(self.result)
+                except RuntimeError:
+                    pass
 
 
 class MainWindow(QtWidgets.QMainWindow):
     SYNC_DEBOUNCE_MS = 3000
-    QUIT_FLUSH_HTTP_TIMEOUT_S = 2.0
+    QUIT_FLUSH_HTTP_TIMEOUT_S = 0.8
     QUIT_FLUSH_MAX_WAIT_S = 2.5
 
     sync_finished = QtCore.Signal(object)
@@ -1240,6 +1250,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.sync_engine,
             parent=self,
             on_resolved=self._refresh_after_sync_change,
+            on_push_requested=lambda: self.start_sync(interactive=False),
         )
         dlg.exec()
 
@@ -1258,7 +1269,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 first_coupling_choice=first_coupling_choice,
                 defer_target_change_prompt=interactive and target_change_choice is None,
                 target_change_choice=target_change_choice,
-            )
+            ),
+            cancel_event=self.sync_engine.cancel_event,
         )
         self._active_sync_runnables.add(runnable)
         runnable.signals.finished.connect(
@@ -1416,30 +1428,47 @@ class MainWindow(QtWidgets.QMainWindow):
         return True
 
     def on_about_to_quit(self) -> None:
-        """Idempotent shutdown handler: save pending edits, stop timers, bounded flush once."""
+        """Idempotent shutdown handler: cancel running sync, flush bounded once, drain worker pool."""
         if self._quit_sync_done:
             return
         quit_deadline = time.monotonic() + self.QUIT_FLUSH_MAX_WAIT_S
         self._quit_sync_done = True
         self._shutting_down = True
+        self._sync_rerun_requested = False
+        self._sync_rerun_interactive = False
         self.sync_debounce_timer.stop()
         self.sync_interval_timer.stop()
         self.save_current_item()
-        if self.settings.get_sync_mode() != "server" or not self.sync_engine.is_configured():
-            return
-        if self.sync_engine.get_pending_count() <= 0:
-            return
+
+        self.sync_engine.begin_shutdown(request_timeout=self.QUIT_FLUSH_HTTP_TIMEOUT_S)
         self._sync_thread_pool.clear()
-        remaining = quit_deadline - time.monotonic()
-        if remaining <= 0.05:
-            return
-        http_timeout = min(self.QUIT_FLUSH_HTTP_TIMEOUT_S, max(0.2, remaining - 0.2))
-        flush_task = _SyncTaskRunnable(
-            lambda: self.sync_engine.flush_pending(timeout=http_timeout)
-        )
-        self._sync_thread_pool.start(flush_task)
-        wait_budget = max(0.0, quit_deadline - time.monotonic() - 0.05)
-        flush_task.done_event.wait(timeout=wait_budget)
+
+        try:
+            if (
+                self.settings.get_sync_mode() == "server"
+                and self.sync_engine.is_configured()
+                and self.sync_engine.get_pending_count() > 0
+            ):
+                remaining = quit_deadline - time.monotonic()
+                if remaining > 0.25:
+                    http_timeout = min(
+                        self.QUIT_FLUSH_HTTP_TIMEOUT_S,
+                        max(0.2, remaining - 0.35),
+                    )
+                    flush_task = _SyncTaskRunnable(
+                        lambda: self.sync_engine.flush_pending(timeout=http_timeout)
+                    )
+                    self._sync_thread_pool.start(flush_task)
+                    flush_wait = min(
+                        http_timeout + 0.2,
+                        max(0.0, quit_deadline - time.monotonic() - 0.15),
+                    )
+                    flush_task.done_event.wait(timeout=flush_wait)
+        finally:
+            self.sync_engine.abort_active_requests()
+            self._sync_thread_pool.clear()
+            pool_wait_ms = max(1, int((quit_deadline - time.monotonic() - 0.02) * 1000))
+            self._sync_thread_pool.waitForDone(pool_wait_ms)
 
     # ------------------------------------------------------------ misc
 
@@ -1546,7 +1575,10 @@ def main() -> int:
     window.show()
     window.maybe_show_onboarding()
     window.sync_on_start(interactive=True)
-    return app.exec()
+    try:
+        return app.exec()
+    finally:
+        window.on_about_to_quit()
 
 
 if __name__ == "__main__":
