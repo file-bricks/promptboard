@@ -89,6 +89,14 @@ Every entry is directly editable, sortable by type and name, and copyable to the
 
 Global hotkeys allow you to show/hide the tray window and quickly copy the last used entry.
 
+## Sync (server mode)
+
+Synchronization is **off by default** (zero network calls). When desired, open **Settings → Preferences… → Synchronization** and switch **Sync mode** to **Server** to synchronize your library with a self-hosted `prompt-sync-server` instance:
+
+- **Namespace:** `promptboard` (schema `promptboard-library-v1`).
+- **Transport & Auth:** Bearer API token stored in the OS keyring when `keyring` (`pip install ".[keyring]"`) is installed, or in a local `0600` file inside your user profile. Plain `http://` is restricted to loopback (`http://127.0.0.1:8765`) or private Tailscale addresses (`100.64.0.0/10`); all other hosts require `https://`.
+- **Offline-first & Three-way Conflicts:** Local saves queue immediately in `sync_queue.json` (debounced 3 s, interval polling, and flushed once on quit). Stale writes (`409 Conflict`) and remote tombstones on locally edited entries never overwrite silently — they open a conflict dialog (*Keep local* [default], *Keep as copy*, or *Take server version*). First coupling to a non-empty server prompts once with *Merge* as the non-destructive default.
+
 ## Comparison
 
 - **Lighter than ProfiPrompt:** No large version history or heavy board system at the core.

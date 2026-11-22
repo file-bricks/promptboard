@@ -1276,5 +1276,357 @@
     "zh": "覆盖文件前进行确认",
     "ja": "ファイルを上書きする前に確認します",
     "ru": "Спрашивать перед перезаписью файла"
+  },
+  "settings.group.sync": {
+    "de": "Synchronisierung",
+    "en": "Synchronization",
+    "es": "Sincronización",
+    "zh": "同步",
+    "ja": "同期",
+    "ru": "Синхронизация"
+  },
+  "settings.group.sync.tooltip": {
+    "de": "Optionale Synchronisierung über einen eigenen Sync-Server",
+    "en": "Optional synchronization via a self-hosted sync server",
+    "es": "Sincronización opcional mediante un servidor propio",
+    "zh": "通过自托管同步服务器进行可选同步",
+    "ja": "セルフホスト型同期サーバーによるオプション同期",
+    "ru": "Необязательная синхронизация через собственный сервер"
+  },
+  "settings.sync.mode": {
+    "de": "Sync-Modus",
+    "en": "Sync mode",
+    "es": "Modo de sincronización",
+    "zh": "同步模式",
+    "ja": "同期モード",
+    "ru": "Режим синхронизации"
+  },
+  "settings.sync.mode.tooltip": {
+    "de": "Wähle den Synchronisierungsmodus (Standard: Aus)",
+    "en": "Select the synchronization mode (default: Off)",
+    "es": "Seleccione el modo de sincronización (predeterminado: Desactivado)",
+    "zh": "选择同步模式（默认：关闭）",
+    "ja": "同期モードを選択します（既定: オフ）",
+    "ru": "Выберите режим синхронизации (по умолчанию: Выкл.)"
+  },
+  "sync.mode.off": {
+    "de": "Aus",
+    "en": "Off",
+    "es": "Desactivado",
+    "zh": "关闭",
+    "ja": "オフ",
+    "ru": "Выкл."
+  },
+  "sync.mode.server": {
+    "de": "Server",
+    "en": "Server",
+    "es": "Servidor",
+    "zh": "服务器",
+    "ja": "サーバー",
+    "ru": "Сервер"
+  },
+  "sync.mode.file": {
+    "de": "Dateibasiert",
+    "en": "File-based",
+    "es": "Basado en archivos",
+    "zh": "基于文件",
+    "ja": "ファイルベース",
+    "ru": "Файловый"
+  },
+  "settings.sync.status_label": {
+    "de": "Status",
+    "en": "Status",
+    "es": "Estado",
+    "zh": "状态",
+    "ja": "状態",
+    "ru": "Статус"
+  },
+  "settings.sync.server_url": {
+    "de": "Server-URL",
+    "en": "Server URL",
+    "es": "URL del servidor",
+    "zh": "服务器 URL",
+    "ja": "サーバー URL",
+    "ru": "URL сервера"
+  },
+  "settings.sync.server_url.tooltip": {
+    "de": "Adresse des Sync-Servers (z. B. http://127.0.0.1:8765 oder https://…)",
+    "en": "Sync server address (e.g. http://127.0.0.1:8765 or https://…)",
+    "es": "Dirección del servidor de sincronización (p. ej. http://127.0.0.1:8765 o https://…)",
+    "zh": "同步服务器地址（例如 http://127.0.0.1:8765 或 https://…）",
+    "ja": "同期サーバーのアドレス（例: http://127.0.0.1:8765 または https://…）",
+    "ru": "Адрес сервера синхронизации (например, http://127.0.0.1:8765 или https://…)"
+  },
+  "settings.sync.namespace": {
+    "de": "Namespace",
+    "en": "Namespace",
+    "es": "Espacio de nombres",
+    "zh": "命名空间",
+    "ja": "名前空間",
+    "ru": "Пространство имён"
+  },
+  "settings.sync.namespace.tooltip": {
+    "de": "Bibliotheks-Namespace auf dem Server (Standard: promptboard)",
+    "en": "Library namespace on the server (default: promptboard)",
+    "es": "Espacio de nombres en el servidor (predeterminado: promptboard)",
+    "zh": "服务器上的库命名空间（默认：promptboard）",
+    "ja": "サーバー上のライブラリ名前空間（既定: promptboard）",
+    "ru": "Пространство имён библиотеки на сервере (по умолчанию: promptboard)"
+  },
+  "settings.sync.token": {
+    "de": "API-Token",
+    "en": "API token",
+    "es": "Token de API",
+    "zh": "API 令牌",
+    "ja": "API トークン",
+    "ru": "API-токен"
+  },
+  "settings.sync.token.tooltip": {
+    "de": "Geheimes Bearer-Token für den Sync-Server",
+    "en": "Secret bearer token for the sync server",
+    "es": "Token Bearer secreto para el servidor de sincronización",
+    "zh": "同步服务器的机密 Bearer 令牌",
+    "ja": "同期サーバー用の秘密 Bearer トークン",
+    "ru": "Секретный Bearer-токен для сервера синхронизации"
+  },
+  "settings.sync.token.placeholder": {
+    "de": "Bearer-Token eingeben…",
+    "en": "Enter bearer token…",
+    "es": "Introducir token Bearer…",
+    "zh": "输入 Bearer 令牌…",
+    "ja": "Bearer トークンを入力…",
+    "ru": "Введите Bearer-токен…"
+  },
+  "settings.sync.interval": {
+    "de": "Intervall (Sek.)",
+    "en": "Interval (sec)",
+    "es": "Intervalo (seg.)",
+    "zh": "间隔（秒）",
+    "ja": "間隔（秒）",
+    "ru": "Интервал (сек.)"
+  },
+  "settings.sync.interval.tooltip": {
+    "de": "Abruf-Intervall für Hintergrund-Synchronisierung in Sekunden",
+    "en": "Polling interval for background synchronization in seconds",
+    "es": "Intervalo de consulta en segundo plano en segundos",
+    "zh": "后台同步轮询间隔（秒）",
+    "ja": "バックグラウンド同期のポーリング間隔（秒）",
+    "ru": "Интервал фоновой синхронизации в секундах"
+  },
+  "settings.sync.test_btn": {
+    "de": "Verbindung testen",
+    "en": "Test connection",
+    "es": "Probar conexión",
+    "zh": "测试连接",
+    "ja": "接続テスト",
+    "ru": "Проверить соединение"
+  },
+  "settings.sync.test_btn.tooltip": {
+    "de": "Prüft Erreichbarkeit, Authentifizierung, Latenz und Revisionsstand",
+    "en": "Check reachability, authentication, latency, and library revision",
+    "es": "Comprobar disponibilidad, autenticación, latencia y revisión",
+    "zh": "检查连通性、身份验证、延迟和库修订号",
+    "ja": "到達性、認証、レイテンシ、ライブラリリビジョンを確認します",
+    "ru": "Проверить доступность, аутентификацию, задержку и ревизию библиотеки"
+  },
+  "settings.sync.sync_now_btn": {
+    "de": "Jetzt synchronisieren",
+    "en": "Sync now",
+    "es": "Sincronizar ahora",
+    "zh": "立即同步",
+    "ja": "今すぐ同期",
+    "ru": "Синхронизировать сейчас"
+  },
+  "settings.sync.sync_now_btn.tooltip": {
+    "de": "Führt sofort einen Abgleich mit dem Sync-Server aus",
+    "en": "Run an immediate synchronization with the sync server",
+    "es": "Ejecutar una sincronización inmediata con el servidor",
+    "zh": "立即与同步服务器执行同步",
+    "ja": "同期サーバーと今すぐ同期を実行します",
+    "ru": "Выполнить немедленную синхронизацию с сервером"
+  },
+  "settings.sync.conflicts_btn": {
+    "de": "Konflikte lösen ({count})…",
+    "en": "Resolve conflicts ({count})…",
+    "es": "Resolver conflictos ({count})…",
+    "zh": "解决冲突 ({count})…",
+    "ja": "競合を解決 ({count})…",
+    "ru": "Разрешить конфликты ({count})…"
+  },
+  "settings.sync.conflicts_btn.tooltip": {
+    "de": "Öffnet die Drei-Wege-Konfliktauflösung",
+    "en": "Open the three-way conflict resolution dialog",
+    "es": "Abrir el diálogo de resolución de conflictos",
+    "zh": "打开三方冲突解决对话框",
+    "ja": "3ウェイ競合解決ダイアログを開きます",
+    "ru": "Открыть диалог трёхстороннего разрешения конфликтов"
+  },
+  "sync.status.off": {
+    "de": "Aus (rein lokal)",
+    "en": "Off (local only)",
+    "es": "Desactivado (solo local)",
+    "zh": "关闭（仅本地）",
+    "ja": "オフ（ローカルのみ）",
+    "ru": "Выкл. (только локально)"
+  },
+  "sync.status.unconfigured": {
+    "de": "Server-URL und API-Token erforderlich",
+    "en": "Server URL and API token required",
+    "es": "Se requieren URL del servidor y token de API",
+    "zh": "需要服务器 URL 和 API 令牌",
+    "ja": "サーバー URL と API トークンが必要です",
+    "ru": "Требуются URL сервера и API-токен"
+  },
+  "sync.status.synced": {
+    "de": "Synchronisiert (Rev. {rev})",
+    "en": "Synchronized (rev {rev})",
+    "es": "Sincronizado (rev. {rev})",
+    "zh": "已同步（修订 {rev}）",
+    "ja": "同期済み（rev {rev}）",
+    "ru": "Синхронизировано (рев. {rev})"
+  },
+  "sync.status.offline_pending": {
+    "de": "Offline – {count} ausstehend",
+    "en": "Offline — {count} pending",
+    "es": "Sin conexión – {count} pendientes",
+    "zh": "离线 – {count} 项待处理",
+    "ja": "オフライン – {count} 件保留中",
+    "ru": "Не в сети – ожидает: {count}"
+  },
+  "sync.status.conflicts": {
+    "de": "{count} Konflikte offen",
+    "en": "{count} conflicts pending",
+    "es": "{count} conflictos pendientes",
+    "zh": "{count} 个冲突待解决",
+    "ja": "{count} 件の競合が未解決",
+    "ru": "Открытых конфликтов: {count}"
+  },
+  "sync.status.test_ok": {
+    "de": "Verbunden ({ms} ms, Rev. {rev})",
+    "en": "Connected ({ms} ms, rev {rev})",
+    "es": "Conectado ({ms} ms, rev. {rev})",
+    "zh": "已连接（{ms} ms，修订 {rev}）",
+    "ja": "接続成功（{ms} ms、rev {rev}）",
+    "ru": "Подключено ({ms} мс, рев. {rev})"
+  },
+  "sync.status.test_failed": {
+    "de": "Verbindung fehlgeschlagen: {detail}",
+    "en": "Connection failed: {detail}",
+    "es": "Error de conexión: {detail}",
+    "zh": "连接失败: {detail}",
+    "ja": "接続失敗: {detail}",
+    "ru": "Ошибка соединения: {detail}"
+  },
+  "dialog.sync_couple.title": {
+    "de": "Erstkoppeln mit Sync-Server",
+    "en": "Initial server coupling",
+    "es": "Vinculación inicial con el servidor",
+    "zh": "首次连接同步服务器",
+    "ja": "同期サーバーとの初回連携",
+    "ru": "Первичная привязка к серверу"
+  },
+  "dialog.sync_couple.body": {
+    "de": "Der Server enthält bereits {count} Einträge (Rev. {rev}). Wie möchtest du beim ersten Verbinden vorgehen?",
+    "en": "The server already contains {count} entries (rev {rev}). How would you like to proceed on first connection?",
+    "es": "El servidor ya contiene {count} entradas (rev. {rev}). ¿Cómo desea proceder en la primera conexión?",
+    "zh": "服务器上已有 {count} 个条目（修订 {rev}）。首次连接时希望如何处理？",
+    "ja": "サーバーには既に {count} 件の項目（rev {rev}）があります。初回接続時の処理を選択してください。",
+    "ru": "На сервере уже есть записей: {count} (рев. {rev}). Как поступить при первом подключении?"
+  },
+  "dialog.sync_couple.merge": {
+    "de": "Zusammenführen (Empfohlen)",
+    "en": "Merge (recommended)",
+    "es": "Combinar (recomendado)",
+    "zh": "合并（推荐）",
+    "ja": "マージ（推奨）",
+    "ru": "Объединить (рекомендуется)"
+  },
+  "dialog.sync_couple.take_server": {
+    "de": "Serverstand übernehmen",
+    "en": "Use server library",
+    "es": "Usar biblioteca del servidor",
+    "zh": "采用服务器版本",
+    "ja": "サーバーの内容を採用",
+    "ru": "Принять версию сервера"
+  },
+  "dialog.sync_conflicts.title": {
+    "de": "Synchronisierungskonflikte auflösen",
+    "en": "Resolve synchronization conflicts",
+    "es": "Resolver conflictos de sincronización",
+    "zh": "解决同步冲突",
+    "ja": "同期の競合を解決",
+    "ru": "Разрешение конфликтов синхронизации"
+  },
+  "dialog.sync_conflicts.intro": {
+    "de": "Wähle pro Eintrag, welche Fassung übernommen werden soll. Eigene Änderungen werden niemals still überschrieben.",
+    "en": "Choose which version to keep for each entry. Local edits are never overwritten silently.",
+    "es": "Elija qué versión conservar para cada entrada. Los cambios locales nunca se sobrescriben en silencio.",
+    "zh": "请为每个条目选择要保留的版本。本地更改绝不会被静默覆盖。",
+    "ja": "項目ごとに保持するバージョンを選択してください。ローカルの編集が暗黙的に上書きされることはありません。",
+    "ru": "Выберите версию для каждой записи. Локальные правки никогда не перезаписываются без спроса."
+  },
+  "dialog.sync_conflicts.list_name": {
+    "de": "Konfliktliste",
+    "en": "Conflict list",
+    "es": "Lista de conflictos",
+    "zh": "冲突列表",
+    "ja": "競合リスト",
+    "ru": "Список конфликтов"
+  },
+  "dialog.sync_conflicts.local_label": {
+    "de": "Lokale Fassung",
+    "en": "Local version",
+    "es": "Versión local",
+    "zh": "本地版本",
+    "ja": "ローカル版",
+    "ru": "Локальная версия"
+  },
+  "dialog.sync_conflicts.server_label": {
+    "de": "Server-Fassung (Rev. {rev})",
+    "en": "Server version (rev {rev})",
+    "es": "Versión del servidor (rev. {rev})",
+    "zh": "服务器版本（修订 {rev}）",
+    "ja": "サーバー版（rev {rev}）",
+    "ru": "Версия сервера (рев. {rev})"
+  },
+  "dialog.sync_conflicts.deleted_marker": {
+    "de": "[Gelöscht]",
+    "en": "[Deleted]",
+    "es": "[Eliminado]",
+    "zh": "[已删除]",
+    "ja": "[削除済み]",
+    "ru": "[Удалено]"
+  },
+  "dialog.sync_conflicts.keep_local": {
+    "de": "Lokal behalten (Standard)",
+    "en": "Keep local (default)",
+    "es": "Conservar local (predeterminado)",
+    "zh": "保留本地（默认）",
+    "ja": "ローカルを保持（既定）",
+    "ru": "Оставить локальную (по умолч.)"
+  },
+  "dialog.sync_conflicts.keep_copy": {
+    "de": "Als Kopie anlegen",
+    "en": "Keep as copy",
+    "es": "Guardar como copia",
+    "zh": "另存为副本",
+    "ja": "コピーとして保存",
+    "ru": "Сохранить как копию"
+  },
+  "dialog.sync_conflicts.take_server": {
+    "de": "Serverstand übernehmen",
+    "en": "Take server version",
+    "es": "Tomar versión del servidor",
+    "zh": "采用服务器版本",
+    "ja": "サーバー版を採用",
+    "ru": "Принять версию сервера"
+  },
+  "sync.copy_suffix": {
+    "de": "LOKALE KOPIE",
+    "en": "LOCAL COPY",
+    "es": "COPIA LOCAL",
+    "zh": "本地副本",
+    "ja": "ローカルコピー",
+    "ru": "ЛОКАЛЬНАЯ КОПИЯ"
   }
 }

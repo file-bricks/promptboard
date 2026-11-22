@@ -18,10 +18,11 @@ from logging_setup import configure_logging
 from materializer import render_item, resolve_batch_targets
 from models import ItemType, LibraryItem, gen_id, normalize_name, now_iso, parse_tags
 from profiprompt_adapter import load_profiprompt_items
-from settings_dialog import SettingsDialog
+from settings_dialog import ConflictResolutionDialog, FirstCouplingDialog, SettingsDialog
 from settings_manager import SettingsManager
 from single_instance import SingleInstance
 from storage import Storage, atomic_write_text
+from sync_backend import FirstCouplingChoice, SyncEngine, SyncOutcome
 from theme import apply_theme
 
 logger = logging.getLogger(__name__)
@@ -66,15 +67,25 @@ def load_app_icon() -> QtGui.QIcon:
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, storage: Storage, settings: SettingsManager):
+    SYNC_DEBOUNCE_MS = 3000
+
+    def __init__(
+        self,
+        storage: Storage,
+        settings: SettingsManager,
+        sync_engine: Optional[SyncEngine] = None,
+    ):
         super().__init__()
         self.storage = storage
         self.settings = settings
+        self.sync_engine = sync_engine or SyncEngine(storage, settings)
         self.clipboard_service = ClipboardService(QtWidgets.QApplication.instance())
         self.current_item_id: Optional[str] = None
         self.last_active_item_id: Optional[str] = self.settings.get_last_active_item_id() or None
         self._loading_ui = False
         self._dirty = False
+        self._quit_hook_registered = False
+        self._quit_sync_done = False
         self.tray_icon: Optional[QtWidgets.QSystemTrayIcon] = None
         self.tray_menu: Optional[QtWidgets.QMenu] = None
         self.hotkeys: Optional[PromptBoardHotkeys] = None
@@ -88,8 +99,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.save_timer.setInterval(500)
         self.save_timer.timeout.connect(self.save_current_item)
 
+        self.sync_debounce_timer = QtCore.QTimer(self)
+        self.sync_debounce_timer.setSingleShot(True)
+        self.sync_debounce_timer.setInterval(self.SYNC_DEBOUNCE_MS)
+        self.sync_debounce_timer.timeout.connect(self._on_sync_debounce_timeout)
+
+        self.sync_interval_timer = QtCore.QTimer(self)
+        self.sync_interval_timer.setSingleShot(False)
+        self.sync_interval_timer.timeout.connect(self._on_sync_interval_timeout)
+
         self._build_ui()
         self._connect_signals()
+        self._configure_sync_timers()
         self.reload_list()
 
     # ---------------------------------------------------------------- UI
@@ -557,6 +578,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.current_item_id = item.id
         self._remember_active_item(item)
         self._update_list_item_text(item)
+        self._notify_local_upsert([item])
 
     @staticmethod
     def _item_display_text(item: LibraryItem) -> str:
@@ -607,6 +629,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.reload_list()
         self.status_label.setText(tr("status.created"))
         self._remember_active_item(item)
+        self._notify_local_upsert([item])
 
     def on_sort_changed(self, *_args) -> None:
         self.settings.set_sort_mode(self.current_sort_mode())
@@ -619,10 +642,15 @@ class MainWindow(QtWidgets.QMainWindow):
             on_import_profiprompt=self.import_profiprompt_library,
             on_import_explorerpro=self.import_explorerpro_library,
             on_export_explorerpro=self.export_to_explorerpro_library,
+            sync_engine=self.sync_engine,
+            on_sync_now=lambda: self.run_sync(interactive=True),
+            on_resolve_conflicts=self.open_conflict_resolution_dialog,
+            on_sync_settings_changed=self._configure_sync_timers,
         )
         dialog.theme_changed.connect(self._on_theme_changed)
         dialog.language_changed.connect(self._on_language_changed)
         dialog.exec()
+        self._configure_sync_timers()
         # Import-source toggles may have changed which File-menu entries apply.
         self._build_menubar()
 
@@ -664,6 +692,9 @@ class MainWindow(QtWidgets.QMainWindow):
             logger.exception("Löschen fehlgeschlagen")
             self._show_error(tr("error.delete_failed"), exc)
             return
+        notify_del = getattr(self, "_notify_local_delete", None)
+        if callable(notify_del):
+            notify_del(item.id)
         self.current_item_id = None
         self.reload_list()
         if self.item_list.count() == 0:
@@ -905,6 +936,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.reload_list()
         self._select_item_by_id(latest_item.id)
         self.status_label.setText(tr("status.imported_profiprompt", count=len(imported_items)))
+        self._notify_local_upsert(imported_items)
         return True
 
     def import_explorerpro_library(self) -> bool:
@@ -934,6 +966,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.reload_list()
         self._select_item_by_id(imported_items[0].id)
         self.status_label.setText(tr("status.imported_explorerpro", count=len(imported_items)))
+        self._notify_local_upsert(imported_items)
         return True
 
     def _select_item_by_id(self, item_id: str) -> None:
@@ -1073,6 +1106,109 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.status_label.setText(tr("status.exported_explorerpro", count=count))
 
+    # ------------------------------------------------------------ synchronization
+
+    def _configure_sync_timers(self) -> None:
+        if self.settings.get_sync_mode() == "server" and self.sync_engine.is_configured():
+            interval_ms = self.settings.get_sync_interval_seconds() * 1000
+            if not self.sync_interval_timer.isActive() or self.sync_interval_timer.interval() != interval_ms:
+                self.sync_interval_timer.start(interval_ms)
+        else:
+            self.sync_interval_timer.stop()
+            self.sync_debounce_timer.stop()
+
+    def _notify_local_upsert(self, items: List[LibraryItem]) -> None:
+        if self.settings.get_sync_mode() != "server":
+            return
+        for item in items:
+            self.sync_engine.enqueue_upsert(item)
+        if self.sync_engine.is_configured():
+            self.sync_debounce_timer.start()
+
+    def _notify_local_delete(self, item_id: str) -> None:
+        if self.settings.get_sync_mode() != "server":
+            return
+        self.sync_engine.enqueue_delete(item_id)
+        if self.sync_engine.is_configured():
+            self.sync_debounce_timer.start()
+
+    def _on_sync_debounce_timeout(self) -> None:
+        self.run_sync(interactive=False)
+
+    def _on_sync_interval_timeout(self) -> None:
+        self.run_sync(interactive=False)
+
+    def prompt_first_coupling(self, remote_count: int, remote_rev: int) -> FirstCouplingChoice:
+        dlg = FirstCouplingDialog(remote_count, remote_rev, parent=self)
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            return dlg.choice
+        return "cancel"
+
+    def _refresh_after_sync_change(self) -> None:
+        active_id = self.current_item_id
+        self.current_item_id = None
+        self.reload_list()
+        if active_id and self.storage.get_item(active_id) is not None:
+            self._select_item_by_id(active_id)
+        elif self.item_list.count() == 0:
+            self.clear_editor()
+        if self.tray_menu is not None:
+            self.rebuild_tray_menu()
+
+    def open_conflict_resolution_dialog(self) -> None:
+        dlg = ConflictResolutionDialog(
+            self.sync_engine,
+            parent=self,
+            on_resolved=self._refresh_after_sync_change,
+        )
+        dlg.exec()
+
+    def run_sync(self, *, interactive: bool = False) -> SyncOutcome:
+        if self.settings.get_sync_mode() != "server":
+            return SyncOutcome(ok=True, mode=self.settings.get_sync_mode())
+        self.save_current_item()
+        outcome = self.sync_engine.sync_once(
+            on_first_coupling=self.prompt_first_coupling if interactive else None,
+        )
+        if outcome.storage_changed:
+            self._refresh_after_sync_change()
+        if outcome.conflict_count > 0:
+            self.status_label.setText(tr("sync.status.conflicts", count=outcome.conflict_count))
+            if interactive:
+                self.open_conflict_resolution_dialog()
+        elif outcome.offline and outcome.pending_queue_count > 0:
+            self.status_label.setText(
+                tr("sync.status.offline_pending", count=outcome.pending_queue_count)
+            )
+        elif outcome.ok:
+            self.status_label.setText(tr("sync.status.synced", rev=outcome.library_rev))
+        return outcome
+
+    def sync_on_start(self, *, interactive: bool = False) -> Optional[SyncOutcome]:
+        if self.settings.get_sync_mode() != "server" or not self.sync_engine.is_configured():
+            return None
+        return self.run_sync(interactive=interactive)
+
+    def register_quit_hook(self, app: Optional[QtCore.QCoreApplication] = None) -> bool:
+        """Connect ``aboutToQuit`` idempotently (at most once per window instance)."""
+        target_app = app or QtWidgets.QApplication.instance()
+        if target_app is None or self._quit_hook_registered:
+            return False
+        target_app.aboutToQuit.connect(self.on_about_to_quit)
+        self._quit_hook_registered = True
+        return True
+
+    def on_about_to_quit(self) -> None:
+        """Idempotent shutdown handler: save pending edits, stop timers, flush sync queue once."""
+        if self._quit_sync_done:
+            return
+        self._quit_sync_done = True
+        self.sync_debounce_timer.stop()
+        self.sync_interval_timer.stop()
+        self.save_current_item()
+        if self.settings.get_sync_mode() == "server":
+            self.sync_engine.flush_pending(timeout=2.0)
+
     # ------------------------------------------------------------ misc
 
     def _show_error(self, title: str, exc: BaseException) -> None:
@@ -1170,6 +1306,8 @@ def main() -> int:
     else:
         window.status_label.setText(tr("status.hotkeys_unavailable"))
     app.aboutToQuit.connect(hotkeys.stop)
+    window.register_quit_hook(app)
+    window.sync_on_start(interactive=True)
     _seed_initial_item_if_empty(storage, window)
     window.show()
     window.maybe_show_onboarding()

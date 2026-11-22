@@ -99,6 +99,14 @@ H1, kompakter Metadatenkopf, dann der eigentliche Inhalt.
 Globale Hotkeys blenden das Tray-Fenster ein oder aus und kopieren den
 zuletzt benutzten Eintrag schnell in die Zwischenablage.
 
+## Sync (server mode)
+
+Die Synchronisierung steht **standardmäßig auf `Aus`** (keinerlei Netzwerkaufrufe). Optional lässt sich unter **Einstellungen → Einstellungen… → Synchronisierung** der Modus **Server** aktivieren, um die Bibliothek mit einer selbst gehosteten `prompt-sync-server`-Instanz abzugleichen:
+
+- **Namespace:** `promptboard` (Schema `promptboard-library-v1`).
+- **Transport & Token:** Das Bearer-Token wird optional über `keyring` (`pip install ".[keyring]"`) im System-Schlüsselbund oder als `0600`-geschützte Datei im lokalen Benutzerprofil abgelegt (niemals im Repo oder Export). Unverschlüsseltes `http://` ist ausschließlich auf Loopback (`http://127.0.0.1:8765`) und private Tailscale-Adressen (`100.64.0.0/10`) begrenzt; andere Ziele erfordern `https://`.
+- **Offline-Queue & Drei-Wege-Konflikte:** Änderungen werden offline-fähig in `sync_queue.json` verdichtet (3-s-Debounce nach dem Speichern, Intervall-Abruf sowie einmaliger Flush beim Beenden). Veraltete Schreibversuche (`409 Conflict`) oder Server-Tombstones auf lokal geänderten Einträgen überschreiben nie still, sondern landen im Konfliktdialog (*Lokal behalten* [Standard], *Als Kopie anlegen*, *Serverstand übernehmen*). Beim erstmaligen Koppeln mit einem befüllten Server fragt ein einmaliger Dialog mit nicht-destruktivem Standard *Zusammenführen*.
+
 ## Abgrenzung
 
 - **Leichter als ProfiPrompt:** keine große Versionshistorie, kein schweres Board-System als Kern.

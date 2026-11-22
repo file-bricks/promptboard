@@ -7,6 +7,12 @@ Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 - Bengalische und portugiesische README ergänzt; alle elf Dokumentationssprachen reziprok verlinkt und im llms.txt-Index aufgeführt. Die App-UI bleibt bei DE/EN/ES/ZH/JA/RU (2026-11-03).
 - Französische, Hindi- und arabische README ergänzt, in allen vorhandenen README-Sprachwahlen verlinkt und im Dokumentationsindex `llms.txt` eingetragen. Die Laufzeitsprachen bleiben unverändert (2026-11-02).
 
+### Optionale Server-Synchronisierung (Stage 1b)
+
+- **`SyncBackend` & `ServerBackend` (`src/sync_backend.py`)**: Transportabstraktion (`SyncBackend`, `NullBackend`, `ServerBackend`, `FileSlotBackend`-Stub für Stage 3) mit Stdlib-HTTP (`urllib.request`), Loopback-/Tailscale-Transportwächter, atomarem `sync_state.json` und verdichtender Offline-Queue `sync_queue.json` im lokalen Datenordner; in `pyproject.toml` unter `py-modules` registriert.
+- **Drei-Wege-Merge, Konfliktdialog & Erstkoppeln (`src/settings_dialog.py`, `src/promptboard.py`)**: Nicht-destruktiver Erstkoppel-Dialog bei befülltem Server (Standard: *Zusammenführen*), Drei-Wege-Konfliktauflösung (*Lokal behalten* [Standard], *Als Kopie anlegen*, *Serverstand übernehmen*), kontrollierte Tombstone-Verarbeitung sowie Start-Pull, 3-s-Debounce nach Speichern, Intervall-Timer und doppelt geschützter `aboutToQuit`-Flush. Standardmodus bleibt `off` (null Netzwerkaufrufe).
+- **Token-Schutz & Lokalisierung (`src/settings_manager.py`, `src/i18n.py`, `locales/translations.json`)**: Optionales Extra `keyring` (`import`-geschützt) mit `0600`-Datei-Fallback im lokalen Benutzerprofil; Einstellungsdialog mit „Verbindung testen“ und 6-Sprachen-Parität (`de`, `en`, `es`, `zh`, `ja`, `ru`).
+
 ### Inline-Variablen mit Leerzeichen und ProfiPrompt-Vertrag (gerettet aus OneDrive-only-Stand)
 
 - **Inline-Variablen:** `{{ name }}` mit Leerzeichen sowie Namen mit Punkt oder Bindestrich (`{{user.name}}`, `{{first-name}}`) werden beim Kopieren abgefragt und ersetzt; bisher landeten sie wörtlich in der Zwischenablage.
