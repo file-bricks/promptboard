@@ -26,7 +26,7 @@ def test_translations_json_matches_i18n_keys():
     data = json.loads((PROJECT_ROOT / "locales" / "translations.json").read_text(encoding="utf-8"))
     json_keys = {k for k in data if not k.startswith("_")}
     assert json_keys == set(_TRANSLATIONS.keys())
-    assert len(json_keys) == 211
+    assert len(json_keys) == 231
     for key in json_keys:
         for lang in VALID_LANGUAGES:
             assert data[key].get(lang), f"Leerer Wert für {key}[{lang}]"

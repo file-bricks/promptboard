@@ -84,6 +84,26 @@ Servermodus (`prompt-sync-server`, Namespace `promptboard`, Schema
 `schema_version`), während `Storage.load_items()` unbekannte Top-Level-Felder
 wie `"manifest"` kompatibel ignoriert.
 
+## Dateibasierte Host-Slot-Synchronisierung (Stage 3)
+
+Im optionalen Dateimodus (`sync/mode = "file"`) schreibt jeder Rechner
+ausschließlich atomar in seinen eigenen Single-Writer-Slot im gewählten
+Sync-Ordner (z. B. OneDrive, Nextcloud, Syncthing oder SMB):
+
+```text
+<sync_dir>/promptboard/<HOST>/promptboard@<HOST>.json
+```
+
+Die Datei nutzt dasselbe `library.json`-Format mit additivem `"manifest"`-Block
+(`app`, `version`, `host`, `updated_at`, `item_count`, `schema_version`,
+`deleted_ids`). Fremde PromptBoard-Slots (`promptboard/<OTHER>/promptboard@<OTHER>.json`)
+sowie Cross-App-Slots von ProfiPrompt (`profiprompt/<HOST>/profiprompt@<HOST>.json`)
+und ProfiPrompt-Browser (`profiprompt-browser/<SLOT>/profiprompt-browser@<SLOT>.json`)
+werden ausschließlich lesend erkannt und je Slot nach konfigurierter Regel
+(`never`, `once`, `on_start`) nicht-destruktiv mit Drei-Wege-Konflikterkennung
+zusammengeführt. Cloud-Konfliktkopien (`*conflicted copy*`, `*.sync-conflict-*`,
+`*-<HOST>.json`, `* (1).json`) und temporäre Dateien werden automatisch ignoriert.
+
 ## Datenschutzgrenze
 
 Das Format enthält bewusst nur Bibliothekseinträge. Es exportiert keine Logs,

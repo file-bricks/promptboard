@@ -1045,6 +1045,114 @@ _TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
         "de": "LOKALE KOPIE", "en": "LOCAL COPY",
         "es": "COPIA LOCAL", "zh": "本地副本", "ja": "ローカルコピー", "ru": "ЛОКАЛЬНАЯ КОПИЯ",
     },
+    "settings.sync.file_dir": {
+        "de": "Sync-Ordner", "en": "Sync folder",
+        "es": "Carpeta de sincronización", "zh": "同步文件夹", "ja": "同期フォルダ", "ru": "Папка синхронизации",
+    },
+    "settings.sync.file_dir.placeholder": {
+        "de": "Gemeinsamen Cloud- oder Netzwerkordner wählen…",
+        "en": "Choose shared cloud or network folder…",
+        "es": "Seleccione una carpeta compartida en la nube o red…",
+        "zh": "选择共享云盘或网络文件夹…",
+        "ja": "共有クラウドまたはネットワークフォルダを選択…",
+        "ru": "Выберите общую облачную или сетевую папку…",
+    },
+    "settings.sync.file_dir.tooltip": {
+        "de": "Ordner für host-spezifische JSON-Slots (jeder Rechner schreibt nur in seinen eigenen Slot)",
+        "en": "Folder for host-specific JSON slots (each device writes only to its own slot)",
+        "es": "Carpeta para ranuras JSON por equipo (cada equipo escribe solo en su propia ranura)",
+        "zh": "按主机划分的 JSON 槽位文件夹（每台设备只写入自己的槽位）",
+        "ja": "ホスト別 JSON スロット用フォルダ（各端末は自分のスロットのみに書き込みます）",
+        "ru": "Папка для JSON-слотов хостов (каждое устройство пишет только в свой слот)",
+    },
+    "settings.sync.file_host": {
+        "de": "Eigener Host-Slot", "en": "Own host slot",
+        "es": "Ranura de equipo propia", "zh": "本机槽位", "ja": "自ホストスロット", "ru": "Свой слот хоста",
+    },
+    "settings.sync.file_host.tooltip": {
+        "de": "Eindeutiger Rechnername für die eigene Schreibdatei promptboard@<HOST>.json",
+        "en": "Unique host name for this device's write file promptboard@<HOST>.json",
+        "es": "Nombre único de equipo para el archivo promptboard@<HOST>.json",
+        "zh": "本机写入文件 promptboard@<HOST>.json 的唯一主机名",
+        "ja": "書き込みファイル promptboard@<HOST>.json に使う一意のホスト名",
+        "ru": "Уникальное имя хоста для файла записи promptboard@<HOST>.json",
+    },
+    "settings.sync.file_slots": {
+        "de": "Gefundene fremde Slots (nur lesend)", "en": "Discovered foreign slots (read-only)",
+        "es": "Ranuras externas detectadas (solo lectura)", "zh": "发现的外部槽位（只读）", "ja": "検出された外部スロット（読み取り専用）", "ru": "Найденные внешние слоты (только чтение)",
+    },
+    "settings.sync.slot_col.host": {
+        "de": "Host / Slot", "en": "Host / Slot",
+        "es": "Equipo / Ranura", "zh": "主机 / 槽位", "ja": "ホスト / スロット", "ru": "Хост / Слот",
+    },
+    "settings.sync.slot_col.app": {
+        "de": "App", "en": "App",
+        "es": "App", "zh": "应用", "ja": "アプリ", "ru": "Приложение",
+    },
+    "settings.sync.slot_col.items": {
+        "de": "Einträge", "en": "Entries",
+        "es": "Entradas", "zh": "条目", "ja": "項目", "ru": "Записи",
+    },
+    "settings.sync.slot_col.mode": {
+        "de": "Import-Regel", "en": "Import rule",
+        "es": "Regla de importación", "zh": "导入规则", "ja": "インポート規則", "ru": "Правило импорта",
+    },
+    "settings.sync.file_rescan_btn": {
+        "de": "Slots neu scannen", "en": "Rescan slots",
+        "es": "Volver a escanear", "zh": "重新扫描槽位", "ja": "スロットを再スキャン", "ru": "Пересканировать слоты",
+    },
+    "settings.sync.file_test_btn": {
+        "de": "Ordner prüfen", "en": "Check folder",
+        "es": "Comprobar carpeta", "zh": "检查文件夹", "ja": "フォルダを確認", "ru": "Проверить папку",
+    },
+    "sync.slot_mode.never": {
+        "de": "Nie", "en": "Never",
+        "es": "Nunca", "zh": "从不", "ja": "しない", "ru": "Никогда",
+    },
+    "sync.slot_mode.once": {
+        "de": "Einmalig", "en": "Once",
+        "es": "Una vez", "zh": "仅一次", "ja": "1回のみ", "ru": "Один раз",
+    },
+    "sync.slot_mode.on_start": {
+        "de": "Bei Start / Sync", "en": "On start / sync",
+        "es": "Al iniciar / sincronizar", "zh": "启动/同步时", "ja": "起動・同期時", "ru": "При запуске / синхр.",
+    },
+    "sync.status.file_unconfigured": {
+        "de": "Sync-Ordner auswählen erforderlich", "en": "Sync folder selection required",
+        "es": "Se requiere seleccionar una carpeta de sincronización", "zh": "需要选择同步文件夹", "ja": "同期フォルダの選択が必要です", "ru": "Требуется выбрать папку синхронизации",
+    },
+    "sync.status.file_ready": {
+        "de": "Dateisync bereit (Slot {host}, {slots} fremde Slots)",
+        "en": "File sync ready (slot {host}, {slots} foreign slots)",
+        "es": "Sincronización por archivos lista (ranura {host}, {slots} externas)",
+        "zh": "文件同步就绪（槽位 {host}，{slots} 个外部槽位）",
+        "ja": "ファイル同期準備完了（スロット {host}、外部 {slots} 件）",
+        "ru": "Файловая синхр. готова (слот {host}, внешних слотов: {slots})",
+    },
+    "sync.status.file_synced": {
+        "de": "Dateisync aktuell ({count} Einträge geschrieben)",
+        "en": "File sync up to date ({count} entries written)",
+        "es": "Sincronización por archivos al día ({count} entradas escritas)",
+        "zh": "文件同步已是最新（已写入 {count} 个条目）",
+        "ja": "ファイル同期完了（{count} 件書き込み済み）",
+        "ru": "Файловая синхр. актуальна (записано записей: {count})",
+    },
+    "sync.status.file_test_ok": {
+        "de": "Ordner schreibbar ({slots} fremde Slots erkannt)",
+        "en": "Folder writable ({slots} foreign slots detected)",
+        "es": "Carpeta escribible ({slots} ranuras externas detectadas)",
+        "zh": "文件夹可写（检测到 {slots} 个外部槽位）",
+        "ja": "フォルダ書き込み可能（外部スロット {slots} 件検出）",
+        "ru": "Папка доступна для записи (найдено внешних слотов: {slots})",
+    },
+    "dialog.choose_sync_file_dir": {
+        "de": "Sync-Ordner für Datei-Slots auswählen",
+        "en": "Choose sync folder for file slots",
+        "es": "Elegir carpeta de sincronización para ranuras de archivo",
+        "zh": "选择文件槽位同步文件夹",
+        "ja": "ファイルスロット用同期フォルダを選択",
+        "ru": "Выберите папку синхронизации для файловых слотов",
+    },
 }
 
 _current_language: LanguageCode = DEFAULT_LANGUAGE

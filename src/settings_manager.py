@@ -1,19 +1,24 @@
 from __future__ import annotations
 
+import json
 import logging
 import sys
 import threading
 import uuid
 from pathlib import Path
+from typing import Dict
 
 from PySide6 import QtCore
 
 from library_query import DEFAULT_SORT_MODE, coerce_sort_mode
 from sync_backend import (
+     DEFAULT_FILE_SLOT_IMPORT_MODE,
      DEFAULT_NAMESPACE,
      DEFAULT_SYNC_MODE,
+     FILE_SLOT_IMPORT_MODES,
      SYNC_MODES,
      TokenStorage,
+     sanitize_host_slot,
      validate_namespace,
 )
 
@@ -251,10 +256,10 @@ class SettingsManager(QtCore.QObject):
         self.qs.setValue("session/onboarding_shown", bool(value))
         self.qs.sync()
 
-    # ---- Synchronization settings (Stage 1b) ----------------------------
+    # ---- Synchronization settings (Stage 1b + Stage 3) ------------------
 
     SYNC_MODE_CHOICES = SYNC_MODES
-    UI_SYNC_MODE_CHOICES = ("off", "server")
+    UI_SYNC_MODE_CHOICES = ("off", "server", "file")
     DEFAULT_SYNC_MODE = DEFAULT_SYNC_MODE
     DEFAULT_SYNC_NAMESPACE = DEFAULT_NAMESPACE
     DEFAULT_SYNC_INTERVAL_SECONDS = 300
@@ -344,3 +349,52 @@ class SettingsManager(QtCore.QObject):
 
     def set_sync_token(self, token: str) -> None:
         self._token_storage().set_token(token)
+
+    def get_sync_file_dir(self) -> str:
+        with self._lock:
+            raw = self.qs.value("sync/file_dir", "", type=str)
+            return (raw or "").strip()
+
+    def set_sync_file_dir(self, path: str | Path) -> None:
+        with self._lock:
+            cleaned = str(path).strip() if path else ""
+            self.qs.setValue("sync/file_dir", cleaned)
+            self.qs.sync()
+
+    def get_sync_file_host_slot(self) -> str:
+        with self._lock:
+            raw = self.qs.value("sync/file_host_slot", "", type=str)
+            return sanitize_host_slot(raw)
+
+    def set_sync_file_host_slot(self, host_slot: str) -> None:
+        with self._lock:
+            cleaned = sanitize_host_slot(host_slot)
+            self.qs.setValue("sync/file_host_slot", cleaned)
+            self.qs.sync()
+
+    def get_sync_file_slot_modes(self) -> Dict[str, str]:
+        with self._lock:
+            raw = self.qs.value("sync/file_slot_modes", "", type=str)
+            if not raw:
+                return {}
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                return {}
+            if not isinstance(parsed, dict):
+                return {}
+            return {
+                str(k): str(v)
+                for k, v in parsed.items()
+                if isinstance(k, str) and str(v) in FILE_SLOT_IMPORT_MODES
+            }
+
+    def set_sync_file_slot_mode(self, slot_key: str, mode: str) -> None:
+        with self._lock:
+            cleaned_mode = (mode or "").strip().lower()
+            if cleaned_mode not in FILE_SLOT_IMPORT_MODES:
+                cleaned_mode = DEFAULT_FILE_SLOT_IMPORT_MODE
+            modes = self.get_sync_file_slot_modes()
+            modes[str(slot_key)] = cleaned_mode
+            self.qs.setValue("sync/file_slot_modes", json.dumps(modes, ensure_ascii=False))
+            self.qs.sync()

@@ -54,6 +54,70 @@ DEFAULT_SCHEMA_VERSION = "promptboard-library-v1"
 DEFAULT_KIND = "item"
 DEFAULT_HTTP_TIMEOUT = 10.0
 DEFAULT_SHUTDOWN_HTTP_TIMEOUT = 0.8
+FILE_SLOT_IMPORT_MODES = ("never", "once", "on_start")
+DEFAULT_FILE_SLOT_IMPORT_MODE = "on_start"
+FILE_SLOT_APP_NAME = "promptboard"
+
+_CONFLICT_COPY_RE = re.compile(
+    r"(conflicted copy|\.sync-conflict-|\(\d+\)\.json$|\(conflict\)|\.tmp$|\.bak$|\.partial$)",
+    re.IGNORECASE,
+)
+_SLOT_FILE_RE = re.compile(
+    r"\A(?P<app>promptboard|profiprompt|profiprompt-browser)@(?P<host>[A-Za-z0-9._-]+)\.json\Z",
+    re.IGNORECASE,
+)
+
+
+def sanitize_host_slot(raw: Optional[str] = None) -> str:
+    """Return a filesystem-safe, single-writer host slot identifier."""
+    candidate = (raw or "").strip()
+    if not candidate:
+        try:
+            candidate = socket.gethostname().strip()
+        except OSError:
+            candidate = ""
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", candidate).strip("-._")
+    if not cleaned:
+        return "LOCAL"
+    return cleaned[:48]
+
+
+def is_cloud_conflict_filename(filename: str, *, expected_host: Optional[str] = None) -> bool:
+    """Detect cloud-sync conflict copies (OneDrive/Dropbox/Syncthing/GDrive) and temp files."""
+    name = (filename or "").strip()
+    if not name or name.startswith(".") or not name.lower().endswith(".json"):
+        return True
+    if _CONFLICT_COPY_RE.search(name):
+        return True
+    match = _SLOT_FILE_RE.fullmatch(name)
+    if match is None:
+        return True
+    if expected_host:
+        slot_host = match.group("host")
+        if slot_host.casefold() != expected_host.casefold():
+            # e.g. OneDrive appended "-ASUS-GEI" inside folder <HOST>/promptboard@<HOST>-ASUS-GEI.json
+            return True
+    return False
+
+
+def format_file_coupling_target(sync_dir: str, host_slot: str) -> str:
+    normalized_dir = str(Path(sync_dir).resolve()) if (sync_dir or "").strip() else ""
+    return f"file://{normalized_dir}|{sanitize_host_slot(host_slot)}"
+
+
+@dataclass
+class ForeignSlotInfo:
+    """Metadata for a discovered peer slot in the configured cloud-sync folder."""
+
+    slot_key: str
+    app: str
+    host_slot: str
+    path: Path
+    item_count: int = 0
+    updated_at: str = ""
+    import_mode: str = DEFAULT_FILE_SLOT_IMPORT_MODE
+    read_only: bool = True
+    imported_once: bool = False
 
 NAMESPACE_RE = re.compile(r"\A[a-z0-9_-]{1,32}\Z")
 KIND_RE = re.compile(r"\A[a-z0-9_-]{1,32}\Z")
@@ -561,27 +625,350 @@ class NullBackend(SyncBackend):
 
 
 class FileSlotBackend(SyncBackend):
-    """Placeholder for Stage 3 file-slot synchronization."""
+    """Stage 3 single-writer file-slot synchronization backend.
+
+    Each host writes exclusively to its own slot file::
+
+        <sync_dir>/promptboard/<HOST>/promptboard@<HOST>.json
+
+    Foreign slots (``promptboard``, ``profiprompt``, ``profiprompt-browser``) are
+    read-only. Cloud conflict copies (OneDrive/Dropbox/Syncthing/Drive) and
+    temporary files are filtered out automatically.
+    """
 
     mode = "file"
 
-    def __init__(self, sync_dir: Optional[Path] = None, host_slot: str = "") -> None:
-        self.sync_dir = Path(sync_dir) if sync_dir is not None else None
-        self.host_slot = host_slot
+    def __init__(
+        self,
+        sync_dir: Optional[Path] = None,
+        host_slot: str = "",
+        *,
+        app_version: str = "1.1.3",
+    ) -> None:
+        raw_dir = str(sync_dir).strip() if sync_dir is not None else ""
+        self.sync_dir: Optional[Path] = Path(raw_dir) if raw_dir else None
+        self.host_slot = sanitize_host_slot(host_slot)
+        self.app_version = app_version
+
+    def own_slot_dir(self) -> Path:
+        if self.sync_dir is None:
+            raise SyncError("Sync folder is not configured.")
+        return self.sync_dir / FILE_SLOT_APP_NAME / self.host_slot
+
+    def own_slot_path(self) -> Path:
+        return self.own_slot_dir() / f"{FILE_SLOT_APP_NAME}@{self.host_slot}.json"
+
+    def _own_slot_key(self) -> str:
+        return f"{FILE_SLOT_APP_NAME}:{self.host_slot.casefold()}"
+
+    def discover_slots(
+        self,
+        *,
+        slot_modes: Optional[Dict[str, str]] = None,
+        imported_once: Optional[set[str]] = None,
+    ) -> List[ForeignSlotInfo]:
+        """Scan ``sync_dir`` for foreign PromptBoard and ProfiPrompt file slots."""
+        if self.sync_dir is None or not self.sync_dir.is_dir():
+            return []
+
+        modes_map = slot_modes or {}
+        once_set = imported_once or set()
+        own_key = self._own_slot_key()
+        try:
+            own_resolved = self.own_slot_path().resolve()
+        except OSError:
+            own_resolved = self.own_slot_path()
+
+        candidates: List[Tuple[str, str, Path]] = []
+        seen_paths: set[Path] = set()
+
+        # Structured layout: <sync_dir>/<app>/<HOST>/<app>@<HOST>.json
+        for app_name in ("promptboard", "profiprompt", "profiprompt-browser"):
+            app_dir = self.sync_dir / app_name
+            if not app_dir.is_dir():
+                continue
+            try:
+                children = sorted(app_dir.iterdir(), key=lambda p: p.name.casefold())
+            except OSError:
+                continue
+            for child in children:
+                if child.is_dir():
+                    folder_host = child.name
+                    try:
+                        files = sorted(child.iterdir(), key=lambda p: p.name.casefold())
+                    except OSError:
+                        continue
+                    for entry in files:
+                        if not entry.is_file():
+                            continue
+                        if is_cloud_conflict_filename(entry.name, expected_host=folder_host):
+                            continue
+                        match = _SLOT_FILE_RE.fullmatch(entry.name)
+                        if match is None or match.group("app").lower() != app_name:
+                            continue
+                        candidates.append((app_name, match.group("host"), entry))
+                elif child.is_file():
+                    if is_cloud_conflict_filename(child.name):
+                        continue
+                    match = _SLOT_FILE_RE.fullmatch(child.name)
+                    if match is None or match.group("app").lower() != app_name:
+                        continue
+                    candidates.append((app_name, match.group("host"), child))
+
+        # Also support flat root files: <sync_dir>/<app>@<HOST>.json
+        try:
+            root_files = sorted(self.sync_dir.iterdir(), key=lambda p: p.name.casefold())
+        except OSError:
+            root_files = []
+        for entry in root_files:
+            if not entry.is_file():
+                continue
+            if is_cloud_conflict_filename(entry.name):
+                continue
+            match = _SLOT_FILE_RE.fullmatch(entry.name)
+            if match is None:
+                continue
+            candidates.append((match.group("app").lower(), match.group("host"), entry))
+
+        discovered: List[ForeignSlotInfo] = []
+        for app_name, host_name, path in candidates:
+            try:
+                resolved = path.resolve()
+            except OSError:
+                resolved = path
+            if resolved == own_resolved or resolved in seen_paths:
+                continue
+            slot_key = f"{app_name}:{host_name.casefold()}"
+            if slot_key == own_key:
+                continue
+            seen_paths.add(resolved)
+
+            payload = self._read_slot_json(path)
+            if payload is None:
+                continue
+            item_count, updated_at = self._extract_slot_meta(app_name, payload, path)
+            raw_mode = modes_map.get(slot_key, DEFAULT_FILE_SLOT_IMPORT_MODE)
+            eff_mode = raw_mode if raw_mode in FILE_SLOT_IMPORT_MODES else DEFAULT_FILE_SLOT_IMPORT_MODE
+            discovered.append(
+                ForeignSlotInfo(
+                    slot_key=slot_key,
+                    app=app_name,
+                    host_slot=host_name,
+                    path=path,
+                    item_count=item_count,
+                    updated_at=updated_at,
+                    import_mode=eff_mode,
+                    read_only=True,
+                    imported_once=slot_key in once_set,
+                )
+            )
+
+        discovered.sort(key=lambda info: (info.app, info.host_slot.casefold()))
+        return discovered
+
+    @staticmethod
+    def _read_slot_json(path: Path) -> Optional[Dict[str, Any]]:
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("Could not read file slot %s: %s", path, exc)
+            return None
+        return raw if isinstance(raw, dict) else None
+
+    @staticmethod
+    def _extract_slot_meta(app_name: str, payload: Dict[str, Any], path: Path) -> Tuple[int, str]:
+        manifest = payload.get("manifest")
+        updated_at = ""
+        item_count: Optional[int] = None
+        if isinstance(manifest, dict):
+            updated_at = str(manifest.get("updated_at") or "").strip()
+            raw_count = manifest.get("item_count")
+            if isinstance(raw_count, int) and raw_count >= 0:
+                item_count = raw_count
+        if item_count is None:
+            if app_name == "promptboard":
+                items = payload.get("items")
+                item_count = len([x for x in items if isinstance(x, dict)]) if isinstance(items, list) else 0
+            else:
+                prompts = payload.get("prompts")
+                item_count = len([x for x in prompts if isinstance(x, dict)]) if isinstance(prompts, list) else 0
+        if not updated_at:
+            try:
+                mtime = path.stat().st_mtime
+                updated_at = datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+            except OSError:
+                updated_at = ""
+        return item_count, updated_at
+
+    def write_own_slot(
+        self,
+        items: List[LibraryItem],
+        *,
+        deleted_ids: Optional[List[str]] = None,
+    ) -> Path:
+        """Atomically write this host's single-writer slot file with an additive manifest."""
+        slot_path = self.own_slot_path()
+        slot_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "manifest": {
+                "app": FILE_SLOT_APP_NAME,
+                "version": self.app_version,
+                "host": self.host_slot,
+                "updated_at": now_iso(),
+                "item_count": len(items),
+                "schema_version": DEFAULT_SCHEMA_VERSION,
+                "deleted_ids": list(deleted_ids or []),
+            },
+            "items": [item_to_dict(item) for item in items],
+        }
+        atomic_write_json(slot_path, payload)
+        return slot_path
 
     def pull(
         self,
         *,
         since_rev: Optional[int] = None,
         etag: Optional[str] = None,
+        slot_modes: Optional[Dict[str, str]] = None,
+        imported_once: Optional[set[str]] = None,
     ) -> PullResult:
-        raise NotImplementedError("FileSlotBackend is scheduled for Stage 3.")
+        """Read eligible foreign slots without modifying them."""
+        if self.sync_dir is None:
+            return PullResult(
+                cursor=since_rev or 0,
+                etag=etag or "",
+                offline=True,
+                error="Sync folder is not configured.",
+            )
+        if not self.sync_dir.is_dir():
+            return PullResult(
+                cursor=since_rev or 0,
+                etag=etag or "",
+                offline=True,
+                error=f"Sync folder does not exist: {self.sync_dir}",
+            )
 
-    def push(self, changes: List[SyncMutation]) -> PushResult:
-        raise NotImplementedError("FileSlotBackend is scheduled for Stage 3.")
+        from profiprompt_adapter import load_profiprompt_export_payload
+
+        slots = self.discover_slots(slot_modes=slot_modes, imported_once=imported_once)
+        upserts_by_id: Dict[str, Tuple[str, RemoteItem]] = {}
+        consumed_once_slots: List[str] = []
+
+        for slot in slots:
+            if slot.import_mode == "never":
+                continue
+            if slot.import_mode == "once" and slot.imported_once:
+                continue
+
+            payload = self._read_slot_json(slot.path)
+            if payload is None:
+                continue
+
+            slot_items: List[LibraryItem] = []
+            if slot.app == "promptboard":
+                raw_items = payload.get("items", [])
+                if isinstance(raw_items, list):
+                    for raw in raw_items:
+                        if isinstance(raw, dict):
+                            slot_items.append(item_from_dict(raw))
+            else:
+                slot_items = load_profiprompt_export_payload(payload)
+
+            for item in slot_items:
+                item_dict = item_to_dict(item)
+                stamp = str(item.updated_at or slot.updated_at or "")
+                remote = RemoteItem(
+                    id=item.id,
+                    kind=DEFAULT_KIND,
+                    rev=0,
+                    updated_at=stamp,
+                    payload=item_dict,
+                )
+                existing = upserts_by_id.get(item.id)
+                if existing is None or stamp >= existing[0]:
+                    upserts_by_id[item.id] = (stamp, remote)
+
+            if slot.import_mode == "once":
+                consumed_once_slots.append(slot.slot_key)
+
+        return PullResult(
+            upserts=[entry[1] for entry in upserts_by_id.values()],
+            tombstones=[],
+            cursor=since_rev or 0,
+            etag=",".join(sorted(consumed_once_slots)),
+        )
+
+    def push(
+        self,
+        changes: List[SyncMutation],
+        *,
+        all_items: Optional[List[LibraryItem]] = None,
+        deleted_ids: Optional[List[str]] = None,
+    ) -> PushResult:
+        """Write the local library snapshot atomically into this host's own slot."""
+        if self.sync_dir is None:
+            return PushResult(queued_offline=True, error="Sync folder is not configured.")
+        try:
+            if all_items is not None:
+                items_to_write = list(all_items)
+            else:
+                # Apply incremental mutations onto current own slot file if present.
+                existing_payload = self._read_slot_json(self.own_slot_path()) if self.own_slot_path().is_file() else {}
+                raw_items = existing_payload.get("items", []) if isinstance(existing_payload, dict) else []
+                by_id: Dict[str, LibraryItem] = {
+                    item.id: item
+                    for raw in raw_items
+                    if isinstance(raw, dict)
+                    for item in [item_from_dict(raw)]
+                }
+                for mut in changes:
+                    if mut.op == "delete":
+                        by_id.pop(mut.id, None)
+                    elif mut.payload is not None:
+                        obj = item_from_dict(mut.payload)
+                        by_id[obj.id] = obj
+                items_to_write = list(by_id.values())
+
+            self.write_own_slot(items_to_write, deleted_ids=deleted_ids)
+        except OSError as exc:
+            return PushResult(queued_offline=True, error=str(exc))
+
+        applied = {make_object_key(m.kind, m.id): 0 for m in changes}
+        return PushResult(applied_revs=applied, queued_offline=False, library_rev=0)
 
     def test_connection(self) -> ConnectionStatus:
-        raise NotImplementedError("FileSlotBackend is scheduled for Stage 3.")
+        """Verify that ``sync_dir`` is accessible and writable for this host's own slot."""
+        start = time.perf_counter()
+        if self.sync_dir is None:
+            return ConnectionStatus(
+                ok=False,
+                latency_ms=0.0,
+                detail="Sync folder is not configured.",
+                library_rev=None,
+            )
+        try:
+            slot_dir = self.own_slot_dir()
+            slot_dir.mkdir(parents=True, exist_ok=True)
+            probe = slot_dir / f".probe-{uuid.uuid4().hex[:8]}.tmp"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink()
+            foreign = self.discover_slots()
+        except OSError as exc:
+            elapsed_ms = round((time.perf_counter() - start) * 1000.0, 1)
+            return ConnectionStatus(
+                ok=False,
+                latency_ms=elapsed_ms,
+                detail=str(exc),
+                library_rev=None,
+            )
+        elapsed_ms = round((time.perf_counter() - start) * 1000.0, 1)
+        return ConnectionStatus(
+            ok=True,
+            latency_ms=elapsed_ms,
+            detail=f"OK ({len(foreign)} foreign slots)",
+            library_rev=0,
+            item_count=len(foreign),
+        )
 
 
 HttpRequester = Callable[
@@ -1448,6 +1835,8 @@ class SyncStateData:
     deleted_ids: List[str] = field(default_factory=list)
     conflicts: List[ConflictEntry] = field(default_factory=list)
     target_snapshots: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    file_slot_hashes: Dict[str, str] = field(default_factory=dict)
+    file_imported_once: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1463,6 +1852,8 @@ class SyncStateData:
             "deleted_ids": list(self.deleted_ids),
             "conflicts": [c.to_dict() for c in self.conflicts],
             "target_snapshots": dict(self.target_snapshots),
+            "file_slot_hashes": {str(k): str(v) for k, v in self.file_slot_hashes.items()},
+            "file_imported_once": list(self.file_imported_once),
         }
 
     @classmethod
@@ -1473,6 +1864,8 @@ class SyncStateData:
         coupled_raw = raw.get("coupled_targets")
         deleted_raw = raw.get("deleted_ids")
         snapshots_raw = raw.get("target_snapshots")
+        file_hashes_raw = raw.get("file_slot_hashes")
+        file_once_raw = raw.get("file_imported_once")
         coupled_list = (
             [str(x) for x in coupled_raw if isinstance(x, str)]
             if isinstance(coupled_raw, list)
@@ -1520,6 +1913,16 @@ class SyncStateData:
                 {str(k): dict(v) for k, v in snapshots_raw.items() if isinstance(v, dict)}
                 if isinstance(snapshots_raw, dict)
                 else {}
+            ),
+            file_slot_hashes=(
+                {str(k): str(v) for k, v in file_hashes_raw.items() if isinstance(v, str)}
+                if isinstance(file_hashes_raw, dict)
+                else {}
+            ),
+            file_imported_once=(
+                [str(x) for x in file_once_raw if isinstance(x, str)]
+                if isinstance(file_once_raw, list)
+                else []
             ),
         )
 
@@ -1833,6 +2236,8 @@ def create_sync_backend(
     namespace: str = DEFAULT_NAMESPACE,
     client_id: str = "promptboard-client",
     requester: Optional[HttpRequester] = None,
+    sync_dir: Optional[Path] = None,
+    host_slot: str = "",
 ) -> SyncBackend:
     normalized = (mode or DEFAULT_SYNC_MODE).strip().lower()
     if normalized == "off" or not normalized:
@@ -1846,7 +2251,7 @@ def create_sync_backend(
             requester=requester,
         )
     if normalized == "file":
-        return FileSlotBackend()
+        return FileSlotBackend(sync_dir=sync_dir, host_slot=host_slot)
     return NullBackend()
 
 
@@ -1930,22 +2335,49 @@ class SyncEngine:
         return raw if raw in SYNC_MODES else DEFAULT_SYNC_MODE
 
     def is_configured(self) -> bool:
-        if self.current_mode() != "server":
-            return False
-        return bool(
-            self.settings.get_sync_server_url().strip() and self.settings.get_sync_token().strip()
-        )
+        mode = self.current_mode()
+        if mode == "server":
+            return bool(
+                self.settings.get_sync_server_url().strip() and self.settings.get_sync_token().strip()
+            )
+        if mode == "file":
+            getter = getattr(self.settings, "get_sync_file_dir", None)
+            return bool(callable(getter) and str(getter() or "").strip())
+        return False
+
+    def _file_sync_dir_raw(self) -> str:
+        getter = getattr(self.settings, "get_sync_file_dir", None)
+        return str(getter() or "").strip() if callable(getter) else ""
+
+    def _file_host_slot(self) -> str:
+        getter = getattr(self.settings, "get_sync_file_host_slot", None)
+        raw = str(getter() or "").strip() if callable(getter) else ""
+        return sanitize_host_slot(raw)
+
+    def _file_slot_modes(self) -> Dict[str, str]:
+        getter = getattr(self.settings, "get_sync_file_slot_modes", None)
+        raw = getter() if callable(getter) else {}
+        return dict(raw) if isinstance(raw, dict) else {}
 
     def target_coupling_id(self) -> str:
+        if self.current_mode() == "file":
+            return format_file_coupling_target(
+                self._file_sync_dir_raw(),
+                self._file_host_slot(),
+            )
         return format_coupling_target(
             self.settings.get_sync_server_url(),
             self.settings.get_sync_namespace(),
         )
 
     def _effective_queue_target(self, state: Optional[SyncStateData] = None) -> Optional[str]:
+        if self.current_mode() == "file":
+            raw_dir = self._file_sync_dir_raw()
+            if raw_dir:
+                return format_file_coupling_target(raw_dir, self._file_host_slot())
         raw_url = self.settings.get_sync_server_url().strip()
         if raw_url:
-            return self.target_coupling_id()
+            return format_coupling_target(raw_url, self.settings.get_sync_namespace())
         loaded = state if state is not None else self.state_store.load()
         if loaded.active_target:
             return loaded.active_target
@@ -2078,6 +2510,7 @@ class SyncEngine:
         if mode == "off":
             return NullBackend()
         resolved_client_id = client_id or self.state_store.load().client_id
+        raw_file_dir = self._file_sync_dir_raw()
         return create_sync_backend(
             mode,
             server_url=self.settings.get_sync_server_url(),
@@ -2085,6 +2518,25 @@ class SyncEngine:
             namespace=self.settings.get_sync_namespace(),
             client_id=resolved_client_id,
             requester=self._requester,
+            sync_dir=Path(raw_file_dir) if raw_file_dir else None,
+            host_slot=self._file_host_slot(),
+        )
+
+    def discover_file_slots(
+        self,
+        *,
+        sync_dir: Optional[str] = None,
+        host_slot: Optional[str] = None,
+    ) -> List[ForeignSlotInfo]:
+        raw_dir = sync_dir if sync_dir is not None else self._file_sync_dir_raw()
+        if not (raw_dir or "").strip():
+            return []
+        eff_host = host_slot if host_slot is not None else self._file_host_slot()
+        state = self.state_store.load()
+        backend = FileSlotBackend(sync_dir=Path(raw_dir), host_slot=eff_host)
+        return backend.discover_slots(
+            slot_modes=self._file_slot_modes(),
+            imported_once=set(state.file_imported_once),
         )
 
     def test_connection(
@@ -2094,11 +2546,15 @@ class SyncEngine:
         server_url: Optional[str] = None,
         token: Optional[str] = None,
         namespace: Optional[str] = None,
+        sync_dir: Optional[str] = None,
+        host_slot: Optional[str] = None,
     ) -> ConnectionStatus:
         effective_mode = mode if mode is not None else self.current_mode()
         if effective_mode == "off":
             return NullBackend().test_connection()
         state = self.state_store.load()
+        raw_dir = sync_dir if sync_dir is not None else self._file_sync_dir_raw()
+        eff_host = host_slot if host_slot is not None else self._file_host_slot()
         try:
             backend = create_sync_backend(
                 effective_mode,
@@ -2107,6 +2563,8 @@ class SyncEngine:
                 namespace=namespace if namespace is not None else self.settings.get_sync_namespace(),
                 client_id=state.client_id,
                 requester=self._requester,
+                sync_dir=Path(raw_dir) if (raw_dir or "").strip() else None,
+                host_slot=eff_host,
             )
         except ValueError as exc:
             return ConnectionStatus(ok=False, latency_ms=0.0, detail=str(exc), library_rev=None)
@@ -2131,26 +2589,40 @@ class SyncEngine:
         return 0
 
     def enqueue_upsert(self, item: LibraryItem, *, kind: str = DEFAULT_KIND) -> None:
-        if self.current_mode() != "server":
+        mode = self.current_mode()
+        if mode not in ("server", "file"):
             return
         with self._state_lock:
             state = self.state_store.load()
+            state_dirty = False
+            if item.id in state.deleted_ids:
+                state.deleted_ids = [x for x in state.deleted_ids if x != item.id]
+                state_dirty = True
             target = self._effective_queue_target(state)
             if target and not state.active_target:
                 state.active_target = target
+                state_dirty = True
+            if state_dirty:
                 self.state_store.save(state)
             key = make_object_key(kind, item.id)
             base_rev = self._base_rev_for_target(state, target, key)
             self.queue.enqueue_upsert(item, known_base_rev=base_rev, kind=kind, target=target)
 
     def enqueue_delete(self, item_id: str, *, kind: str = DEFAULT_KIND) -> None:
-        if self.current_mode() != "server":
+        mode = self.current_mode()
+        if mode not in ("server", "file"):
             return
         with self._state_lock:
             state = self.state_store.load()
+            state_dirty = False
+            if mode == "file" and item_id not in state.deleted_ids:
+                state.deleted_ids.append(item_id)
+                state_dirty = True
             target = self._effective_queue_target(state)
             if target and not state.active_target:
                 state.active_target = target
+                state_dirty = True
+            if state_dirty:
                 self.state_store.save(state)
             key = make_object_key(kind, item_id)
             base_rev = self._base_rev_for_target(state, target, key)
@@ -2526,6 +2998,158 @@ class SyncEngine:
                 error=error_msg,
             )
 
+    def _sync_file_slots(self) -> SyncOutcome:
+        """Execute Stage 3 single-writer file-slot sync (pull foreign slots, 3-way merge, write own slot)."""
+        if not self.is_configured():
+            return SyncOutcome(
+                ok=False,
+                mode="file",
+                pending_queue_count=self.get_pending_count(),
+                conflict_count=len(self.get_conflicts()),
+                error="Sync folder is not configured.",
+            )
+        if self.is_cancelled():
+            return SyncOutcome(ok=False, mode="file", cancelled=True)
+
+        coupling_id = self.target_coupling_id()
+        with self._engine_lock, self._state_lock:
+            state = self.state_store.load()
+            state.mode = "file"
+            state.active_target = coupling_id
+            if coupling_id not in state.coupled_targets:
+                state.coupled_targets.append(coupling_id)
+            self.queue.set_active_target(coupling_id)
+            backend = self.build_backend(client_id=state.client_id)
+            assert isinstance(backend, FileSlotBackend)
+            slot_modes = self._file_slot_modes()
+            imported_once_set = set(state.file_imported_once)
+
+        pull_res = backend.pull(
+            slot_modes=slot_modes,
+            imported_once=imported_once_set,
+        )
+        if pull_res.offline:
+            return SyncOutcome(
+                ok=False,
+                mode="file",
+                offline=True,
+                pending_queue_count=self.get_pending_count(target=coupling_id),
+                conflict_count=len(self.get_conflicts()),
+                error=pull_res.error,
+            )
+
+        consumed_once = [s for s in (pull_res.etag or "").split(",") if s]
+
+        with self._engine_lock, self.storage._lock, self._state_lock:
+            live_state = self.state_store.load()
+            local_items = self.storage.load_items()
+            local_by_id: Dict[str, LibraryItem] = {it.id: it for it in local_items}
+            deleted_set = set(live_state.deleted_ids)
+            applied_upserts = 0
+            storage_changed = False
+
+            for remote in pull_res.upserts:
+                if remote.id in deleted_set:
+                    # Respect local delete blocklist: do not resurrect deleted entries from foreign slots.
+                    continue
+                key = make_object_key(remote.kind, remote.id)
+                remote_item = item_from_dict(remote.payload)
+                remote_dict = item_to_dict(remote_item)
+                remote_hash = canonical_item_hash(remote_dict)
+
+                local_existing = local_by_id.get(remote.id)
+                if local_existing is None:
+                    local_by_id[remote.id] = remote_item
+                    live_state.item_hashes[key] = remote_hash
+                    live_state.file_slot_hashes[key] = remote_hash
+                    applied_upserts += 1
+                    storage_changed = True
+                    continue
+
+                local_dict = item_to_dict(local_existing)
+                local_hash = canonical_item_hash(local_dict)
+                if local_hash == remote_hash:
+                    live_state.item_hashes[key] = local_hash
+                    live_state.file_slot_hashes[key] = remote_hash
+                    continue
+
+                last_local_base = live_state.item_hashes.get(key)
+                last_remote_base = live_state.file_slot_hashes.get(key)
+
+                if last_local_base and local_hash == last_local_base and remote_hash != last_remote_base:
+                    # Unchanged locally, updated in foreign slot -> fast-forward.
+                    local_by_id[remote.id] = remote_item
+                    live_state.item_hashes[key] = remote_hash
+                    live_state.file_slot_hashes[key] = remote_hash
+                    applied_upserts += 1
+                    storage_changed = True
+                elif last_remote_base and remote_hash == last_remote_base:
+                    # Foreign slot unchanged; keep local edit and publish to own slot.
+                    live_state.item_hashes[key] = local_hash
+                else:
+                    # Both sides diverged (or first-time colliding ID with different contents) -> record conflict.
+                    self._upsert_conflict(
+                        live_state.conflicts,
+                        ConflictEntry(
+                            id=remote.id,
+                            kind=remote.kind,
+                            title=local_existing.name or remote_item.name,
+                            source="file",
+                            client_base_rev=0,
+                            server_rev=0,
+                            updated_at=remote.updated_at,
+                            local_op="upsert",
+                            local_item=local_dict,
+                            server_item=remote_dict,
+                            server_deleted=False,
+                        ),
+                    )
+                    live_state.file_slot_hashes[key] = remote_hash
+
+            merged_items = list(local_by_id.values())
+            if storage_changed:
+                self.storage.save_items(merged_items)
+
+            # Update baseline hashes for all local items.
+            for it in merged_items:
+                key = make_object_key(DEFAULT_KIND, it.id)
+                if key not in {c.object_key for c in live_state.conflicts}:
+                    live_state.item_hashes[key] = canonical_item_hash(item_to_dict(it))
+
+            for slot_key in consumed_once:
+                if slot_key not in live_state.file_imported_once:
+                    live_state.file_imported_once.append(slot_key)
+
+            push_res = backend.push([], all_items=merged_items, deleted_ids=live_state.deleted_ids)
+            if push_res.queued_offline:
+                live_state.target_snapshots[coupling_id] = self._snapshot_from_state(live_state)
+                self.state_store.save(live_state)
+                return SyncOutcome(
+                    ok=False,
+                    mode="file",
+                    pulled_upserts=applied_upserts,
+                    offline=True,
+                    pending_queue_count=self.get_pending_count(target=coupling_id),
+                    conflict_count=len(live_state.conflicts),
+                    storage_changed=storage_changed,
+                    error=push_res.error,
+                )
+
+            self.queue.clear(target=coupling_id)
+            live_state.target_snapshots[coupling_id] = self._snapshot_from_state(live_state)
+            self.state_store.save(live_state)
+            return SyncOutcome(
+                ok=True,
+                mode="file",
+                library_rev=0,
+                pulled_upserts=applied_upserts,
+                pulled_tombstones=0,
+                pushed_count=len(merged_items),
+                pending_queue_count=0,
+                conflict_count=len(live_state.conflicts),
+                storage_changed=storage_changed,
+            )
+
     def sync_once(
         self,
         *,
@@ -2543,7 +3167,7 @@ class SyncEngine:
         if mode == "off":
             return SyncOutcome(ok=True, mode="off")
         if mode == "file":
-            raise NotImplementedError("FileSlotBackend is scheduled for Stage 3.")
+            return self._sync_file_slots()
         if not self.is_configured():
             return SyncOutcome(
                 ok=False,
@@ -2971,8 +3595,26 @@ class SyncEngine:
 
     def flush_pending(self, *, timeout: float = 2.0) -> PushResult:
         """Best-effort push of pending queue mutations for the active target without holding locks across I/O."""
-        if self.current_mode() != "server" or not self.is_configured():
+        mode = self.current_mode()
+        if mode not in ("server", "file") or not self.is_configured():
             return PushResult()
+        if mode == "file":
+            with self._engine_lock, self.storage._lock, self._state_lock:
+                coupling_id = self.target_coupling_id()
+                state = self.state_store.load()
+                items = self.storage.load_items()
+                backend = self.build_backend(client_id=state.client_id)
+                assert isinstance(backend, FileSlotBackend)
+                res = backend.push([], all_items=items, deleted_ids=state.deleted_ids)
+                if not res.queued_offline:
+                    self.queue.clear(target=coupling_id)
+                return PushResult(
+                    applied_revs={"_count": len(items)} if not res.queued_offline else {},
+                    conflicts=list(state.conflicts),
+                    queued_offline=res.queued_offline,
+                    library_rev=0,
+                    error=res.error,
+                )
         with self._engine_lock, self._state_lock:
             coupling_id = self.target_coupling_id()
             state = self.state_store.load()
@@ -3128,16 +3770,25 @@ class SyncEngine:
                 push
                 and not self.is_cancelled()
                 and eff_target
-                and self.current_mode() == "server"
+                and self.current_mode() in ("server", "file")
                 and self.is_configured()
                 and eff_target == self.target_coupling_id()
             ):
-                pending_to_push = self.queue.load_all(target=eff_target)
-                if pending_to_push:
+                if self.current_mode() == "file":
                     try:
-                        backend = self.build_backend(client_id=state.client_id)
+                        file_backend = self.build_backend(client_id=state.client_id)
+                        if isinstance(file_backend, FileSlotBackend):
+                            file_backend.push([], all_items=items, deleted_ids=state.deleted_ids)
+                            self.queue.clear(target=eff_target)
                     except SyncError:
-                        backend = None
+                        pass
+                else:
+                    pending_to_push = self.queue.load_all(target=eff_target)
+                    if pending_to_push:
+                        try:
+                            backend = self.build_backend(client_id=state.client_id)
+                        except SyncError:
+                            backend = None
 
         if push and not self.is_cancelled() and pending_to_push and isinstance(backend, ServerBackend) and eff_target:
             try:

@@ -14,7 +14,9 @@ from storage import Storage
 from sync_backend import (
     ConflictEntry,
     ConflictResolutionChoice,
+    FILE_SLOT_IMPORT_MODES,
     FirstCouplingChoice,
+    ForeignSlotInfo,
     SyncEngine,
     SyncOutcome,
     TargetChangeQueueChoice,
@@ -378,9 +380,9 @@ class ConflictResolutionDialog(QtWidgets.QDialog):
     def _schedule_background_push(self) -> bool:
         if self.sync_engine.is_cancelled():
             return False
-        if self.sync_engine.current_mode() != "server" or not self.sync_engine.is_configured():
+        if self.sync_engine.current_mode() not in ("server", "file") or not self.sync_engine.is_configured():
             return False
-        if self.sync_engine.get_pending_count() <= 0:
+        if self.sync_engine.current_mode() == "server" and self.sync_engine.get_pending_count() <= 0:
             return False
         if self._on_push_requested is not None:
             return bool(self._on_push_requested())
@@ -648,6 +650,63 @@ class SettingsDialog(QtWidgets.QDialog):
         server_layout.addLayout(sync_btn_row)
 
         sync_outer.addWidget(self.sync_server_container)
+
+        # File-slot synchronization controls (Stage 3)
+        self.sync_file_container = QtWidgets.QWidget()
+        file_layout = QtWidgets.QVBoxLayout(self.sync_file_container)
+        file_layout.setContentsMargins(0, 0, 0, 0)
+        self.sync_file_form = QtWidgets.QFormLayout()
+
+        self.sync_file_dir_edit = QtWidgets.QLineEdit(self.settings.get_sync_file_dir())
+        self.sync_file_dir_edit.setReadOnly(True)
+        self.sync_file_dir_edit.setPlaceholderText(tr("settings.sync.file_dir.placeholder"))
+        self.change_sync_file_dir_button = QtWidgets.QPushButton(tr("btn.change"))
+        self.sync_file_form.addRow(
+            tr("settings.sync.file_dir"),
+            self._row(self.sync_file_dir_edit, self.change_sync_file_dir_button),
+        )
+
+        self.sync_file_host_edit = QtWidgets.QLineEdit(self.settings.get_sync_file_host_slot())
+        self.sync_file_form.addRow(tr("settings.sync.file_host"), self.sync_file_host_edit)
+        file_layout.addLayout(self.sync_file_form)
+
+        self.sync_file_slots_label = QtWidgets.QLabel(tr("settings.sync.file_slots"))
+        file_layout.addWidget(self.sync_file_slots_label)
+
+        self.sync_file_slots_table = QtWidgets.QTableWidget(0, 4)
+        self.sync_file_slots_table.setHorizontalHeaderLabels(
+            [
+                tr("settings.sync.slot_col.host"),
+                tr("settings.sync.slot_col.app"),
+                tr("settings.sync.slot_col.items"),
+                tr("settings.sync.slot_col.mode"),
+            ]
+        )
+        self.sync_file_slots_table.verticalHeader().setVisible(False)
+        self.sync_file_slots_table.setEditTriggers(
+            QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self.sync_file_slots_table.setSelectionMode(
+            QtWidgets.QAbstractItemView.SelectionMode.NoSelection
+        )
+        self.sync_file_slots_table.setMaximumHeight(120)
+        self.sync_file_slots_table.horizontalHeader().setStretchLastSection(True)
+        file_layout.addWidget(self.sync_file_slots_table)
+
+        file_btn_row = QtWidgets.QHBoxLayout()
+        self.sync_file_rescan_button = QtWidgets.QPushButton(tr("settings.sync.file_rescan_btn"))
+        self.sync_file_test_button = QtWidgets.QPushButton(tr("settings.sync.file_test_btn"))
+        self.sync_file_now_button = QtWidgets.QPushButton(tr("settings.sync.sync_now_btn"))
+        self.sync_file_conflicts_button = QtWidgets.QPushButton(
+            tr("settings.sync.conflicts_btn", count=0)
+        )
+        file_btn_row.addWidget(self.sync_file_rescan_button)
+        file_btn_row.addWidget(self.sync_file_test_button)
+        file_btn_row.addWidget(self.sync_file_now_button)
+        file_btn_row.addWidget(self.sync_file_conflicts_button)
+        file_layout.addLayout(file_btn_row)
+
+        sync_outer.addWidget(self.sync_file_container)
         layout.addWidget(self.sync_group)
 
         # Info
@@ -707,6 +766,12 @@ class SettingsDialog(QtWidgets.QDialog):
         self.test_connection_button.clicked.connect(self.run_test_connection)
         self.sync_now_button.clicked.connect(self.run_sync_now)
         self.resolve_conflicts_button.clicked.connect(self.open_conflicts_dialog)
+        self.change_sync_file_dir_button.clicked.connect(self.change_sync_file_dir)
+        self.sync_file_host_edit.editingFinished.connect(self._persist_file_sync_fields)
+        self.sync_file_rescan_button.clicked.connect(self.refresh_file_slots_table)
+        self.sync_file_test_button.clicked.connect(self.run_test_file_connection)
+        self.sync_file_now_button.clicked.connect(self.run_sync_now)
+        self.sync_file_conflicts_button.clicked.connect(self.open_conflicts_dialog)
         self.close_button.clicked.connect(self._on_close_clicked)
 
     def showEvent(self, event: QtGui.QShowEvent) -> None:
@@ -782,8 +847,11 @@ class SettingsDialog(QtWidgets.QDialog):
         return res
 
     def _on_close_clicked(self) -> None:
-        if (self.sync_mode_combo.currentData() or "off") == "server":
+        current_mode = self.sync_mode_combo.currentData() or "off"
+        if current_mode == "server":
             self._persist_sync_fields()
+        elif current_mode == "file":
+            self._persist_file_sync_fields()
         self.accept()
 
     def shutdown_workers(self, timeout_ms: int = 2000) -> bool:
@@ -815,12 +883,87 @@ class SettingsDialog(QtWidgets.QDialog):
         self._notify_sync_settings_changed()
         self._refresh_sync_visibility_and_status()
 
+    def _persist_file_sync_fields(self) -> None:
+        self.settings.set_sync_file_dir(self.sync_file_dir_edit.text().strip())
+        self.settings.set_sync_file_host_slot(self.sync_file_host_edit.text().strip())
+        self.sync_file_host_edit.setText(self.settings.get_sync_file_host_slot())
+        self._notify_sync_settings_changed()
+        self._refresh_sync_visibility_and_status()
+
+    def change_sync_file_dir(self) -> None:
+        current = self.settings.get_sync_file_dir() or str(Path.home())
+        new_path = QtWidgets.QFileDialog.getExistingDirectory(
+            self, tr("dialog.choose_sync_file_dir"), current
+        )
+        if new_path:
+            self.settings.set_sync_file_dir(new_path)
+            self.sync_file_dir_edit.setText(new_path)
+            self._persist_file_sync_fields()
+
+    def refresh_file_slots_table(self) -> List[ForeignSlotInfo]:
+        engine = self._get_or_create_sync_engine()
+        slots = engine.discover_file_slots(
+            sync_dir=self.sync_file_dir_edit.text().strip(),
+            host_slot=self.sync_file_host_edit.text().strip(),
+        )
+        self.sync_file_slots_table.setRowCount(len(slots))
+        is_file = (self.sync_mode_combo.currentData() or self.settings.get_sync_mode()) == "file"
+        combo_focus = (
+            QtCore.Qt.FocusPolicy.StrongFocus if is_file else QtCore.Qt.FocusPolicy.NoFocus
+        )
+        for row, info in enumerate(slots):
+            self.sync_file_slots_table.setItem(row, 0, QtWidgets.QTableWidgetItem(info.host_slot))
+            self.sync_file_slots_table.setItem(row, 1, QtWidgets.QTableWidgetItem(info.app))
+            self.sync_file_slots_table.setItem(
+                row, 2, QtWidgets.QTableWidgetItem(str(info.item_count))
+            )
+            mode_combo = QtWidgets.QComboBox()
+            mode_combo.setFocusPolicy(combo_focus)
+            for opt in FILE_SLOT_IMPORT_MODES:
+                mode_combo.addItem(tr(f"sync.slot_mode.{opt}"), opt)
+            idx = mode_combo.findData(info.import_mode)
+            if idx >= 0:
+                mode_combo.setCurrentIndex(idx)
+            mode_combo.currentIndexChanged.connect(
+                lambda _i, sk=info.slot_key, cb=mode_combo: self._on_file_slot_mode_changed(
+                    sk, str(cb.currentData() or "on_start")
+                )
+            )
+            self.sync_file_slots_table.setCellWidget(row, 3, mode_combo)
+        return slots
+
+    def _on_file_slot_mode_changed(self, slot_key: str, mode: str) -> None:
+        self.settings.set_sync_file_slot_mode(slot_key, mode)
+        self._notify_sync_settings_changed()
+
+    def run_test_file_connection(self) -> bool:
+        self._persist_file_sync_fields()
+        engine = self._get_or_create_sync_engine()
+        status = engine.test_connection(
+            mode="file",
+            sync_dir=self.sync_file_dir_edit.text().strip(),
+            host_slot=self.sync_file_host_edit.text().strip(),
+        )
+        self.refresh_file_slots_table()
+        if status.ok:
+            self.sync_status_label.setText(
+                tr(
+                    "sync.status.file_test_ok",
+                    slots=status.item_count if status.item_count is not None else 0,
+                )
+            )
+            return True
+        self.sync_status_label.setText(tr("sync.status.test_failed", detail=status.detail))
+        return False
+
     def _on_sync_mode_changed(self) -> None:
         mode = self.sync_mode_combo.currentData() or SettingsManager.DEFAULT_SYNC_MODE
         self.settings.set_sync_mode(mode)
         if mode == "server":
             self._ensure_sync_token_loaded()
             self._persist_sync_fields()
+        elif mode == "file":
+            self._persist_file_sync_fields()
         else:
             self._notify_sync_settings_changed()
             self._refresh_sync_visibility_and_status()
@@ -836,9 +979,11 @@ class SettingsDialog(QtWidgets.QDialog):
     def _refresh_sync_visibility_and_status(self) -> None:
         mode = self.sync_mode_combo.currentData() or self.settings.get_sync_mode()
         is_server = mode == "server"
+        is_file = mode == "file"
         self.sync_server_container.setVisible(is_server)
+        self.sync_file_container.setVisible(is_file)
 
-        focus_edit = (
+        server_focus = (
             QtCore.Qt.FocusPolicy.StrongFocus if is_server else QtCore.Qt.FocusPolicy.NoFocus
         )
         for widget in (
@@ -849,20 +994,63 @@ class SettingsDialog(QtWidgets.QDialog):
             self.test_connection_button,
             self.sync_now_button,
         ):
-            widget.setFocusPolicy(focus_edit)
+            widget.setFocusPolicy(server_focus)
 
-        if not is_server:
+        file_focus = (
+            QtCore.Qt.FocusPolicy.StrongFocus if is_file else QtCore.Qt.FocusPolicy.NoFocus
+        )
+        for widget in (
+            self.sync_file_dir_edit,
+            self.change_sync_file_dir_button,
+            self.sync_file_host_edit,
+            self.sync_file_slots_table,
+            self.sync_file_rescan_button,
+            self.sync_file_test_button,
+            self.sync_file_now_button,
+        ):
+            widget.setFocusPolicy(file_focus)
+
+        if not is_server and not is_file:
             self.sync_status_label.setText(tr("sync.status.off"))
             self.resolve_conflicts_button.setEnabled(False)
             self.resolve_conflicts_button.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+            self.sync_file_conflicts_button.setEnabled(False)
+            self.sync_file_conflicts_button.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
             return
 
         engine = self._get_or_create_sync_engine()
         conflicts = engine.get_conflicts()
+        conflict_count = len(conflicts)
+
+        if is_file:
+            self.resolve_conflicts_button.setEnabled(False)
+            self.resolve_conflicts_button.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+            self.sync_file_conflicts_button.setText(
+                tr("settings.sync.conflicts_btn", count=conflict_count)
+            )
+            self.sync_file_conflicts_button.setEnabled(conflict_count > 0)
+            self.sync_file_conflicts_button.setFocusPolicy(
+                QtCore.Qt.FocusPolicy.StrongFocus
+                if conflict_count > 0
+                else QtCore.Qt.FocusPolicy.NoFocus
+            )
+            slots = self.refresh_file_slots_table()
+            if not self.sync_file_dir_edit.text().strip():
+                self.sync_status_label.setText(tr("sync.status.file_unconfigured"))
+            elif conflict_count > 0:
+                self.sync_status_label.setText(tr("sync.status.conflicts", count=conflict_count))
+            else:
+                self.sync_status_label.setText(
+                    tr("sync.status.file_ready", host=self.settings.get_sync_file_host_slot(), slots=len(slots))
+                )
+            return
+
+        self.sync_file_conflicts_button.setEnabled(False)
+        self.sync_file_conflicts_button.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+
         pending = engine.get_pending_count()
         lib_rev = engine.get_library_rev()
 
-        conflict_count = len(conflicts)
         self.resolve_conflicts_button.setText(
             tr("settings.sync.conflicts_btn", count=conflict_count)
         )
@@ -918,9 +1106,14 @@ class SettingsDialog(QtWidgets.QDialog):
         return False
 
     def run_sync_now(self) -> Optional[SyncOutcome]:
-        self._ensure_sync_token_loaded()
-        self._persist_sync_fields()
+        mode = self.sync_mode_combo.currentData() or self.settings.get_sync_mode()
+        if mode == "server":
+            self._ensure_sync_token_loaded()
+            self._persist_sync_fields()
+        elif mode == "file":
+            self._persist_file_sync_fields()
         self.sync_now_button.setEnabled(False)
+        self.sync_file_now_button.setEnabled(False)
         try:
             if self._on_sync_now is not None:
                 outcome = self._on_sync_now()
@@ -929,9 +1122,14 @@ class SettingsDialog(QtWidgets.QDialog):
                 outcome = self._run_in_worker_pool(engine.sync_once)
         finally:
             self.sync_now_button.setEnabled(True)
+            self.sync_file_now_button.setEnabled(True)
         self._refresh_sync_visibility_and_status()
         if outcome is not None and not outcome.ok and outcome.error:
             self.sync_status_label.setText(tr("sync.status.test_failed", detail=outcome.error))
+        elif outcome is not None and outcome.ok and outcome.mode == "file":
+            self.sync_status_label.setText(
+                tr("sync.status.file_synced", count=outcome.pushed_count)
+            )
         return outcome
 
     def open_conflicts_dialog(self) -> None:
@@ -1108,6 +1306,17 @@ class SettingsDialog(QtWidgets.QDialog):
         self.resolve_conflicts_button.setAccessibleDescription(tr("settings.sync.conflicts_btn.tooltip"))
         self.resolve_conflicts_button.setToolTip(tr("settings.sync.conflicts_btn.tooltip"))
 
+        self.sync_file_dir_edit.setAccessibleName(tr("settings.sync.file_dir"))
+        self.sync_file_dir_edit.setToolTip(tr("settings.sync.file_dir.tooltip"))
+        self.change_sync_file_dir_button.setAccessibleName(tr("settings.sync.file_dir"))
+        self.sync_file_host_edit.setAccessibleName(tr("settings.sync.file_host"))
+        self.sync_file_host_edit.setToolTip(tr("settings.sync.file_host.tooltip"))
+        self.sync_file_slots_table.setAccessibleName(tr("settings.sync.file_slots"))
+        self.sync_file_rescan_button.setAccessibleName(tr("settings.sync.file_rescan_btn"))
+        self.sync_file_test_button.setAccessibleName(tr("settings.sync.file_test_btn"))
+        self.sync_file_now_button.setAccessibleName(tr("settings.sync.sync_now_btn"))
+        self.sync_file_conflicts_button.setAccessibleName(tr("settings.sync.conflicts_btn.tooltip"))
+
         self.info_group.setAccessibleName(tr("settings.group.info"))
         self.info_group.setAccessibleDescription(tr("settings.group.info.tooltip"))
         self.info_group.setToolTip(tr("settings.group.info.tooltip"))
@@ -1137,6 +1346,20 @@ class SettingsDialog(QtWidgets.QDialog):
         self.sync_token_edit.setPlaceholderText(tr("settings.sync.token.placeholder"))
         self.test_connection_button.setText(tr("settings.sync.test_btn"))
         self.sync_now_button.setText(tr("settings.sync.sync_now_btn"))
+        self.change_sync_file_dir_button.setText(tr("btn.change"))
+        self.sync_file_dir_edit.setPlaceholderText(tr("settings.sync.file_dir.placeholder"))
+        self.sync_file_slots_label.setText(tr("settings.sync.file_slots"))
+        self.sync_file_slots_table.setHorizontalHeaderLabels(
+            [
+                tr("settings.sync.slot_col.host"),
+                tr("settings.sync.slot_col.app"),
+                tr("settings.sync.slot_col.items"),
+                tr("settings.sync.slot_col.mode"),
+            ]
+        )
+        self.sync_file_rescan_button.setText(tr("settings.sync.file_rescan_btn"))
+        self.sync_file_test_button.setText(tr("settings.sync.file_test_btn"))
+        self.sync_file_now_button.setText(tr("settings.sync.sync_now_btn"))
         self.close_button.setText(tr("btn.ok"))
 
         labels_paths = [
@@ -1176,6 +1399,15 @@ class SettingsDialog(QtWidgets.QDialog):
         ]
         for i, text in enumerate(labels_sync_srv):
             label_item = self.sync_server_form.itemAt(i, QtWidgets.QFormLayout.LabelRole)
+            if label_item and isinstance(label_item.widget(), QtWidgets.QLabel):
+                label_item.widget().setText(text)
+
+        labels_sync_file = [
+            tr("settings.sync.file_dir"),
+            tr("settings.sync.file_host"),
+        ]
+        for i, text in enumerate(labels_sync_file):
+            label_item = self.sync_file_form.itemAt(i, QtWidgets.QFormLayout.LabelRole)
             if label_item and isinstance(label_item.widget(), QtWidgets.QLabel):
                 label_item.widget().setText(text)
 
