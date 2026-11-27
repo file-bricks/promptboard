@@ -2,16 +2,24 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+from PySide6 import QtCore
+import pytest
 
-from models import ItemType, LibraryItem, item_to_dict, now_iso
+from models import ItemType, LibraryItem, item_from_dict, item_to_dict, now_iso
 from settings_dialog import SettingsDialog
 from settings_manager import SettingsManager
 from storage import Storage
+import sync_backend
 from sync_backend import (
     FileSlotBackend,
     SyncEngine,
+    SyncTransportError,
+    format_coupling_target,
+    format_file_coupling_target,
     is_cloud_conflict_filename,
+    make_object_key,
     sanitize_host_slot,
 )
 
@@ -33,6 +41,10 @@ def _make_item(item_id: str, name: str, content: str, *, category: str = "Sync")
 
 def _make_settings(tmp_path: Path, name: str, sync_dir: Path, host_slot: str) -> SettingsManager:
     settings = SettingsManager()
+    settings.qs = QtCore.QSettings(
+        str(tmp_path / f"{name}.qsettings.ini"),
+        QtCore.QSettings.Format.IniFormat,
+    )
     settings.qs.clear()
     settings.qs.setValue("paths/data", str(tmp_path / name))
     settings.set_sync_mode("file")
@@ -49,9 +61,10 @@ def test_cloud_conflict_filename_filter_and_host_sanitization():
     assert is_cloud_conflict_filename("profiprompt@MAC.json", expected_host="MAC") is False
     assert is_cloud_conflict_filename("profiprompt-browser@EDGE.json", expected_host="EDGE") is False
 
-    # A7 conflict copies & temporary files must be ignored
-    assert is_cloud_conflict_filename("promptboard@PC1-LAPTOP.json", expected_host="PC1") is True
+    # Conflict copies & temporary files must be ignored
+    assert is_cloud_conflict_filename("promptboard@PC1-PEER.json", expected_host="PC1") is True
     assert is_cloud_conflict_filename("promptboard@PC1 (conflicted copy).json") is True
+    assert is_cloud_conflict_filename("promptboard@PC1_conflict-20261126-120000.json") is True
     assert is_cloud_conflict_filename("promptboard@PC1.sync-conflict-20261126.json") is True
     assert is_cloud_conflict_filename("promptboard@PC1 (1).json") is True
     assert is_cloud_conflict_filename(".promptboard@PC1.tmp") is True
@@ -83,7 +96,7 @@ def test_two_hosts_single_writer_sync_and_conflict_copy_ignored(tmp_path):
     assert slot_a_doc["manifest"]["item_count"] == 1
     assert len(slot_a_doc["items"]) == 1
 
-    # Drop a simulated OneDrive conflict copy in HOST-A folder — must be ignored
+    # Drop a simulated cloud conflict copy in HOST-A folder — must be ignored
     conflict_copy = sync_dir / "promptboard" / "HOST-A" / "promptboard@HOST-A-OTHERPC.json"
     conflict_copy.write_text(
         json.dumps({"items": [item_to_dict(_make_item("id-ghost", "GHOST", "Must not load"))]}),
@@ -215,7 +228,7 @@ def test_file_slot_three_way_conflict_and_resolution(tmp_path):
 def test_file_slot_cross_app_profiprompt_and_browser_readonly_import(tmp_path):
     sync_dir = tmp_path / "cloud_sync"
 
-    pp_slot = sync_dir / "profiprompt" / "WORKSTATION" / "profiprompt@WORKSTATION.json"
+    pp_slot = sync_dir / "profiprompt" / "PEER-WORKSTATION" / "profiprompt@PEER-WORKSTATION.json"
     pp_slot.parent.mkdir(parents=True)
     pp_slot.write_text(
         json.dumps(
@@ -236,7 +249,7 @@ def test_file_slot_cross_app_profiprompt_and_browser_readonly_import(tmp_path):
         encoding="utf-8",
     )
 
-    br_slot = sync_dir / "profiprompt-browser" / "EDGE-WORK" / "profiprompt-browser@EDGE-WORK.json"
+    br_slot = sync_dir / "profiprompt-browser" / "BROWSER-A" / "profiprompt-browser@BROWSER-A.json"
     br_slot.parent.mkdir(parents=True)
     br_slot.write_text(
         json.dumps(
@@ -256,7 +269,7 @@ def test_file_slot_cross_app_profiprompt_and_browser_readonly_import(tmp_path):
         encoding="utf-8",
     )
 
-    settings = _make_settings(tmp_path, "pb_cross", sync_dir, "ASUS-HOST")
+    settings = _make_settings(tmp_path, "pb_cross", sync_dir, "HOST-LOCAL")
     storage = Storage(settings.get_data_path())
     engine = SyncEngine(storage, settings)
 
@@ -280,14 +293,14 @@ def test_file_slot_cross_app_profiprompt_and_browser_readonly_import(tmp_path):
 
 def test_settings_dialog_file_mode_ui_and_slot_table(qapp, tmp_path):
     sync_dir = tmp_path / "cloud_sync"
-    peer_slot = sync_dir / "promptboard" / "MAC-STUDIO" / "promptboard@MAC-STUDIO.json"
+    peer_slot = sync_dir / "promptboard" / "NODE-SYNC" / "promptboard@NODE-SYNC.json"
     peer_slot.parent.mkdir(parents=True)
     peer_slot.write_text(
-        json.dumps({"items": [item_to_dict(_make_item("m1", "MAC PROMPT", "Hello"))]}),
+        json.dumps({"items": [item_to_dict(_make_item("m1", "NODE PROMPT", "Hello"))]}),
         encoding="utf-8",
     )
 
-    settings = _make_settings(tmp_path, "ui_data", sync_dir, "LAPTOP-1")
+    settings = _make_settings(tmp_path, "ui_data", sync_dir, "HOST-1")
     storage = Storage(settings.get_data_path())
     engine = SyncEngine(storage, settings)
 
@@ -298,7 +311,7 @@ def test_settings_dialog_file_mode_ui_and_slot_table(qapp, tmp_path):
         assert dlg.sync_file_container.isHidden() is False
         assert dlg.sync_server_container.isHidden() is True
         assert dlg.sync_file_slots_table.rowCount() == 1
-        assert dlg.sync_file_slots_table.item(0, 0).text() == "MAC-STUDIO"
+        assert dlg.sync_file_slots_table.item(0, 0).text() == "NODE-SYNC"
         assert dlg.run_test_file_connection() is True
         outcome = dlg.run_sync_now()
         assert outcome is not None
@@ -318,3 +331,273 @@ def test_file_slot_backend_direct_push_incremental(tmp_path):
     doc = json.loads(backend.own_slot_path().read_text(encoding="utf-8"))
     assert doc["manifest"]["deleted_ids"] == ["old-1"]
     assert doc["items"][0]["id"] == "d1"
+
+
+def test_file_slot_symlink_containment_and_own_slot_guard(tmp_path, monkeypatch):
+    sync_dir = tmp_path / "cloud_sync"
+    sync_dir.mkdir()
+    outside_secret = tmp_path / "secret_outside.json"
+    outside_secret.write_text(
+        json.dumps({"items": [item_to_dict(_make_item("sec-1", "SECRET", "Leak"))]}),
+        encoding="utf-8",
+    )
+
+    peer_dir = sync_dir / "promptboard" / "PEER-SYM"
+    peer_dir.mkdir(parents=True)
+    peer_link = peer_dir / "promptboard@PEER-SYM.json"
+
+    symlink_created = False
+    try:
+        os.symlink(outside_secret, peer_link)
+        symlink_created = True
+    except OSError:
+        # Windows without Developer Mode / elevated symlink privilege: simulate symlink detection via helper hook
+        peer_link.write_text(outside_secret.read_text(encoding="utf-8"), encoding="utf-8")
+        orig_check = sync_backend._is_symlink_or_junction
+        monkeypatch.setattr(
+            sync_backend,
+            "_is_symlink_or_junction",
+            lambda p: True if Path(p).name == "promptboard@PEER-SYM.json" else orig_check(p),
+        )
+
+    backend = FileSlotBackend(sync_dir=sync_dir, host_slot="HOST-SAFE")
+    assert backend.discover_slots() == []
+    pull_res = backend.pull()
+    assert pull_res.offline is False
+    assert pull_res.upserts == []
+
+    # Own slot symlink/junction protection
+    own_dir = backend.own_slot_dir()
+    own_dir.mkdir(parents=True, exist_ok=True)
+    own_path = backend.own_slot_path()
+    outside_target = tmp_path / "outside_write_target.json"
+    if symlink_created:
+        os.symlink(outside_target, own_path)
+    else:
+        monkeypatch.setattr(
+            sync_backend,
+            "_is_symlink_or_junction",
+            lambda p: Path(p).name == own_path.name,
+        )
+
+    with pytest.raises(SyncTransportError):
+        backend.write_own_slot([_make_item("x1", "SAFE", "No escape")])
+    assert not outside_target.exists()
+    assert backend.test_connection().ok is False
+    assert backend.push([], all_items=[_make_item("x1", "SAFE", "No escape")]).queued_offline is True
+
+
+def test_file_slot_target_switch_persists_active_target_and_isolates_server_snapshot(tmp_path):
+    sync_dir = tmp_path / "cloud_sync"
+    peer_slot = sync_dir / "promptboard" / "PEER-SW" / "promptboard@PEER-SW.json"
+    peer_slot.parent.mkdir(parents=True)
+    peer_slot.write_text(
+        json.dumps({"items": [item_to_dict(_make_item("shared-1", "SHARED", "Peer version"))]}),
+        encoding="utf-8",
+    )
+
+    settings = _make_settings(tmp_path, "switch_data", sync_dir, "HOST-SW")
+    server_url = "http://127.0.0.1:8765"
+    server_target = format_coupling_target(server_url, "promptboard")
+    file_target = format_file_coupling_target(str(sync_dir), "HOST-SW")
+
+    settings.set_sync_mode("server")
+    settings.set_sync_server_url(server_url)
+    settings.set_sync_namespace("promptboard")
+    storage = Storage(settings.get_data_path())
+    storage.save_items([_make_item("shared-1", "SHARED", "Local edited")])
+
+    engine = SyncEngine(storage, settings)
+    srv_state = engine.state_store.load()
+    srv_state.mode = "server"
+    srv_state.active_target = server_target
+    srv_state.coupled_targets = [server_target]
+    srv_state.library_rev = 42
+    srv_state.item_revs = {make_object_key("item", "shared-1"): 42}
+    srv_state.item_hashes = {make_object_key("item", "shared-1"): "old-server-hash"}
+    engine.state_store.save(srv_state)
+
+    # Switch to file mode and sync
+    settings.set_sync_mode("file")
+    outcome = engine.sync_once()
+    assert outcome.ok is True
+    assert outcome.conflict_count == 1
+
+    post_state = engine.state_store.load()
+    assert post_state.mode == "file"
+    assert post_state.active_target == file_target
+    assert file_target in post_state.coupled_targets
+    assert server_target in post_state.target_snapshots
+    assert post_state.target_snapshots[server_target]["library_rev"] == 42
+    assert post_state.library_rev == 0
+    assert post_state.item_revs == {}
+
+    # Conflict resolution pushes cleanly to own file slot because active_target was persisted
+    engine.resolve_conflict("shared-1", "keep_local")
+    assert engine.get_conflicts() == []
+    own_doc = json.loads(
+        (sync_dir / "promptboard" / "HOST-SW" / "promptboard@HOST-SW.json").read_text(encoding="utf-8")
+    )
+    assert own_doc["items"][0]["content"] == "Local edited"
+
+
+def test_file_slot_size_cap_flat_host_check_and_malformed_item_isolation(tmp_path, monkeypatch):
+    sync_dir = tmp_path / "cloud_sync"
+    sync_dir.mkdir()
+
+    # 1) Valid structured slot with malformed scalar fields mixed alongside a clean item
+    bad_peer = sync_dir / "promptboard" / "PEER-MIXED" / "promptboard@PEER-MIXED.json"
+    bad_peer.parent.mkdir(parents=True)
+    bad_peer.write_text(
+        json.dumps(
+            {
+                "manifest": {"app": "promptboard", "host": "PEER-MIXED", "item_count": True},
+                "items": [
+                    {"id": 100, "name": "NUMERIC ID AND CAT", "content": "OK", "category": 456, "source": 789, "tags": {"x": 1}},
+                    {"id": ["invalid-list"], "name": "SKIPPED"},
+                    item_to_dict(_make_item("good-1", "GOOD", "Still imports")),
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    # Direct item_from_dict regression guard for malformed non-string scalar fields
+    coerced = item_from_dict({"id": 77, "name": "TEST", "content": "C", "category": 123, "source": False})
+    assert coerced.id == "77"
+    assert coerced.category == "123"
+
+    # 2) Flat file whose manifest.host mismatches filename host (unsuffixed conflict copy)
+    flat_mismatch = sync_dir / "promptboard@HOST-BADCOPY.json"
+    flat_mismatch.write_text(
+        json.dumps(
+            {
+                "manifest": {"app": "promptboard", "host": "HOST"},
+                "items": [item_to_dict(_make_item("ghost-flat", "GHOST", "Must skip"))],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    # 3) Oversized file slot exceeding limit
+    monkeypatch.setattr(sync_backend, "MAX_SLOT_FILE_BYTES", 512)
+    oversized = sync_dir / "promptboard" / "PEER-HUGE" / "promptboard@PEER-HUGE.json"
+    oversized.parent.mkdir(parents=True)
+    oversized.write_text(
+        json.dumps({"items": [item_to_dict(_make_item("huge-1", "HUGE", "X" * 2048))]}),
+        encoding="utf-8",
+    )
+
+    settings = _make_settings(tmp_path, "mixed_data", sync_dir, "HOST-MAIN")
+    storage = Storage(settings.get_data_path())
+    engine = SyncEngine(storage, settings)
+
+    discovered = engine.discover_file_slots()
+    assert [s.slot_key for s in discovered] == ["promptboard:peer-mixed"]
+    assert discovered[0].item_count == 3  # bool manifest item_count=True ignored safely
+
+    outcome = engine.sync_once()
+    assert outcome.ok is True
+    loaded = {it.id: it for it in storage.load_items()}
+    assert "good-1" in loaded
+    assert "100" in loaded
+    assert loaded["100"].category == "456"
+    assert "ghost-flat" not in loaded
+    assert "huge-1" not in loaded
+
+
+def test_file_slot_tombstone_propagation_and_conflict_protection(tmp_path):
+    sync_dir = tmp_path / "cloud_sync"
+    sync_dir.mkdir()
+
+    settings_a = _make_settings(tmp_path, "host_a", sync_dir, "HOST-A")
+    storage_a = Storage(settings_a.get_data_path())
+    storage_a.save_items(
+        [
+            _make_item("del-clean", "DEL CLEAN", "Shared v1"),
+            _make_item("del-dirty", "DEL DIRTY", "Shared v1"),
+            _make_item("del-take", "DEL TAKE", "Shared v1"),
+        ]
+    )
+    engine_a = SyncEngine(storage_a, settings_a)
+    assert engine_a.sync_once().ok is True
+
+    settings_b = _make_settings(tmp_path, "host_b", sync_dir, "HOST-B")
+    storage_b = Storage(settings_b.get_data_path())
+    engine_b = SyncEngine(storage_b, settings_b)
+    assert engine_b.sync_once().pulled_upserts == 3
+
+    # Host A deletes all three items and writes manifest.deleted_ids
+    storage_a.save_items([])
+    engine_a.enqueue_delete("del-clean")
+    engine_a.enqueue_delete("del-dirty")
+    engine_a.enqueue_delete("del-take")
+    assert engine_a.sync_once().ok is True
+
+    # Host B leaves del-clean untouched, edits del-dirty & del-take locally
+    dirty = storage_b.get_item("del-dirty")
+    dirty.content = "Important local work on B"
+    storage_b.upsert_item(dirty)
+    take = storage_b.get_item("del-take")
+    take.content = "Disposable edit on B"
+    storage_b.upsert_item(take)
+
+    out_b = engine_b.sync_once()
+    assert out_b.ok is True
+    assert out_b.pulled_tombstones == 1
+    assert out_b.conflict_count == 2
+    assert storage_b.get_item("del-clean") is None
+    assert storage_b.get_item("del-dirty") is not None
+    assert all(c.server_deleted is True for c in engine_b.get_conflicts())
+
+    # Keep local on del-dirty, accept remote deletion on del-take
+    engine_b.resolve_conflict("del-dirty", "keep_local")
+    engine_b.resolve_conflict("del-take", "take_server")
+    assert engine_b.get_conflicts() == []
+    assert storage_b.get_item("del-take") is None
+
+    # A stale 3rd peer still advertising del-clean must NOT resurrect it after Host B recorded the tombstone
+    stale_c = sync_dir / "promptboard" / "HOST-C" / "promptboard@HOST-C.json"
+    stale_c.parent.mkdir(parents=True)
+    stale_c.write_text(
+        json.dumps(
+            {
+                "manifest": {"app": "promptboard", "host": "HOST-C", "updated_at": "2020-01-01T00:00:00Z"},
+                "items": [item_to_dict(_make_item("del-clean", "DEL CLEAN", "Stale ghost"))],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    out_b2 = engine_b.sync_once()
+    assert out_b2.ok is True
+    assert out_b2.conflict_count == 0
+    assert storage_b.get_item("del-dirty") is not None
+    assert storage_b.get_item("del-clean") is None
+    assert storage_b.get_item("del-take") is None
+
+
+def test_file_slot_flush_and_sync_do_not_hold_locks_during_push(tmp_path, monkeypatch):
+    sync_dir = tmp_path / "cloud_sync"
+    settings = _make_settings(tmp_path, "lock_data", sync_dir, "HOST-LOCK")
+    storage = Storage(settings.get_data_path())
+    storage.save_items([_make_item("l1", "LOCK CHECK", "Body")])
+    engine = SyncEngine(storage, settings)
+
+    lock_held_during_push: list[bool] = []
+    orig_write = FileSlotBackend.write_own_slot
+
+    def wrapped_write(self, items, *, deleted_ids=None):
+        acquired = engine._state_lock.acquire(blocking=False)
+        if acquired:
+            engine._state_lock.release()
+        lock_held_during_push.append(not acquired)
+        return orig_write(self, items, deleted_ids=deleted_ids)
+
+    monkeypatch.setattr(FileSlotBackend, "write_own_slot", wrapped_write)
+    assert engine.flush_pending().queued_offline is False
+    assert lock_held_during_push == [False]
+    state = engine.state_store.load()
+    assert make_object_key("item", "l1") in state.item_hashes
+    assert engine.sync_once().ok is True
+    assert lock_held_during_push == [False, False]

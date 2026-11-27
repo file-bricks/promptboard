@@ -237,9 +237,13 @@ def load_profiprompt_export_payload(payload: dict[str, Any]) -> list[LibraryItem
     for prompt in prompts:
         if not isinstance(prompt, dict):
             continue
-        prompt_id = str(prompt.get("id", "")).strip()
-        board_titles = board_titles_by_prompt_id.get(prompt_id, [])
-        items.append(_map_prompt(prompt, board_titles))
+        try:
+            raw_pid = prompt.get("id", "")
+            prompt_id = str(raw_pid).strip() if isinstance(raw_pid, (str, int, float)) and not isinstance(raw_pid, bool) else ""
+            board_titles = board_titles_by_prompt_id.get(prompt_id, [])
+            items.append(_map_prompt(prompt, board_titles))
+        except (TypeError, ValueError, AttributeError, KeyError, OverflowError) as exc:
+            logger.warning("ProfiPrompt-Eintrag wurde wegen ungültiger Struktur übersprungen: %s", exc)
 
     items.sort(
         key=lambda item: (

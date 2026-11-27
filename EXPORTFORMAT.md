@@ -101,8 +101,11 @@ sowie Cross-App-Slots von ProfiPrompt (`profiprompt/<HOST>/profiprompt@<HOST>.js
 und ProfiPrompt-Browser (`profiprompt-browser/<SLOT>/profiprompt-browser@<SLOT>.json`)
 werden ausschließlich lesend erkannt und je Slot nach konfigurierter Regel
 (`never`, `once`, `on_start`) nicht-destruktiv mit Drei-Wege-Konflikterkennung
-zusammengeführt. Cloud-Konfliktkopien (`*conflicted copy*`, `*.sync-conflict-*`,
-`*-<HOST>.json`, `* (1).json`) und temporäre Dateien werden automatisch ignoriert.
+zusammengeführt. Löschungen über `manifest.deleted_ids` werden zwischen
+PromptBoard-Slots als Tombstones abgeglichen (lokal geänderte Einträge bleiben als
+Konflikt geschützt). Cloud-Konfliktkopien (`*conflicted copy*`, `*_conflict-*`,
+`*.sync-conflict-*`, `*-<HOST>.json`, `* (1).json`) und temporäre Dateien werden
+automatisch ignoriert.
 
 ## Datenschutzgrenze
 

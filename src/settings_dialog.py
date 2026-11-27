@@ -476,6 +476,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self._worker_pool = QtCore.QThreadPool()
         self._worker_pool.setMaxThreadCount(1)
         self._active_runnables: set[_DialogWorkerRunnable] = set()
+        self._initializing = True
 
         self.setWindowTitle(tr("settings.title"))
         self.resize(640, 580)
@@ -484,6 +485,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self._build_ui()
         self._connect_signals()
         self._refresh_sync_visibility_and_status()
+        self._initializing = False
 
     def _get_or_create_sync_engine(self) -> SyncEngine:
         if self._sync_engine is None:
@@ -900,12 +902,7 @@ class SettingsDialog(QtWidgets.QDialog):
             self.sync_file_dir_edit.setText(new_path)
             self._persist_file_sync_fields()
 
-    def refresh_file_slots_table(self) -> List[ForeignSlotInfo]:
-        engine = self._get_or_create_sync_engine()
-        slots = engine.discover_file_slots(
-            sync_dir=self.sync_file_dir_edit.text().strip(),
-            host_slot=self.sync_file_host_edit.text().strip(),
-        )
+    def _populate_file_slots_table(self, slots: List[ForeignSlotInfo]) -> None:
         self.sync_file_slots_table.setRowCount(len(slots))
         is_file = (self.sync_mode_combo.currentData() or self.settings.get_sync_mode()) == "file"
         combo_focus = (
@@ -930,6 +927,31 @@ class SettingsDialog(QtWidgets.QDialog):
                 )
             )
             self.sync_file_slots_table.setCellWidget(row, 3, mode_combo)
+
+    def refresh_file_slots_table(self, *, offload: Optional[bool] = None) -> List[ForeignSlotInfo]:
+        engine = self._get_or_create_sync_engine()
+        sync_dir = self.sync_file_dir_edit.text().strip()
+        host_slot = self.sync_file_host_edit.text().strip()
+        use_worker = (not self._initializing) if offload is None else offload
+        if use_worker:
+            self.sync_file_rescan_button.setEnabled(False)
+            try:
+                slots = self._run_in_worker_pool(
+                    lambda: engine.discover_file_slots(
+                        sync_dir=sync_dir,
+                        host_slot=host_slot,
+                    )
+                )
+            finally:
+                self.sync_file_rescan_button.setEnabled(True)
+            if slots is None:
+                slots = []
+        else:
+            slots = engine.discover_file_slots(
+                sync_dir=sync_dir,
+                host_slot=host_slot,
+            )
+        self._populate_file_slots_table(slots)
         return slots
 
     def _on_file_slot_mode_changed(self, slot_key: str, mode: str) -> None:
@@ -939,12 +961,32 @@ class SettingsDialog(QtWidgets.QDialog):
     def run_test_file_connection(self) -> bool:
         self._persist_file_sync_fields()
         engine = self._get_or_create_sync_engine()
-        status = engine.test_connection(
-            mode="file",
-            sync_dir=self.sync_file_dir_edit.text().strip(),
-            host_slot=self.sync_file_host_edit.text().strip(),
-        )
-        self.refresh_file_slots_table()
+        sync_dir = self.sync_file_dir_edit.text().strip()
+        host_slot = self.sync_file_host_edit.text().strip()
+        self.sync_file_test_button.setEnabled(False)
+        self.sync_file_rescan_button.setEnabled(False)
+
+        def _probe_and_discover():
+            probe_status = engine.test_connection(
+                mode="file",
+                sync_dir=sync_dir,
+                host_slot=host_slot,
+            )
+            found_slots = engine.discover_file_slots(
+                sync_dir=sync_dir,
+                host_slot=host_slot,
+            )
+            return probe_status, found_slots
+
+        try:
+            result = self._run_in_worker_pool(_probe_and_discover)
+        finally:
+            self.sync_file_test_button.setEnabled(True)
+            self.sync_file_rescan_button.setEnabled(True)
+        if result is None:
+            return False
+        status, slots = result
+        self._populate_file_slots_table(slots)
         if status.ok:
             self.sync_status_label.setText(
                 tr(

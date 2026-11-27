@@ -33,6 +33,8 @@ class ItemType(str, Enum):
     def from_value(cls, value: str | ItemType) -> ItemType:
         if isinstance(value, cls):
             return value
+        if value is None or isinstance(value, (bool, dict, list, tuple, set)):
+            return cls.PROMPT
         normalized = str(value).strip().upper().replace("-", "_").replace(" ", "_")
         if normalized == "ROLE":
             normalized = "ROLLE"
@@ -46,6 +48,18 @@ class ItemType(str, Enum):
         return [item.value for item in cls]
 
 
+def _coerce_scalar_text(value: Any, fallback: str = "") -> str:
+    if value is None:
+        return fallback
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bool) or isinstance(value, (dict, list, tuple, set)):
+        return fallback
+    if isinstance(value, (int, float)):
+        return str(value)
+    return fallback
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -55,12 +69,12 @@ def gen_id() -> str:
 
 
 def normalize_name(name: str) -> str:
-    raw = "" if name is None else str(name)
+    raw = _coerce_scalar_text(name)
     return " ".join(raw.split()).upper()
 
 
 def parse_tags(raw: str | Iterable[str] | None) -> List[str]:
-    if raw is None:
+    if raw is None or isinstance(raw, dict):
         return []
     if isinstance(raw, str):
         values = raw.split(",")
@@ -73,7 +87,7 @@ def parse_tags(raw: str | Iterable[str] | None) -> List[str]:
     for value in values:
         if value is None:
             continue
-        tag = str(value).strip()
+        tag = _coerce_scalar_text(value).strip()
         if not tag:
             continue
         key = tag.casefold()
@@ -113,11 +127,19 @@ class LibraryItem:
     updated_at: str = field(default_factory=now_iso)
 
     def __post_init__(self) -> None:
+        coerced_id = _coerce_scalar_text(self.id).strip()
+        if coerced_id:
+            self.id = coerced_id
+        elif not isinstance(self.id, str):
+            self.id = gen_id()
         self.item_type = ItemType.from_value(self.item_type)
-        self.name = normalize_name(self.name)
-        self.category = self.category.strip()
-        self.source = self.source.strip()
+        self.name = normalize_name(_coerce_scalar_text(self.name))
+        self.content = _coerce_scalar_text(self.content)
+        self.category = _coerce_scalar_text(self.category).strip()
+        self.source = _coerce_scalar_text(self.source).strip()
         self.tags = parse_tags(self.tags)
+        self.created_at = _coerce_scalar_text(self.created_at).strip() or now_iso()
+        self.updated_at = _coerce_scalar_text(self.updated_at).strip() or now_iso()
 
     def to_dict(self) -> Dict[str, Any]:
         return {
