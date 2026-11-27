@@ -318,6 +318,7 @@ def test_settings_dialog_file_mode_ui_and_slot_table(qapp, tmp_path):
         assert outcome.ok is True
         assert len(storage.load_items()) == 1
     finally:
+        dlg.shutdown_workers(timeout_ms=2000)
         dlg.close()
 
 
@@ -371,20 +372,48 @@ def test_file_slot_symlink_containment_and_own_slot_guard(tmp_path, monkeypatch)
     own_dir.mkdir(parents=True, exist_ok=True)
     own_path = backend.own_slot_path()
     outside_target = tmp_path / "outside_write_target.json"
-    if symlink_created:
-        os.symlink(outside_target, own_path)
-    else:
-        monkeypatch.setattr(
-            sync_backend,
-            "_is_symlink_or_junction",
-            lambda p: Path(p).name == own_path.name,
-        )
+    with monkeypatch.context() as mp:
+        if symlink_created:
+            os.symlink(outside_target, own_path)
+        else:
+            own_path.write_text("{}", encoding="utf-8")
+            mp.setattr(
+                sync_backend,
+                "_is_symlink_or_junction",
+                lambda p: Path(p).name == own_path.name,
+            )
 
-    with pytest.raises(SyncTransportError):
-        backend.write_own_slot([_make_item("x1", "SAFE", "No escape")])
-    assert not outside_target.exists()
-    assert backend.test_connection().ok is False
-    assert backend.push([], all_items=[_make_item("x1", "SAFE", "No escape")]).queued_offline is True
+        with pytest.raises(SyncTransportError):
+            backend.write_own_slot([_make_item("x1", "SAFE", "No escape")])
+        assert not outside_target.exists()
+        assert backend.test_connection().ok is False
+        assert backend.push([], all_items=[_make_item("x1", "SAFE", "No escape")]).queued_offline is True
+
+    # Real Windows directory junction test (works without elevation on NTFS)
+    if os.name == "nt":
+        import subprocess
+
+        junc_outside = tmp_path / "junction_outside"
+        junc_outside.mkdir()
+        junc_peer_dir = sync_dir / "promptboard" / "PEER-JUNC"
+        mk = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(junc_peer_dir), str(junc_outside)],
+            capture_output=True,
+            text=True,
+        )
+        if mk.returncode == 0:
+            try:
+                (junc_outside / "promptboard@PEER-JUNC.json").write_text(
+                    json.dumps({"items": [item_to_dict(_make_item("j1", "JUNCTION", "Outside"))]}),
+                    encoding="utf-8",
+                )
+                assert "promptboard:peer-junc" not in [s.slot_key for s in backend.discover_slots()]
+                assert backend.pull().upserts == []
+            finally:
+                try:
+                    junc_peer_dir.rmdir()
+                except OSError:
+                    pass
 
 
 def test_file_slot_target_switch_persists_active_target_and_isolates_server_snapshot(tmp_path):
