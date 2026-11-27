@@ -276,12 +276,12 @@ def test_server_url_and_namespace_validation():
 def test_file_slot_backend_stub_ready_for_stage3():
     backend = create_sync_backend("file")
     assert isinstance(backend, FileSlotBackend)
-    with pytest.raises(NotImplementedError):
-        backend.pull()
-    with pytest.raises(NotImplementedError):
-        backend.push([])
-    with pytest.raises(NotImplementedError):
-        backend.test_connection()
+    status = backend.test_connection()
+    assert status.ok is False
+    pull_res = backend.pull()
+    assert pull_res.offline is True
+    push_res = backend.push([])
+    assert push_res.queued_offline is True
 
 
 # ---------------------------------------------------------------------------

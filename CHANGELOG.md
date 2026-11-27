@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an PromptBoard werden hier dokumentiert.
 
 ## [Unreleased]
 
+### Optionale Dateibasierte Host-Slot-Synchronisierung (Stage 3)
+
+- **`FileSlotBackend` (`src/sync_backend.py`)**: Single-Writer-Dateimodus (`<sync_dir>/promptboard/<HOST>/promptboard@<HOST>.json`) mit atomarem Schreiben und additivem `"manifest"`, A7-Konfliktkopien-Filter (`*conflicted copy*`, `*.sync-conflict-*`, Host-Suffix-Abweichungen, Temp-Dateien), konfigurierbarer Import-Regel je fremdem Slot (`never`, `once`, `on_start`), lokaler `deleted_ids`-Sperrliste gegen Geister-Wiederauferstehung, nicht-destruktivem Drei-Wege-Merge inkl. Konfliktliste sowie lesender Cross-App-Erkennung von `profiprompt@<HOST>.json` und `profiprompt-browser@<SLOT>.json` über `src/profiprompt_adapter.py`.
+- **Einstellungen, Trigger & 6-Sprachen-Parität (`src/settings_manager.py`, `src/settings_dialog.py`, `src/promptboard.py`, `src/i18n.py`, `locales/translations.json`)**: Sync-Modus `Dateibasiert` im Einstellungsdialog mit Ordner-Auswahl, eigenem Host-Slot, Fremd-Slot-Tabelle, „Ordner prüfen“/„Slots neu scannen“/„Jetzt synchronisieren“, sauberer Tab-Order-Kapselung für `off`/`server`/`file` sowie Start-, Debounce-, Intervall- und `aboutToQuit`-Abgleich.
+
 - Bengalische und portugiesische README ergänzt; alle elf Dokumentationssprachen reziprok verlinkt und im llms.txt-Index aufgeführt. Die App-UI bleibt bei DE/EN/ES/ZH/JA/RU (2026-11-03).
 - Französische, Hindi- und arabische README ergänzt, in allen vorhandenen README-Sprachwahlen verlinkt und im Dokumentationsindex `llms.txt` eingetragen. Die Laufzeitsprachen bleiben unverändert (2026-11-02).
 

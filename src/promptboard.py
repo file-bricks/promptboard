@@ -1175,7 +1175,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # ------------------------------------------------------------ synchronization
 
     def _configure_sync_timers(self) -> None:
-        if self.settings.get_sync_mode() == "server" and self.sync_engine.is_configured():
+        if self.settings.get_sync_mode() in ("server", "file") and self.sync_engine.is_configured():
             interval_ms = self.settings.get_sync_interval_seconds() * 1000
             if not self.sync_interval_timer.isActive() or self.sync_interval_timer.interval() != interval_ms:
                 self.sync_interval_timer.start(interval_ms)
@@ -1184,7 +1184,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.sync_debounce_timer.stop()
 
     def _notify_local_upsert(self, items: List[LibraryItem]) -> None:
-        if self.settings.get_sync_mode() != "server":
+        if self.settings.get_sync_mode() not in ("server", "file"):
             return
         for item in items:
             self.sync_engine.enqueue_upsert(item)
@@ -1192,7 +1192,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.sync_debounce_timer.start()
 
     def _notify_local_delete(self, item_id: str) -> None:
-        if self.settings.get_sync_mode() != "server":
+        if self.settings.get_sync_mode() not in ("server", "file"):
             return
         self.sync_engine.enqueue_delete(item_id)
         if self.sync_engine.is_configured() and not self._shutting_down:
@@ -1296,7 +1296,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 tr("sync.status.offline_pending", count=outcome.pending_queue_count)
             )
         elif outcome.ok:
-            self.status_label.setText(tr("sync.status.synced", rev=outcome.library_rev))
+            if outcome.mode == "file":
+                self.status_label.setText(
+                    tr("sync.status.file_synced", count=outcome.pushed_count)
+                )
+            else:
+                self.status_label.setText(tr("sync.status.synced", rev=outcome.library_rev))
         elif outcome.error:
             self.status_label.setText(tr("sync.status.test_failed", detail=outcome.error))
 
@@ -1371,7 +1376,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """Schedule non-blocking synchronization on QThreadPool; delivers results via signals."""
         if self._shutting_down or self._quit_sync_done:
             return False
-        if self.settings.get_sync_mode() != "server" or not self.sync_engine.is_configured():
+        if self.settings.get_sync_mode() not in ("server", "file") or not self.sync_engine.is_configured():
             return False
         self.save_current_item()
         if self._sync_in_progress:
@@ -1384,7 +1389,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def run_sync(self, *, interactive: bool = False) -> SyncOutcome:
         """Run sync via QThreadPool worker while keeping the GUI event loop responsive."""
         mode = self.settings.get_sync_mode()
-        if mode != "server":
+        if mode not in ("server", "file"):
             return SyncOutcome(ok=True, mode=mode)
         self.save_current_item()
         if not self.sync_engine.is_configured():
@@ -1414,7 +1419,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def sync_on_start(self, *, interactive: bool = False) -> Optional[SyncOutcome]:
         """Kick off non-blocking startup pull in QThreadPool without delaying window.show()."""
-        if self.settings.get_sync_mode() != "server" or not self.sync_engine.is_configured():
+        if self.settings.get_sync_mode() not in ("server", "file") or not self.sync_engine.is_configured():
             return None
         self.start_sync(interactive=interactive)
         return None
@@ -1456,9 +1461,12 @@ class MainWindow(QtWidgets.QMainWindow):
         pool_drain_reserve_s = 0.35
         try:
             if (
-                self.settings.get_sync_mode() == "server"
+                self.settings.get_sync_mode() in ("server", "file")
                 and self.sync_engine.is_configured()
-                and self.sync_engine.get_pending_count() > 0
+                and (
+                    self.settings.get_sync_mode() == "file"
+                    or self.sync_engine.get_pending_count() > 0
+                )
             ):
                 flush_budget = internal_deadline - time.monotonic() - pool_drain_reserve_s
                 if flush_budget >= 0.25:
